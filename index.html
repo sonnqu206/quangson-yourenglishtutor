@@ -155,86 +155,94 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- Sidebar Navigation (Desktop) -->
-  <aside class="hidden md:flex flex-col h-screen w-72 bg-surface-container-lowest border-r border-outline-variant/30 ambient-shadow fixed left-0 top-0 bottom-0 p-5 z-40">
+  <!-- Mobile Backdrop Overlay -->
+  <div id="sidebar-backdrop" onclick="App.closeMobileSidebar()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 lg:hidden hidden transition-opacity duration-300 opacity-0"></div>
+
+  <!-- Sidebar Navigation (Desktop Fixed & Mobile Slide-over Drawer) -->
+  <aside id="app-sidebar" class="fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-surface-container-lowest border-r border-outline-variant/30 ambient-shadow flex flex-col p-5 -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out h-full overflow-hidden">
     
-    <!-- Logo & Brand Header -->
-    <div class="flex items-center gap-3 mb-6 px-2">
-      <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary flex items-center justify-center font-bold text-xl shadow-md">
-        <span class="material-symbols-outlined text-2xl">school</span>
+    <!-- Logo & Brand Header with Close button for Mobile -->
+    <div class="flex items-center justify-between mb-5 px-1 shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary flex items-center justify-center font-bold text-xl shadow-md">
+          <span class="material-symbols-outlined text-2xl">school</span>
+        </div>
+        <div>
+          <h1 class="font-headline-md text-base font-bold text-primary leading-tight">Quang Son</h1>
+          <p class="font-label-sm text-[11px] font-semibold text-secondary">Your English Tutor</p>
+        </div>
       </div>
-      <div>
-        <h1 class="font-headline-md text-base font-bold text-primary leading-tight">Quang Son</h1>
-        <p class="font-label-sm text-xs font-semibold text-secondary">Your English Tutor</p>
-      </div>
+      <button onclick="App.closeMobileSidebar()" class="lg:hidden p-2 rounded-xl text-outline hover:text-on-surface hover:bg-surface-container transition-colors" title="Đóng menu">
+        <span class="material-symbols-outlined text-xl">close</span>
+      </button>
     </div>
 
     <!-- Quick Action: Open Batch Table Input (Admin/Teacher Only) -->
-    <button id="sidebar-batch-btn" onclick="App.openBatchTableModal()" class="w-full bg-primary text-on-primary rounded-xl py-3 px-4 font-bold text-sm btn-press flex items-center justify-center gap-2 mb-5 hover-lift shadow-sm">
-      <span class="material-symbols-outlined text-lg">table_rows</span>
-      + Thêm Từ Dạng Bảng
+    <button id="sidebar-batch-btn" onclick="App.openBatchTableModal(); App.closeMobileSidebar();" class="w-full bg-primary text-on-primary rounded-xl py-2.5 px-4 font-bold text-xs btn-press flex items-center justify-center gap-2 mb-4 hover-lift shadow-sm shrink-0">
+      <span class="material-symbols-outlined text-base">table_rows</span>
+      <span>+ Thêm Từ Dạng Bảng</span>
     </button>
 
     <!-- Main Navigation Menu -->
-    <nav class="flex-1 space-y-1.5 overflow-y-auto pr-1">
+    <nav class="flex-1 space-y-1 overflow-y-auto pr-1 -mr-1">
       <p class="px-3 text-[11px] font-bold uppercase tracking-wider text-outline mb-1">Học Tập & Lớp Học</p>
       
-      <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" data-nav-tab="dashboard" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" data-nav-tab="dashboard" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">dashboard</span>
-        <span class="font-medium">Trang Chủ & Lớp Học</span>
+        <span>Trang Chủ & Lớp Học</span>
       </a>
 
-      <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" data-nav-tab="vocabulary" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" data-nav-tab="vocabulary" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">menu_book</span>
-        <span class="font-medium">Kho Từ Vựng (Lớp Em)</span>
+        <span>Kho Từ Vựng (Lớp Em)</span>
       </a>
 
       <!-- Admin-Only Management Links -->
-      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('classes')" data-nav-tab="classes" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('classes')" data-nav-tab="classes" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">groups</span>
-        <span class="font-medium">Lớp Học & Học Viên</span>
+        <span>Lớp Học & Học Viên</span>
       </a>
 
-      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('accounts')" data-nav-tab="accounts" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('accounts')" data-nav-tab="accounts" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">manage_accounts</span>
-        <span class="font-medium">Quản Lý & Cấp Tài Khoản</span>
+        <span>Quản Lý & Cấp Tài Khoản</span>
       </a>
 
-      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('lessons')" data-nav-tab="lessons" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('lessons')" data-nav-tab="lessons" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">auto_stories</span>
-        <span class="font-medium">Quản Lý Bài Học</span>
+        <span>Quản Lý Bài Học</span>
       </a>
 
-      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('table_input')" data-nav-tab="table_input" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('table_input')" data-nav-tab="table_input" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">table_rows</span>
-        <span class="font-medium">Bảng Nhập Từ Hàng Loạt</span>
+        <span>Bảng Nhập Từ Hàng Loạt</span>
       </a>
 
-      <p class="px-3 text-[11px] font-bold uppercase tracking-wider text-outline mt-5 mb-1">Góc Luyện Thi Vào 10</p>
+      <p class="px-3 text-[11px] font-bold uppercase tracking-wider text-outline mt-4 mb-1">Góc Luyện Thi Vào 10</p>
 
-      <a href="javascript:void(0)" onclick="App.switchTab('flashcards')" data-nav-tab="flashcards" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" onclick="App.switchTab('flashcards')" data-nav-tab="flashcards" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">style</span>
-        <span class="font-medium">Luyện Flashcard 3D</span>
+        <span>Luyện Flashcard 3D</span>
       </a>
 
-      <a href="javascript:void(0)" onclick="App.switchTab('quiz', { startNew: true, isRandom: true })" data-nav-tab="quiz" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" onclick="App.switchTab('quiz', { startNew: true, isRandom: true })" data-nav-tab="quiz" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">quiz</span>
-        <span class="font-medium">Bài Kiểm Tra (3 Dạng)</span>
+        <span>Bài Kiểm Tra (3 Dạng)</span>
       </a>
 
-      <a href="javascript:void(0)" onclick="App.switchTab('reports')" data-nav-tab="reports" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" onclick="App.switchTab('reports')" data-nav-tab="reports" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">analytics</span>
-        <span class="font-medium">Báo Cáo & Tiến Độ</span>
+        <span>Báo Cáo & Tiến Độ</span>
       </a>
 
-      <a href="javascript:void(0)" onclick="App.switchTab('tutor')" data-nav-tab="tutor" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+      <a href="javascript:void(0)" onclick="App.switchTab('tutor')" data-nav-tab="tutor" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">psychology</span>
-        <span class="font-medium">Gia Sư AI Quang Son</span>
+        <span>Gia Sư AI Quang Son</span>
       </a>
     </nav>
 
     <!-- Logged in User Profile & Logout in Sidebar -->
-    <div class="mt-auto pt-4 border-t border-outline-variant/30 space-y-2">
+    <div class="mt-auto pt-3 border-t border-outline-variant/30 space-y-2 shrink-0">
       <div id="sidebar-user-profile"></div>
 
       <div class="flex items-center justify-between px-2 text-xs">
@@ -249,43 +257,50 @@
   </aside>
 
   <!-- Main Content Wrapper -->
-  <div class="flex-1 flex flex-col md:ml-72 min-h-screen relative">
+  <div class="flex-1 flex flex-col lg:ml-72 min-h-screen relative pb-20 lg:pb-0">
     
     <!-- Top Bar -->
-    <header class="bg-surface-container-lowest/90 backdrop-blur-md sticky top-0 z-30 border-b border-outline-variant/30 px-margin-mobile md:px-margin-desktop py-3.5 flex items-center justify-between">
+    <header class="bg-surface-container-lowest/90 backdrop-blur-md sticky top-0 z-30 border-b border-outline-variant/30 px-3 sm:px-6 md:px-margin-desktop py-2.5 sm:py-3.5 flex items-center justify-between gap-2">
       
-      <!-- Mobile Brand Header -->
-      <div class="flex items-center gap-3 md:hidden">
-        <div class="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold">
-          <span class="material-symbols-outlined text-xl">school</span>
-        </div>
-        <div>
-          <span class="font-bold text-sm text-primary block leading-none">Quang Son</span>
-          <span class="text-[10px] text-secondary font-semibold">Your English Tutor</span>
-        </div>
-      </div>
+      <!-- Mobile Left Header (Hamburger Menu & Brand) -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button onclick="App.toggleMobileSidebar()" class="lg:hidden p-2 rounded-xl text-primary bg-primary/10 hover:bg-primary/20 transition-all flex items-center justify-center" title="Mở danh mục">
+          <span class="material-symbols-outlined text-xl">menu</span>
+        </button>
 
-      <!-- Desktop Breadcrumbs -->
-      <div class="hidden md:flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
-        <span class="text-primary font-bold">Quang Son - Your English Tutor</span>
-        <span class="text-outline">/</span>
-        <span class="text-on-surface">Luyện Thi Tiếng Anh Vào 10 Chuyên Sâu</span>
+        <div class="flex items-center gap-2 lg:hidden">
+          <div class="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold text-sm">
+            <span class="material-symbols-outlined text-lg">school</span>
+          </div>
+          <div>
+            <span class="font-bold text-xs sm:text-sm text-primary block leading-none">Quang Son</span>
+            <span class="text-[9px] sm:text-[10px] text-secondary font-semibold">Your English Tutor</span>
+          </div>
+        </div>
+
+        <!-- Desktop Breadcrumbs -->
+        <div class="hidden lg:flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+          <span class="text-primary font-bold">Quang Son - Your English Tutor</span>
+          <span class="text-outline">/</span>
+          <span class="text-on-surface">Luyện Thi Tiếng Anh Vào 10 Chuyên Sâu</span>
+        </div>
       </div>
 
       <!-- Right Header Actions -->
-      <div class="flex items-center gap-3">
-        <button id="header-batch-btn" onclick="App.openBatchTableModal()" class="hidden sm:flex bg-primary/10 text-primary hover:bg-primary hover:text-on-primary px-3.5 py-1.5 rounded-full text-xs font-bold items-center gap-1.5 transition-all">
+      <div class="flex items-center gap-1.5 sm:gap-3">
+        <button id="header-batch-btn" onclick="App.openBatchTableModal()" class="hidden md:flex bg-primary/10 text-primary hover:bg-primary hover:text-on-primary px-3.5 py-1.5 rounded-full text-xs font-bold items-center gap-1.5 transition-all">
           <span class="material-symbols-outlined text-sm">table_rows</span>
           <span>Bảng Nhập Từ</span>
         </button>
 
-        <button onclick="App.switchTab('tutor')" class="bg-secondary-container/20 text-secondary hover:bg-secondary-container hover:text-on-secondary-container px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all">
+        <button onclick="App.switchTab('tutor')" class="bg-secondary-container/20 text-secondary hover:bg-secondary-container hover:text-on-secondary-container px-2.5 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-bold flex items-center gap-1.5 transition-all">
           <span class="material-symbols-outlined text-sm">psychology</span>
-          <span>Gia sư AI</span>
+          <span class="hidden sm:inline">Gia sư AI</span>
+          <span class="sm:hidden">AI Tutor</span>
         </button>
 
         <!-- User Badge -->
-        <div id="header-user-badge" class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-full border border-outline-variant/30"></div>
+        <div id="header-user-badge" class="flex items-center gap-2 bg-surface-container-low px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-outline-variant/30 text-xs"></div>
         
         <button onclick="App.handleLogout()" class="p-1.5 rounded-full bg-surface-container hover:bg-error-container/20 hover:text-error text-outline transition-colors" title="Đăng xuất">
           <span class="material-symbols-outlined text-base">logout</span>
@@ -294,12 +309,12 @@
     </header>
 
     <!-- Main Content Container (Dynamic Rendering) -->
-    <main id="app-root" class="flex-1 p-margin-mobile md:p-margin-desktop bg-[#F0F9FF] flex flex-col">
+    <main id="app-root" class="flex-1 p-3 sm:p-5 md:p-margin-desktop bg-[#F0F9FF] flex flex-col">
       <!-- Injected by src/app.js -->
     </main>
 
     <!-- Footer Copyright -->
-    <footer class="bg-surface-container-lowest border-t border-outline-variant/30 py-4 px-margin-mobile md:px-margin-desktop text-center text-xs text-on-surface-variant">
+    <footer class="bg-surface-container-lowest border-t border-outline-variant/30 py-4 px-4 md:px-margin-desktop text-center text-xs text-on-surface-variant">
       <div class="max-w-container-max mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
         <p class="font-medium">© 2026 Quang Son - Your English Tutor. All rights reserved.</p>
         <p class="text-outline text-[11px]">Nền tảng Ôn thi Tiếng Anh vào 10 • Host Account & Cookies Authentication</p>
@@ -308,23 +323,27 @@
 
   </div>
 
-  <!-- Mobile Bottom Navigation Bar -->
-  <nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-lowest border-t border-outline-variant/30 z-50 px-2 py-2 flex justify-around shadow-lg">
-    <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" class="flex flex-col items-center p-1 text-on-surface-variant">
-      <span class="material-symbols-outlined text-xl">dashboard</span>
-      <span class="text-[10px] font-medium">Trang chủ</span>
+  <!-- Mobile Bottom Navigation Bar (Modern 5-tab thumb accessible) -->
+  <nav id="mobile-bottom-nav" class="lg:hidden fixed bottom-0 left-0 right-0 w-full bg-surface-container-lowest/95 backdrop-blur-lg border-t border-outline-variant/30 z-30 px-2 py-1.5 flex items-center justify-around shadow-[0_-4px_16px_rgba(0,0,0,0.06)] pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))]">
+    <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" data-mobile-tab="dashboard" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
+      <span class="material-symbols-outlined text-xl sm:text-2xl">dashboard</span>
+      <span class="text-[10px] font-bold mt-0.5">Trang chủ</span>
     </a>
-    <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" class="flex flex-col items-center p-1 text-on-surface-variant">
-      <span class="material-symbols-outlined text-xl">menu_book</span>
-      <span class="text-[10px] font-medium">Kho từ</span>
+    <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" data-mobile-tab="vocabulary" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
+      <span class="material-symbols-outlined text-xl sm:text-2xl">menu_book</span>
+      <span class="text-[10px] font-bold mt-0.5">Kho từ</span>
     </a>
-    <a href="javascript:void(0)" onclick="App.switchTab('flashcards')" class="flex flex-col items-center p-1 text-on-surface-variant">
-      <span class="material-symbols-outlined text-xl">style</span>
-      <span class="text-[10px]">Flashcard</span>
+    <a href="javascript:void(0)" onclick="App.switchTab('flashcards')" data-mobile-tab="flashcards" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
+      <span class="material-symbols-outlined text-xl sm:text-2xl">style</span>
+      <span class="text-[10px] font-bold mt-0.5">Flashcard</span>
     </a>
-    <a href="javascript:void(0)" onclick="App.switchTab('tutor')" class="flex flex-col items-center p-1 text-on-surface-variant">
-      <span class="material-symbols-outlined text-xl">psychology</span>
-      <span class="text-[10px] font-medium">Gia sư AI</span>
+    <a href="javascript:void(0)" onclick="App.switchTab('quiz', { startNew: true, isRandom: true })" data-mobile-tab="quiz" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
+      <span class="material-symbols-outlined text-xl sm:text-2xl">quiz</span>
+      <span class="text-[10px] font-bold mt-0.5">Luyện đề</span>
+    </a>
+    <a href="javascript:void(0)" onclick="App.toggleMobileSidebar()" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
+      <span class="material-symbols-outlined text-xl sm:text-2xl">menu</span>
+      <span class="text-[10px] font-bold mt-0.5">Menu</span>
     </a>
   </nav>
 

@@ -513,6 +513,7 @@ window.App = {
     }
 
     state.currentTab = tabName;
+    this.closeMobileSidebar();
     if (tabName === 'flashcards') {
       state.flashcardIndex = 0;
       state.flashcardFlipped = false;
@@ -1066,27 +1067,56 @@ window.App = {
   // VIEW RENDERERS & ROLE-BASED NAVIGATION
   // =========================================================================
 
+  // Mobile drawer controls
+  toggleMobileSidebar() {
+    const sidebar = document.getElementById('app-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!sidebar) return;
+    const isClosed = sidebar.classList.contains('-translate-x-full');
+    if (isClosed) {
+      sidebar.classList.remove('-translate-x-full');
+      if (backdrop) {
+        backdrop.classList.remove('hidden');
+        setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+      }
+    } else {
+      this.closeMobileSidebar();
+    }
+  },
+
+  closeMobileSidebar() {
+    const sidebar = document.getElementById('app-sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar) sidebar.classList.add('-translate-x-full');
+    if (backdrop) {
+      backdrop.classList.add('opacity-0');
+      setTimeout(() => backdrop.classList.add('hidden'), 300);
+    }
+  },
+
   render() {
     const mainContainer = document.getElementById('app-root');
     if (!mainContainer) return;
 
     // Toggle Sidebar & Header visibility depending on login state
-    const sidebar = document.querySelector('aside');
+    const sidebar = document.getElementById('app-sidebar');
     const header = document.querySelector('header');
-    const mobileNav = document.querySelector('nav.md\\:hidden');
+    const mobileNav = document.getElementById('mobile-bottom-nav');
+    const backdrop = document.getElementById('sidebar-backdrop');
 
     if (!state.currentUser) {
       if (sidebar) sidebar.classList.add('hidden');
       if (header) header.classList.add('hidden');
       if (mobileNav) mobileNav.classList.add('hidden');
-      mainContainer.parentElement.classList.remove('md:ml-72');
+      if (backdrop) backdrop.classList.add('hidden');
+      mainContainer.parentElement.classList.remove('lg:ml-72');
       mainContainer.innerHTML = this.renderLoginView();
       return;
     } else {
       if (sidebar) sidebar.classList.remove('hidden');
       if (header) header.classList.remove('hidden');
       if (mobileNav) mobileNav.classList.remove('hidden');
-      mainContainer.parentElement.classList.add('md:ml-72');
+      mainContainer.parentElement.classList.add('lg:ml-72');
     }
 
     // Role-based sidebar menu items filtering
@@ -1110,14 +1140,26 @@ window.App = {
     const currentRenderer = viewRenderers[state.currentTab] || this.renderDashboardView;
     mainContainer.innerHTML = currentRenderer.call(this);
 
-    // Update active nav indicators
+    // Update active nav indicators in Desktop/Drawer Sidebar
     document.querySelectorAll('[data-nav-tab]').forEach(el => {
       const tab = el.getAttribute('data-nav-tab');
       if (tab === state.currentTab) {
-        el.classList.add('bg-primary-container', 'text-on-primary-container', 'font-bold');
+        el.classList.add('bg-primary-container', 'text-on-primary-container', 'font-bold', 'shadow-sm');
         el.classList.remove('text-on-surface-variant');
       } else {
-        el.classList.remove('bg-primary-container', 'text-on-primary-container', 'font-bold');
+        el.classList.remove('bg-primary-container', 'text-on-primary-container', 'font-bold', 'shadow-sm');
+        el.classList.add('text-on-surface-variant');
+      }
+    });
+
+    // Update active nav indicators in Mobile Bottom Navigation
+    document.querySelectorAll('[data-mobile-tab]').forEach(el => {
+      const tab = el.getAttribute('data-mobile-tab');
+      if (tab === state.currentTab) {
+        el.classList.add('text-primary', 'font-bold', 'scale-105');
+        el.classList.remove('text-on-surface-variant');
+      } else {
+        el.classList.remove('text-primary', 'font-bold', 'scale-105');
         el.classList.add('text-on-surface-variant');
       }
     });
