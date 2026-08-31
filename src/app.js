@@ -2167,14 +2167,16 @@ window.App = {
     `;
   },
 
-  // 1. Dashboard View (Clean & Focused Personal Learning Hub)
+  // 1. Dashboard View (Class Workspace Folders & Personal Learning Hub)
   renderDashboardView() {
     const user = state.currentUser;
     const isStudent = user.role === 'student';
+    const isTeacher = !isStudent;
     
-    // For students, lock selectedClassId to their own class
-    const targetClassId = isStudent ? Number(user.class_id || 1) : Number(state.selectedClassId || user.class_id || 1);
-    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học", class_code: "QS9A" };
+    // Managed classes for this user (Host sees all, Assistant Teacher sees their classes, Student sees their class)
+    const visibleClasses = this.getManagedClasses(user);
+    const targetClassId = isStudent ? Number(user.class_id || 1) : Number(state.selectedClassId || user.class_id || (visibleClasses[0] ? visibleClasses[0].id : 1));
+    const activeClass = state.classes.find(c => c.id === targetClassId) || visibleClasses[0] || state.classes[0] || { name: "Lớp học", class_code: "QS9A" };
 
     // Compute personal learning time & test stats for this user
     const userStudySessions = (state.studySessions || []).filter(s => s.user_id === user.id || (user.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
@@ -2203,15 +2205,15 @@ window.App = {
             <div class="flex items-center gap-2 text-primary font-bold text-xs mb-2">
               <span class="material-symbols-outlined text-lg">verified</span>
               <span>${CONFIG.BRAND.NAME}</span>
-              <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary font-mono text-[11px] font-bold">Lớp: ${activeClass.name}</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary font-mono text-[11px] font-bold">Lớp chính: ${activeClass.name}</span>
             </div>
             <h1 class="font-display-lg text-2xl md:text-3xl font-bold text-on-surface">
               Xin chào, <span class="text-primary">${user.full_name}!</span> 👋
             </h1>
             <p class="font-body-md text-sm text-on-surface-variant mt-2 max-w-xl">
               ${isStudent 
-                ? 'Không gian ôn thi Tiếng Anh vào 10 cá nhân hóa. Bấm vào lớp học để bắt đầu luyện chuyên đề và làm bài thi.' 
-                : 'Phân hệ quản trị và giảng dạy. Bấm vào lớp học để quản lý bài học, kho từ vựng, tài khoản học sinh và báo cáo.'
+                ? 'Không gian ôn thi Tiếng Anh vào 10 cá nhân hóa. Bấm vào từng thư mục lớp bên dưới để luyện bài học và thi thử.' 
+                : 'Phân hệ quản trị & giảng dạy. Quản lý các thư mục lớp học, bài học, kho từ vựng, tài khoản học sinh và báo cáo bên dưới.'
               }
             </p>
           </div>
@@ -2219,13 +2221,130 @@ window.App = {
           <div class="flex items-center gap-3 flex-wrap">
             <button onclick="App.openClassDetail(${targetClassId})" class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3.5 rounded-2xl font-bold text-sm btn-press flex items-center gap-2 hover-lift shadow-md">
               <span class="material-symbols-outlined text-xl">school</span>
-              <span>👉 Vào Học Lớp: ${activeClass.name.split(' - ')[0]}</span>
+              <span>👉 Vào Lớp: ${activeClass.name.split(' - ')[0]}</span>
             </button>
             
             <button onclick="App.switchTab('tutor')" class="bg-secondary-container text-on-secondary-container px-4 py-3 rounded-2xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-base">psychology</span>
               <span>Gia Sư AI</span>
             </button>
+          </div>
+        </div>
+
+        <!-- 📁 THƯ MỤC CÁC LỚP HỌC (CLASS WORKSPACE FOLDERS GRID) -->
+        <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <div class="flex items-center gap-2 text-primary font-bold text-xs mb-1">
+                <span class="material-symbols-outlined text-base">folder_open</span>
+                <span>DANH MỤC THƯ MỤC CÁC LỚP HỌC</span>
+              </div>
+              <h3 class="font-headline-md text-xl font-bold text-on-surface">Thư Mục Các Lớp Quản Lý & Học Tập</h3>
+              <p class="text-xs text-on-surface-variant">Chọn trực tiếp các chuyên mục: Bài học, Từ vựng, Quản lý tài khoản hoặc Báo cáo trong từng thư mục lớp.</p>
+            </div>
+
+            ${isTeacher ? `
+              <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm self-start sm:self-auto">
+                <span class="material-symbols-outlined text-sm">add</span> + Tạo Lớp Mới
+              </button>
+            ` : ''}
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-stack-md">
+            ${visibleClasses.length > 0 ? visibleClasses.map(c => {
+              const cLessons = state.lessons.filter(l => l.class_id === c.id);
+              const cVocab = state.vocabulary.filter(v => v.class_id === c.id);
+              const cStudents = state.usersList.filter(u => u.role === 'student' && u.class_id === c.id);
+              
+              return `
+                <div class="bg-surface-container-lowest rounded-3xl ambient-shadow border border-outline-variant/30 p-6 flex flex-col justify-between gap-5 hover-lift transition-all">
+                  
+                  <!-- Folder Top Header -->
+                  <div>
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                      <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center font-bold shadow-sm shrink-0">
+                          <span class="material-symbols-outlined text-2xl">folder</span>
+                        </div>
+                        <div>
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <h4 class="font-headline-md text-base sm:text-lg font-bold text-on-surface">${c.name}</h4>
+                            <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary font-mono text-[11px] font-bold">Mã: ${c.class_code}</span>
+                          </div>
+                          <p class="text-xs text-outline mt-0.5">Không gian lớp học độc lập</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 4 Sub-Folders / Mini Tabs directly inside this class folder card -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                      
+                      <!-- 1. Bài học -->
+                      <button onclick="App.openClassDetail(${c.id}, 'units')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-primary/10 hover:text-primary text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                        <div class="flex items-center justify-between">
+                          <span class="material-symbols-outlined text-primary text-base group-hover:scale-110 transition-transform">auto_stories</span>
+                          <span class="font-bold text-[11px] text-outline">${cLessons.length}</span>
+                        </div>
+                        <span class="font-bold text-[11px]">1. Bài Học</span>
+                      </button>
+
+                      <!-- 2. Từ vựng -->
+                      <button onclick="App.openClassDetail(${c.id}, 'vocabulary')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-secondary/10 hover:text-secondary text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                        <div class="flex items-center justify-between">
+                          <span class="material-symbols-outlined text-secondary text-base group-hover:scale-110 transition-transform">menu_book</span>
+                          <span class="font-bold text-[11px] text-outline">${cVocab.length}</span>
+                        </div>
+                        <span class="font-bold text-[11px]">2. Từ Vựng</span>
+                      </button>
+
+                      <!-- 3. Quản lý / Cấp tài khoản -->
+                      <button onclick="App.openClassDetail(${c.id}, 'accounts')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-blue-500/10 hover:text-blue-700 text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                        <div class="flex items-center justify-between">
+                          <span class="material-symbols-outlined text-blue-600 text-base group-hover:scale-110 transition-transform">manage_accounts</span>
+                          <span class="font-bold text-[11px] text-outline">${cStudents.length}</span>
+                        </div>
+                        <span class="font-bold text-[11px]">3. ${isTeacher ? 'Cấp Acc' : 'Học Sinh'}</span>
+                      </button>
+
+                      <!-- 4. Báo cáo thống kê -->
+                      <button onclick="App.openClassDetail(${c.id}, 'reports')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-green-500/10 hover:text-green-700 text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                        <div class="flex items-center justify-between">
+                          <span class="material-symbols-outlined text-green-600 text-base group-hover:scale-110 transition-transform">analytics</span>
+                          <span class="font-bold text-[11px] text-outline">Xem</span>
+                        </div>
+                        <span class="font-bold text-[11px]">4. Báo Cáo</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Folder Quick Actions Bar -->
+                  <div class="flex items-center justify-between gap-2 pt-3 border-t border-outline-variant/30 flex-wrap">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <button onclick="App.selectClass(${c.id}); App.startLessonFlashcard(null);" class="px-3 py-1.5 bg-surface-container text-primary hover:bg-primary hover:text-on-primary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
+                      </button>
+                      <button onclick="App.selectClass(${c.id}); App.startNewQuiz(null, true);" class="px-3 py-1.5 bg-surface-container text-on-surface hover:bg-secondary hover:text-on-secondary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
+                      </button>
+                    </div>
+
+                    <button onclick="App.openClassDetail(${c.id})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs btn-press flex items-center gap-1 hover-lift shadow-sm">
+                      <span>Mở Lớp Học</span>
+                      <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                  </div>
+
+                </div>
+              `;
+            }).join('') : `
+              <div class="col-span-full p-8 bg-surface-container-lowest rounded-3xl border border-outline-variant/30 text-center">
+                <span class="material-symbols-outlined text-4xl text-outline mb-2">folder_off</span>
+                <p class="font-bold text-sm text-on-surface">Chưa có thư mục lớp học nào</p>
+                <button onclick="App.openCreateClassModal()" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs inline-flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">add</span> Tạo Lớp Đầu Tiên
+                </button>
+              </div>
+            `}
           </div>
         </div>
 
