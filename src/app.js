@@ -1206,8 +1206,6 @@ window.App = {
     if (meaningInput) meaningInput.value = '';
     const ipaInput = document.getElementById('input-vocab-ipa');
     if (ipaInput) ipaInput.value = '';
-    const exampleInput = document.getElementById('input-vocab-example');
-    if (exampleInput) exampleInput.value = '';
     const grammarCheck = document.getElementById('input-vocab-is-grammar');
     if (grammarCheck) grammarCheck.checked = false;
 
@@ -1255,15 +1253,11 @@ window.App = {
         if (ipaInput && result.ipa) {
           ipaInput.value = result.ipa;
         }
-        const exampleInput = document.getElementById('input-vocab-example');
-        if (exampleInput && result.example) {
-          exampleInput.value = result.example;
-        }
         const grammarCheck = document.getElementById('input-vocab-is-grammar');
         if (grammarCheck && typeof result.is_grammar === 'boolean') {
           grammarCheck.checked = result.is_grammar;
         }
-        showToast("Gemini AI đã tự động điền IPA & Ví dụ thành công! ✨", "success");
+        showToast("Gemini AI đã tự động điền IPA thành công! ✨", "success");
       }
     } catch (err) {
       console.warn("AI enrich failed:", err);
@@ -1286,7 +1280,6 @@ window.App = {
     const word = document.getElementById('input-vocab-word')?.value?.trim();
     const meaning = document.getElementById('input-vocab-meaning')?.value?.trim();
     const ipa = document.getElementById('input-vocab-ipa')?.value?.trim() || "";
-    const example = document.getElementById('input-vocab-example')?.value?.trim() || "";
     const isGrammar = Boolean(document.getElementById('input-vocab-is-grammar')?.checked);
 
     if (!word || !meaning) {
@@ -1301,7 +1294,7 @@ window.App = {
         word: word,
         meaning: meaning,
         ipa: ipa,
-        example: example,
+        example: "",
         is_grammar: isGrammar
       });
 
@@ -1352,9 +1345,6 @@ window.App = {
     const ipaInput = document.getElementById('input-edit-vocab-ipa');
     if (ipaInput) ipaInput.value = item.ipa || "";
     
-    const exampleInput = document.getElementById('input-edit-vocab-example');
-    if (exampleInput) exampleInput.value = item.example || "";
-    
     const grammarCheck = document.getElementById('input-edit-vocab-is-grammar');
     if (grammarCheck) grammarCheck.checked = Boolean(item.is_grammar);
 
@@ -1389,13 +1379,11 @@ window.App = {
       if (result) {
         const ipaInput = document.getElementById('input-edit-vocab-ipa');
         if (ipaInput && result.ipa) ipaInput.value = result.ipa;
-        const exampleInput = document.getElementById('input-edit-vocab-example');
-        if (exampleInput && result.example) exampleInput.value = result.example;
         const grammarCheck = document.getElementById('input-edit-vocab-is-grammar');
         if (grammarCheck && typeof result.is_grammar === 'boolean') {
           grammarCheck.checked = result.is_grammar;
         }
-        showToast("Gemini AI đã cập nhật lại IPA & Ví dụ! ✨", "success");
+        showToast("Gemini AI đã cập nhật lại IPA! ✨", "success");
       }
     } catch (err) {
       console.warn(err);
@@ -1415,7 +1403,6 @@ window.App = {
     const word = document.getElementById('input-edit-vocab-word')?.value?.trim();
     const meaning = document.getElementById('input-edit-vocab-meaning')?.value?.trim();
     const ipa = document.getElementById('input-edit-vocab-ipa')?.value?.trim() || "";
-    const example = document.getElementById('input-edit-vocab-example')?.value?.trim() || "";
     const isGrammar = Boolean(document.getElementById('input-edit-vocab-is-grammar')?.checked);
 
     if (!id || !word || !meaning) {
@@ -1429,7 +1416,7 @@ window.App = {
         word: word,
         meaning: meaning,
         ipa: ipa,
-        example: example,
+        example: "",
         is_grammar: isGrammar
       });
 
@@ -2527,7 +2514,7 @@ window.App = {
 
           <div class="p-5 bg-surface-container-low border-t border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="text-xs text-on-surface-variant">
-              💡 <strong>Mẹo AI:</strong> Chỉ cần gõ <em>Từ vựng</em> và <em>Nghĩa</em>, <strong>Gemini AI</strong> sẽ tự động tạo <strong>Phiên âm IPA</strong> và <strong>Câu ví dụ</strong> khi lưu!
+              💡 <strong>Mẹo AI:</strong> Chỉ cần gõ <em>Từ vựng</em> và <em>Nghĩa</em>, <strong>Gemini AI</strong> sẽ tự động tạo <strong>Phiên âm chuẩn IPA</strong> khi lưu!
             </div>
 
             <div class="flex items-center gap-3">
@@ -2870,11 +2857,6 @@ window.App = {
                           </span>
                         </div>
                         <p class="font-body-md text-sm font-semibold text-on-surface mb-3">${item.meaning}</p>
-                        ${item.example ? `
-                          <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/20 mb-3">
-                            <p class="text-xs text-on-surface-variant italic">"${item.example}"</p>
-                          </div>
-                        ` : ''}
                       </div>
 
                       <div class="flex items-center justify-between pt-3 border-t border-outline-variant/30 text-xs">
@@ -3237,11 +3219,6 @@ window.App = {
 
                   <div class="my-3">
                     <p class="font-body-md text-on-surface font-medium text-xs leading-relaxed">${item.meaning}</p>
-                    ${item.example ? `
-                      <div class="mt-2.5 p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs text-on-surface-variant">
-                        <p class="italic text-on-surface">"${item.example}"</p>
-                      </div>
-                    ` : ''}
                   </div>
                 </div>
 
@@ -3425,12 +3402,6 @@ window.App = {
               </div>
               <div class="my-auto text-center">
                 <h3 class="font-headline-md text-2xl font-bold text-on-surface mb-3">${currentWord.meaning}</h3>
-                ${currentWord.example ? `
-                  <div class="p-4 rounded-xl bg-surface-container border border-outline-variant/30 text-left">
-                    <p class="text-xs font-bold text-outline uppercase mb-1">Ví dụ:</p>
-                    <p class="font-body-md text-xs text-on-surface italic">"${currentWord.example}"</p>
-                  </div>
-                ` : ''}
               </div>
               <div class="text-center text-xs text-outline">
                 Nhấn lần nữa để lật lại mặt trước
