@@ -116,6 +116,18 @@ CREATE POLICY "Students can view lessons of their own class" ON lessons
     get_user_role() = 'teacher' OR class_id = get_user_class_id()
   );
 
+DROP POLICY IF EXISTS "Teachers and students can create lessons in their class" ON lessons;
+CREATE POLICY "Teachers and students can create lessons in their class" ON lessons 
+  FOR INSERT WITH CHECK (
+    get_user_role() = 'teacher' OR class_id = get_user_class_id()
+  );
+
+DROP POLICY IF EXISTS "Teachers and students can update lessons in their class" ON lessons;
+CREATE POLICY "Teachers and students can update lessons in their class" ON lessons 
+  FOR UPDATE USING (
+    get_user_role() = 'teacher' OR class_id = get_user_class_id()
+  );
+
 DROP POLICY IF EXISTS "Teachers can manage lessons" ON lessons;
 CREATE POLICY "Teachers can manage lessons" ON lessons 
   FOR ALL USING (get_user_role() = 'teacher');
@@ -124,6 +136,24 @@ CREATE POLICY "Teachers can manage lessons" ON lessons
 DROP POLICY IF EXISTS "Students can view vocabulary of their own class" ON vocabulary;
 CREATE POLICY "Students can view vocabulary of their own class" ON vocabulary 
   FOR SELECT USING (
+    get_user_role() = 'teacher' OR class_id = get_user_class_id()
+  );
+
+DROP POLICY IF EXISTS "Teachers and students can add vocabulary to their class" ON vocabulary;
+CREATE POLICY "Teachers and students can add vocabulary to their class" ON vocabulary 
+  FOR INSERT WITH CHECK (
+    get_user_role() = 'teacher' OR class_id = get_user_class_id()
+  );
+
+DROP POLICY IF EXISTS "Teachers and students can update vocabulary of their class" ON vocabulary;
+CREATE POLICY "Teachers and students can update vocabulary of their class" ON vocabulary 
+  FOR UPDATE USING (
+    get_user_role() = 'teacher' OR class_id = get_user_class_id()
+  );
+
+DROP POLICY IF EXISTS "Teachers and students can delete vocabulary in their class" ON vocabulary;
+CREATE POLICY "Teachers and students can delete vocabulary in their class" ON vocabulary 
+  FOR DELETE USING (
     get_user_role() = 'teacher' OR class_id = get_user_class_id()
   );
 

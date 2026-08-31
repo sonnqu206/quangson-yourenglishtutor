@@ -501,9 +501,9 @@ window.App = {
       return;
     }
 
-    // Role-based restrictions: Students cannot access management tabs
+    // Role-based restrictions: Students cannot access system admin tabs (classes, accounts)
     if (state.currentUser?.role === 'student') {
-      const restrictedTabs = ['classes', 'accounts', 'lessons', 'table_input'];
+      const restrictedTabs = ['classes', 'accounts'];
       if (restrictedTabs.includes(tabName)) {
         showToast("Học sinh chỉ được phép truy cập vào các phần liên quan đến học tập của lớp mình!", "error");
         state.currentTab = 'dashboard';
@@ -530,13 +530,12 @@ window.App = {
   },
 
   // =========================================================================
-  // GIAO DIỆN THÊM TỪ VỰNG DẠNG BẢNG (TEACHER / HOST ONLY)
+  // GIAO DIỆN THÊM TỪ VỰNG DẠNG BẢNG
   // =========================================================================
 
   openBatchTableModal() {
     if (state.currentUser?.role === 'student') {
-      showToast("Học sinh không có quyền truy cập tính năng thêm từ vựng!", "error");
-      return;
+      state.selectedClassId = Number(state.currentUser.class_id) || 1;
     }
     this.switchTab('table_input');
   },
@@ -624,7 +623,10 @@ window.App = {
   },
 
   async saveBatchTableToSupabase() {
-    const classId = Number(document.getElementById('table-input-class')?.value) || state.selectedClassId || 1;
+    const isStudent = state.currentUser?.role === 'student';
+    const classId = isStudent 
+      ? Number(state.currentUser.class_id || 1)
+      : (Number(document.getElementById('table-input-class')?.value) || state.selectedClassId || 1);
     const lessonId = Number(document.getElementById('table-input-lesson')?.value) || state.selectedLessonId || 1;
 
     const validRows = state.batchTableRows.filter(r => r.word && r.word.trim() !== "");
@@ -715,14 +717,22 @@ window.App = {
   },
 
   openCreateLessonModal() {
-    if (state.currentUser?.role === 'student') return;
     const modal = document.getElementById('create-lesson-modal');
     if (modal) {
       const classSelect = document.getElementById('modal-lesson-class');
+      const isStudent = state.currentUser?.role === 'student';
+      const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
       if (classSelect) {
-        classSelect.innerHTML = state.classes.map(c => 
-          `<option value="${c.id}" ${state.selectedClassId === c.id ? 'selected' : ''}>${c.name}</option>`
-        ).join('');
+        if (isStudent) {
+          const studentClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
+          classSelect.innerHTML = `<option value="${targetClassId}">${studentClass ? studentClass.name : 'Lớp của bạn'}</option>`;
+          classSelect.disabled = true;
+        } else {
+          classSelect.disabled = false;
+          classSelect.innerHTML = state.classes.map(c => 
+            `<option value="${c.id}" ${state.selectedClassId === c.id ? 'selected' : ''}>${c.name}</option>`
+          ).join('');
+        }
       }
       modal.classList.remove('hidden');
     }
@@ -730,18 +740,23 @@ window.App = {
 
   async handleCreateLesson(e) {
     e.preventDefault();
-    if (state.currentUser?.role === 'student') return;
-    const classId = document.getElementById('modal-lesson-class')?.value || state.selectedClassId || 1;
+    const isStudent = state.currentUser?.role === 'student';
+    const classId = isStudent 
+      ? Number(state.currentUser.class_id || 1)
+      : Number(document.getElementById('modal-lesson-class')?.value || state.selectedClassId || 1);
     const title = document.getElementById('input-lesson-title')?.value.trim();
     if (!title) {
       showToast("Vui lòng nhập tên bài học!", "error");
       return;
     }
     try {
-      await SupabaseService.createLesson(classId, title);
+      const created = await SupabaseService.createLesson(classId, title);
       showToast(`Đã tạo bài học "${title}" thành công!`, "success");
       this.closeModal('create-lesson-modal');
+      const titleInput = document.getElementById('input-lesson-title');
+      if (titleInput) titleInput.value = '';
       await this.loadAllData();
+      state.selectedLessonId = created.id;
       this.render();
     } catch (err) {
       showToast("Lỗi khi tạo bài học: " + err.message, "error");
@@ -749,7 +764,6 @@ window.App = {
   },
 
   async deleteLesson(id) {
-    if (state.currentUser?.role === 'student') return;
     if (!confirm("Bạn có chắc chắn muốn xóa bài học này?")) return;
     try {
       await SupabaseService.deleteLesson(id);
@@ -761,8 +775,298 @@ window.App = {
     }
   },
 
+  // =========================================================================
+  // SINGLE VOCABULARY CREATION & EDITING (STUDENTS & TEACHERS)
+  // =========================================================================
+
+  openCreateVocabularyModal(preselectedLessonId = null) {
+    const isStudent = state.currentUser?.role === 'student';
+    const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
+    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
+
+    const classSelect = document.getElementById('input-vocab-class');
+    if (classSelect) {
+      if (isStudent) {
+        const studentClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
+        classSelect.innerHTML = `<option value="${targetClassId}">${studentClass ? studentClass.name : 'Lớp của bạn'}</option>`;
+        classSelect.disabled = true;
+      } else {
+        classSelect.disabled = false;
+        classSelect.innerHTML = state.classes.map(c => 
+          `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
+        ).join('');
+      }
+    }
+
+    const lessonSelect = document.getElementById('input-vocab-lesson');
+    if (lessonSelect) {
+      if (classLessons.length > 0) {
+        lessonSelect.innerHTML = classLessons.map(l => 
+          `<option value="${l.id}" ${(preselectedLessonId === l.id || state.selectedLessonId === l.id) ? 'selected' : ''}>${l.title}</option>`
+        ).join('');
+      } else {
+        lessonSelect.innerHTML = `<option value="1">Unit mặc định</option>`;
+      }
+    }
+
+    // Reset inputs
+    const wordInput = document.getElementById('input-vocab-word');
+    if (wordInput) wordInput.value = '';
+    const meaningInput = document.getElementById('input-vocab-meaning');
+    if (meaningInput) meaningInput.value = '';
+    const ipaInput = document.getElementById('input-vocab-ipa');
+    if (ipaInput) ipaInput.value = '';
+    const exampleInput = document.getElementById('input-vocab-example');
+    if (exampleInput) exampleInput.value = '';
+    const grammarCheck = document.getElementById('input-vocab-is-grammar');
+    if (grammarCheck) grammarCheck.checked = false;
+
+    const modal = document.getElementById('create-vocabulary-modal');
+    if (modal) modal.classList.remove('hidden');
+  },
+
+  handleVocabModalClassChange(classId, mode = 'create') {
+    const targetClassId = Number(classId);
+    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
+    const selectId = mode === 'create' ? 'input-vocab-lesson' : 'input-edit-vocab-lesson';
+    const lessonSelect = document.getElementById(selectId);
+    if (lessonSelect) {
+      if (classLessons.length > 0) {
+        lessonSelect.innerHTML = classLessons.map(l => `<option value="${l.id}">${l.title}</option>`).join('');
+      } else {
+        lessonSelect.innerHTML = `<option value="1">Unit mặc định</option>`;
+      }
+    }
+  },
+
+  async autoEnrichCreateVocab() {
+    const wordInput = document.getElementById('input-vocab-word');
+    const word = wordInput?.value?.trim();
+    if (!word) {
+      showToast("Vui lòng nhập từ tiếng Anh trước khi bấm AI tra cứu!", "error");
+      wordInput?.focus();
+      return;
+    }
+
+    const btn = document.getElementById('btn-ai-enrich-create');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> <span>Đang tra AI...</span>`;
+    }
+
+    try {
+      const result = await GeminiService.enrichVocabulary(word);
+      if (result) {
+        const meaningInput = document.getElementById('input-vocab-meaning');
+        if (meaningInput && !meaningInput.value.trim() && result.meaning) {
+          meaningInput.value = result.meaning;
+        }
+        const ipaInput = document.getElementById('input-vocab-ipa');
+        if (ipaInput && result.ipa) {
+          ipaInput.value = result.ipa;
+        }
+        const exampleInput = document.getElementById('input-vocab-example');
+        if (exampleInput && result.example) {
+          exampleInput.value = result.example;
+        }
+        const grammarCheck = document.getElementById('input-vocab-is-grammar');
+        if (grammarCheck && typeof result.is_grammar === 'boolean') {
+          grammarCheck.checked = result.is_grammar;
+        }
+        showToast("Gemini AI đã tự động điền IPA & Ví dụ thành công! ✨", "success");
+      }
+    } catch (err) {
+      console.warn("AI enrich failed:", err);
+      showToast("Không thể tra AI lúc này, vui lòng tự nhập tay.", "error");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="material-symbols-outlined text-sm">auto_awesome</span> <span>AI Điền</span>`;
+      }
+    }
+  },
+
+  async handleCreateSingleVocabulary(e) {
+    e.preventDefault();
+    const isStudent = state.currentUser?.role === 'student';
+    const classId = isStudent 
+      ? Number(state.currentUser.class_id || 1)
+      : Number(document.getElementById('input-vocab-class')?.value || state.selectedClassId || 1);
+    const lessonId = Number(document.getElementById('input-vocab-lesson')?.value) || state.selectedLessonId || 1;
+    const word = document.getElementById('input-vocab-word')?.value?.trim();
+    const meaning = document.getElementById('input-vocab-meaning')?.value?.trim();
+    const ipa = document.getElementById('input-vocab-ipa')?.value?.trim() || "";
+    const example = document.getElementById('input-vocab-example')?.value?.trim() || "";
+    const isGrammar = Boolean(document.getElementById('input-vocab-is-grammar')?.checked);
+
+    if (!word || !meaning) {
+      showToast("Vui lòng nhập từ vựng và nghĩa tiếng Việt!", "error");
+      return;
+    }
+
+    try {
+      const item = await SupabaseService.addVocabulary({
+        class_id: classId,
+        lesson_id: lessonId,
+        word: word,
+        meaning: meaning,
+        ipa: ipa,
+        example: example,
+        is_grammar: isGrammar
+      });
+
+      showToast(`Đã thêm từ "${word}" vào lớp thành công! 🎉`, "success");
+      this.closeModal('create-vocabulary-modal');
+      await this.loadAllData();
+      state.selectedLessonId = lessonId;
+      this.updateStudyList();
+      this.render();
+    } catch (err) {
+      showToast("Lỗi khi thêm từ vựng: " + err.message, "error");
+    }
+  },
+
+  openEditVocabularyModal(vocabId) {
+    const item = state.vocabulary.find(v => v.id === Number(vocabId));
+    if (!item) {
+      showToast("Không tìm thấy từ vựng này!", "error");
+      return;
+    }
+
+    const itemClass = state.classes.find(c => c.id === item.class_id) || state.classes[0];
+    const classLessons = state.lessons.filter(l => l.class_id === item.class_id);
+
+    const idInput = document.getElementById('input-edit-vocab-id');
+    if (idInput) idInput.value = item.id;
+    
+    const classNameInput = document.getElementById('input-edit-vocab-class-name');
+    if (classNameInput) classNameInput.value = itemClass ? itemClass.name : `Lớp #${item.class_id}`;
+    
+    const lessonSelect = document.getElementById('input-edit-vocab-lesson');
+    if (lessonSelect) {
+      if (classLessons.length > 0) {
+        lessonSelect.innerHTML = classLessons.map(l => 
+          `<option value="${l.id}" ${l.id === item.lesson_id ? 'selected' : ''}>${l.title}</option>`
+        ).join('');
+      } else {
+        lessonSelect.innerHTML = `<option value="${item.lesson_id}">Unit #${item.lesson_id}</option>`;
+      }
+    }
+
+    const wordInput = document.getElementById('input-edit-vocab-word');
+    if (wordInput) wordInput.value = item.word || "";
+    
+    const meaningInput = document.getElementById('input-edit-vocab-meaning');
+    if (meaningInput) meaningInput.value = item.meaning || "";
+    
+    const ipaInput = document.getElementById('input-edit-vocab-ipa');
+    if (ipaInput) ipaInput.value = item.ipa || "";
+    
+    const exampleInput = document.getElementById('input-edit-vocab-example');
+    if (exampleInput) exampleInput.value = item.example || "";
+    
+    const grammarCheck = document.getElementById('input-edit-vocab-is-grammar');
+    if (grammarCheck) grammarCheck.checked = Boolean(item.is_grammar);
+
+    const deleteBtn = document.getElementById('btn-edit-vocab-delete');
+    if (deleteBtn) {
+      deleteBtn.onclick = () => {
+        this.closeModal('edit-vocabulary-modal');
+        this.deleteVocabulary(item.id, item.word);
+      };
+    }
+
+    const modal = document.getElementById('edit-vocabulary-modal');
+    if (modal) modal.classList.remove('hidden');
+  },
+
+  async autoEnrichEditVocab() {
+    const wordInput = document.getElementById('input-edit-vocab-word');
+    const word = wordInput?.value?.trim();
+    if (!word) {
+      showToast("Vui lòng nhập từ tiếng Anh trước!", "error");
+      return;
+    }
+
+    const btn = document.getElementById('btn-ai-enrich-edit');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> <span>Đang tra AI...</span>`;
+    }
+
+    try {
+      const result = await GeminiService.enrichVocabulary(word);
+      if (result) {
+        const ipaInput = document.getElementById('input-edit-vocab-ipa');
+        if (ipaInput && result.ipa) ipaInput.value = result.ipa;
+        const exampleInput = document.getElementById('input-edit-vocab-example');
+        if (exampleInput && result.example) exampleInput.value = result.example;
+        const grammarCheck = document.getElementById('input-edit-vocab-is-grammar');
+        if (grammarCheck && typeof result.is_grammar === 'boolean') {
+          grammarCheck.checked = result.is_grammar;
+        }
+        showToast("Gemini AI đã cập nhật lại IPA & Ví dụ! ✨", "success");
+      }
+    } catch (err) {
+      console.warn(err);
+      showToast("Không thể tra cứu AI lúc này.", "error");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="material-symbols-outlined text-sm">auto_awesome</span> <span>AI Cập nhật</span>`;
+      }
+    }
+  },
+
+  async handleSaveEditVocabulary(e) {
+    e.preventDefault();
+    const id = Number(document.getElementById('input-edit-vocab-id')?.value);
+    const lessonId = Number(document.getElementById('input-edit-vocab-lesson')?.value);
+    const word = document.getElementById('input-edit-vocab-word')?.value?.trim();
+    const meaning = document.getElementById('input-edit-vocab-meaning')?.value?.trim();
+    const ipa = document.getElementById('input-edit-vocab-ipa')?.value?.trim() || "";
+    const example = document.getElementById('input-edit-vocab-example')?.value?.trim() || "";
+    const isGrammar = Boolean(document.getElementById('input-edit-vocab-is-grammar')?.checked);
+
+    if (!id || !word || !meaning) {
+      showToast("Vui lòng điền đầy đủ từ vựng và nghĩa tiếng Việt!", "error");
+      return;
+    }
+
+    try {
+      await SupabaseService.updateVocabulary(id, {
+        lesson_id: lessonId,
+        word: word,
+        meaning: meaning,
+        ipa: ipa,
+        example: example,
+        is_grammar: isGrammar
+      });
+
+      // Update local state
+      const idx = state.vocabulary.findIndex(v => v.id === id);
+      if (idx !== -1) {
+        state.vocabulary[idx] = {
+          ...state.vocabulary[idx],
+          lesson_id: lessonId,
+          word,
+          meaning,
+          ipa,
+          example,
+          is_grammar: isGrammar
+        };
+      }
+      this.updateStudyList();
+
+      showToast(`Đã lưu thay đổi từ "${word}" thành công! 🎉`, "success");
+      this.closeModal('edit-vocabulary-modal');
+      this.render();
+    } catch (err) {
+      showToast("Lỗi khi lưu chỉnh sửa từ: " + err.message, "error");
+    }
+  },
+
   async deleteVocabulary(id, word) {
-    if (state.currentUser?.role === 'student') return;
     if (!confirm(`Bạn có chắc chắn muốn xóa từ "${word}" khỏi lớp học này?`)) return;
     try {
       await SupabaseService.deleteVocabulary(id);
@@ -1173,7 +1477,7 @@ window.App = {
     if (!user) return;
     const isStudent = user.role === 'student';
 
-    // Hide admin navigation items for students
+    // Hide admin navigation items for students (classes, accounts)
     document.querySelectorAll('[data-admin-only]').forEach(el => {
       if (isStudent) {
         el.classList.add('hidden');
@@ -1182,18 +1486,15 @@ window.App = {
       }
     });
 
-    // Hide quick batch table button on top of sidebar for students
+    // Both student and teachers can use batch table buttons
     const sidebarBatchBtn = document.getElementById('sidebar-batch-btn');
     if (sidebarBatchBtn) {
-      if (isStudent) sidebarBatchBtn.classList.add('hidden');
-      else sidebarBatchBtn.classList.remove('hidden');
+      sidebarBatchBtn.classList.remove('hidden');
     }
 
-    // Hide top bar batch button for students
     const headerBatchBtn = document.getElementById('header-batch-btn');
     if (headerBatchBtn) {
-      if (isStudent) headerBatchBtn.classList.add('hidden');
-      else headerBatchBtn.classList.remove('hidden');
+      headerBatchBtn.classList.remove('hidden');
     }
   },
 
@@ -1380,19 +1681,21 @@ window.App = {
               Lớp <strong class="text-primary">${activeClass.name}</strong> hiện có <strong class="text-primary">${classVocab.length} từ vựng</strong> thuộc <strong class="text-primary">${classLessons.length} chuyên đề</strong>.
             </p>
           </div>
-          <div class="flex items-center gap-3 flex-wrap">
-            ${!isStudent ? `
-              <button onclick="App.openBatchTableModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm btn-press flex items-center gap-2 hover-lift">
-                <span class="material-symbols-outlined">table_rows</span>
-                Bảng Thêm Từ Vựng Mới
-              </button>
-            ` : ''}
-            <button onclick="App.switchTab('flashcards')" class="bg-secondary-container text-on-secondary-container px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover-lift">
-              <span class="material-symbols-outlined">style</span>
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <button onclick="App.openCreateVocabularyModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs btn-press flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-base">add_circle</span>
+              + Thêm Từ Vựng
+            </button>
+            <button onclick="App.openBatchTableModal()" class="bg-surface-container text-primary px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover:bg-surface-container-high border border-primary/20">
+              <span class="material-symbols-outlined text-base">table_rows</span>
+              Bảng Nhập Từ
+            </button>
+            <button onclick="App.switchTab('flashcards')" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
+              <span class="material-symbols-outlined text-base">style</span>
               Luyện Flashcard 3D
             </button>
-            <button onclick="App.startNewQuiz(null, true)" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift">
-              <span class="material-symbols-outlined">casino</span>
+            <button onclick="App.startNewQuiz(null, true)" class="bg-primary-container text-on-primary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+              <span class="material-symbols-outlined text-base">casino</span>
               Test Random Toàn Lớp
             </button>
           </div>
@@ -1452,11 +1755,14 @@ window.App = {
               <h3 class="font-headline-md text-lg font-bold text-on-surface">Chuyên Đề Bài Học - ${activeClass.name}</h3>
               <p class="text-xs text-on-surface-variant">Luyện tập từ vựng hoặc làm bài kiểm tra 3 dạng bài theo từng Unit</p>
             </div>
-            ${!isStudent ? `
-              <button onclick="App.openCreateLessonModal()" class="text-primary font-bold text-xs flex items-center gap-1 hover:underline">
-                <span class="material-symbols-outlined text-sm">add_circle</span> Thêm bài học
+            <div class="flex items-center gap-2">
+              <button onclick="App.openCreateVocabularyModal()" class="text-secondary font-bold text-xs flex items-center gap-1 hover:underline">
+                <span class="material-symbols-outlined text-sm">add_circle</span> Thêm từ vựng
               </button>
-            ` : ''}
+              <button onclick="App.openCreateLessonModal()" class="text-primary font-bold text-xs flex items-center gap-1 hover:underline ml-2">
+                <span class="material-symbols-outlined text-sm">add</span> Thêm bài học
+              </button>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1471,12 +1777,15 @@ window.App = {
                     </div>
                     <h4 class="font-headline-md text-sm font-bold text-on-surface mb-3">${lesson.title}</h4>
                   </div>
-                  <div class="flex items-center gap-2 pt-3 border-t border-outline-variant/30">
+                  <div class="flex items-center gap-1.5 pt-3 border-t border-outline-variant/30 flex-wrap">
+                    <button onclick="App.openCreateVocabularyModal(${lesson.id})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
+                      <span class="material-symbols-outlined text-sm">add</span>
+                    </button>
                     <button onclick="App.state.selectedLessonId = ${lesson.id}; App.switchTab('flashcards');" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
                       <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
                     </button>
                     <button onclick="App.startNewQuiz(${lesson.id}, false)" class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-bold text-xs hover:bg-primary-container transition-colors text-center flex items-center justify-center gap-1">
-                      <span class="material-symbols-outlined text-sm">quiz</span> Thi thử (3 Dạng)
+                      <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
                     </button>
                   </div>
                 </div>
@@ -1589,9 +1898,10 @@ window.App = {
 
   // 2. Batch Vocabulary Input Table View
   renderTableInputView() {
-    if (state.currentUser?.role === 'student') return this.renderDashboardView();
-
-    const classLessons = state.lessons.filter(l => l.class_id === state.selectedClassId);
+    const isStudent = state.currentUser?.role === 'student';
+    const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
+    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
+    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
@@ -1601,7 +1911,7 @@ window.App = {
             <span class="material-symbols-outlined text-base">arrow_back</span>
             <span>← Quay lại Kho từ vựng</span>
           </button>
-          <span class="text-xs font-bold text-primary uppercase">Thêm từ vựng nhiều dòng</span>
+          <span class="text-xs font-bold text-primary uppercase">Thêm từ vựng nhiều dòng • ${activeClass.name}</span>
         </div>
 
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1616,14 +1926,19 @@ window.App = {
           <div class="flex items-center gap-4 w-full sm:w-auto">
             <div>
               <label class="block text-xs font-bold text-outline uppercase mb-1">Lớp học đích (*)</label>
-              <select id="table-input-class" onchange="App.selectClass(this.value)" class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-sm font-bold text-primary focus:outline-none">
-                ${state.classes.map(c => `<option value="${c.id}" ${c.id === state.selectedClassId ? 'selected' : ''}>${c.name}</option>`).join('')}
-              </select>
+              ${isStudent ? `
+                <input type="text" readonly value="${activeClass.name}" class="py-2.5 px-3.5 bg-surface-container border border-outline-variant/30 rounded-xl text-sm font-bold text-primary cursor-not-allowed" />
+                <input type="hidden" id="table-input-class" value="${targetClassId}" />
+              ` : `
+                <select id="table-input-class" onchange="App.selectClass(this.value)" class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-sm font-bold text-primary focus:outline-none">
+                  ${state.classes.map(c => `<option value="${c.id}" ${c.id === state.selectedClassId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                </select>
+              `}
             </div>
             <div>
               <label class="block text-xs font-bold text-outline uppercase mb-1">Bài học đích (*)</label>
               <select id="table-input-lesson" class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-sm font-semibold focus:outline-none">
-                ${classLessons.map(l => `<option value="${l.id}" ${l.id === state.selectedLessonId ? 'selected' : ''}>${l.title}</option>`).join('')}
+                ${classLessons.length > 0 ? classLessons.map(l => `<option value="${l.id}" ${l.id === state.selectedLessonId ? 'selected' : ''}>${l.title}</option>`).join('') : '<option value="1">Unit mặc định</option>'}
               </select>
             </div>
           </div>
@@ -1778,23 +2093,30 @@ window.App = {
     `;
   },
 
-  // 4. Lessons View (Admin / Teacher Only)
+  // 4. Lessons View (Admin, Teacher & Student)
   renderLessonsView() {
-    if (state.currentUser?.role === 'student') return this.renderDashboardView();
-
-    const activeClass = state.classes.find(c => c.id === state.selectedClassId) || state.classes[0];
-    const classLessons = state.lessons.filter(l => l.class_id === Number(state.selectedClassId));
+    const isStudent = state.currentUser?.role === 'student';
+    const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
+    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
+    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Quản lý Bài học - ${activeClass.name}</h2>
+            <div class="flex items-center gap-2 text-primary font-bold text-xs mb-1">
+              <span class="material-symbols-outlined text-base">school</span>
+              <span>LỚP HỌC: ${activeClass.name}</span>
+            </div>
+            <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Quản lý Bài học & Chuyên đề</h2>
             <p class="font-body-md text-sm text-on-surface-variant">Danh mục chuyên đề ôn thi vào 10 cho ${activeClass.name}.</p>
           </div>
-          <div class="flex items-center gap-3">
-            <button onclick="App.openCreateLessonModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift">
-              <span class="material-symbols-outlined">add</span> Thêm Bài Học
+          <div class="flex items-center gap-3 flex-wrap">
+            <button onclick="App.openCreateVocabularyModal()" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Từ Vựng
+            </button>
+            <button onclick="App.openCreateLessonModal()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
             </button>
           </div>
         </div>
@@ -1811,14 +2133,17 @@ window.App = {
                   </div>
                   <h3 class="font-headline-md text-base font-bold text-on-surface mb-2">${l.title}</h3>
                 </div>
-                <div class="flex items-center gap-2 pt-4 border-t border-outline-variant/30">
+                <div class="flex items-center gap-2 pt-4 border-t border-outline-variant/30 flex-wrap">
+                  <button onclick="App.openCreateVocabularyModal(${l.id})" class="p-2 bg-surface-container text-primary font-bold text-xs rounded-xl hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
+                    <span class="material-symbols-outlined text-base">add</span>
+                  </button>
                   <button onclick="App.state.selectedLessonId = ${l.id}; App.switchTab('vocabulary');" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center">
                     Kho từ
                   </button>
                   <button onclick="App.startNewQuiz(${l.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary-container transition-colors text-center">
                     Thi thử
                   </button>
-                  <button onclick="App.deleteLesson(${l.id})" class="p-2 text-outline hover:text-error rounded-xl">
+                  <button onclick="App.deleteLesson(${l.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa bài học">
                     <span class="material-symbols-outlined text-base">delete</span>
                   </button>
                 </div>
@@ -1834,7 +2159,7 @@ window.App = {
   renderVocabularyView() {
     const isStudent = state.currentUser?.role === 'student';
     const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
-    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
+    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
     
     const filteredVocab = state.vocabulary.filter(v => {
@@ -1866,15 +2191,16 @@ window.App = {
             </p>
           </div>
 
-          <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <button onclick="App.openCreateVocabularyModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
+            </button>
+            <button onclick="App.openBatchTableModal()" class="bg-primary-container text-on-primary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">table_rows</span> + Thêm Dạng Bảng
+            </button>
             <button onclick="App.ExcelService.exportVocabulary(filteredVocab)" class="bg-surface-container text-on-surface px-4 py-2.5 rounded-xl font-bold text-xs border border-outline-variant/40 flex items-center gap-1.5 hover:bg-surface-container-high">
               <span class="material-symbols-outlined text-sm">download</span> Xuất Excel
             </button>
-            ${!isStudent ? `
-              <button onclick="App.openBatchTableModal()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
-                <span class="material-symbols-outlined text-sm">table_rows</span> + Thêm Từ Dạng Bảng
-              </button>
-            ` : ''}
           </div>
         </div>
 
@@ -1911,52 +2237,66 @@ window.App = {
 
         <!-- Vocabulary Cards Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-          ${filteredVocab.length > 0 ? filteredVocab.map(item => `
-            <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift group">
-              <div>
-                <div class="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <h3 class="font-headline-md text-lg font-bold text-primary flex items-center gap-2">
-                      ${item.word}
-                      <button onclick="App.speakWord('${item.word}')" class="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors" title="Nghe phát âm">
-                        <span class="material-symbols-outlined text-sm">volume_up</span>
-                      </button>
-                    </h3>
-                    <span class="font-mono text-xs text-outline">${item.ipa || ''}</span>
-                  </div>
-                  <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${item.is_grammar ? 'bg-amber-100 text-amber-800' : 'bg-primary-container/20 text-primary'}">
-                    ${item.is_grammar ? 'Ngữ pháp' : 'Từ vựng'}
-                  </span>
-                </div>
+          ${filteredVocab.length > 0 ? filteredVocab.map(item => {
+            const lessonObj = classLessons.find(l => l.id === item.lesson_id);
+            const lessonLabel = lessonObj ? lessonObj.title : `Unit #${item.lesson_id}`;
+            const safeWord = item.word.replace(/'/g, "\\'");
 
-                <div class="my-3">
-                  <p class="font-body-md text-on-surface font-medium text-xs leading-relaxed">${item.meaning}</p>
-                  ${item.example ? `
-                    <div class="mt-2.5 p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs text-on-surface-variant">
-                      <p class="italic text-on-surface">"${item.example}"</p>
+            return `
+              <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift group">
+                <div>
+                  <div class="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <h3 class="font-headline-md text-lg font-bold text-primary flex items-center gap-2">
+                        ${item.word}
+                        <button onclick="App.speakWord('${safeWord}')" class="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors" title="Nghe phát âm">
+                          <span class="material-symbols-outlined text-sm">volume_up</span>
+                        </button>
+                      </h3>
+                      <span class="font-mono text-xs text-outline">${item.ipa || ''}</span>
                     </div>
-                  ` : ''}
+                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${item.is_grammar ? 'bg-amber-100 text-amber-800' : 'bg-primary-container/20 text-primary'}">
+                      ${item.is_grammar ? 'Ngữ pháp' : 'Từ vựng'}
+                    </span>
+                  </div>
+
+                  <div class="my-3">
+                    <p class="font-body-md text-on-surface font-medium text-xs leading-relaxed">${item.meaning}</p>
+                    ${item.example ? `
+                      <div class="mt-2.5 p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs text-on-surface-variant">
+                        <p class="italic text-on-surface">"${item.example}"</p>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-outline-variant/30 text-xs text-outline mt-2">
+                  <span class="truncate max-w-[140px] text-[11px]" title="${lessonLabel}">${lessonLabel}</span>
+                  <div class="flex items-center gap-2.5">
+                    <button onclick="App.openEditVocabularyModal(${item.id})" class="text-primary hover:underline font-bold text-xs flex items-center gap-0.5" title="Chỉnh sửa từ vựng này">
+                      <span class="material-symbols-outlined text-sm">edit</span>
+                      <span>Sửa</span>
+                    </button>
+                    <button onclick="App.deleteVocabulary(${item.id}, '${safeWord}')" class="text-error hover:underline font-bold text-xs flex items-center gap-0.5" title="Xóa từ này">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                      <span>Xóa</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              <div class="flex items-center justify-between pt-3 border-t border-outline-variant/30 text-xs text-outline mt-2">
-                <span>Unit #${item.lesson_id}</span>
-                ${!isStudent ? `
-                  <div class="flex items-center gap-2">
-                    <button onclick="App.deleteVocabulary(${item.id}, '${item.word}')" class="text-error hover:underline font-bold">Xóa</button>
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-          `).join('') : `
+            `;
+          }).join('') : `
             <div class="col-span-full py-16 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 text-center flex flex-col items-center justify-center">
               <span class="material-symbols-outlined text-5xl text-outline mb-2">menu_book</span>
               <p class="font-headline-md text-base font-bold text-on-surface">Chưa có từ vựng nào trong lớp/bài học này</p>
-              ${!isStudent ? `
-                <button onclick="App.openBatchTableModal()" class="mt-3 bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs btn-press">
-                  + Thêm Từ Vựng Dạng Bảng Ngay
+              <div class="flex items-center gap-3 mt-3">
+                <button onclick="App.openCreateVocabularyModal()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs btn-press">
+                  + Thêm 1 Từ Vựng Ngay
                 </button>
-              ` : ''}
+                <button onclick="App.openBatchTableModal()" class="bg-surface-container text-primary px-5 py-2.5 rounded-xl font-bold text-xs border border-primary/30">
+                  + Thêm Từ Dạng Bảng
+                </button>
+              </div>
             </div>
           `}
         </div>

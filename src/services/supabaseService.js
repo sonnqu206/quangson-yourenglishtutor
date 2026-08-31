@@ -504,11 +504,37 @@ export const SupabaseService = {
   },
 
   /**
+   * Đảm bảo lớp học luôn có ít nhất 1 bài học (Unit) để chứa từ vựng
+   */
+  async ensureClassLesson(classId) {
+    const targetClassId = Number(classId) || 1;
+    const lessons = await this.getLessons(targetClassId);
+    if (lessons && lessons.length > 0) {
+      return lessons[0].id;
+    }
+    const allCls = await this.getClasses();
+    const targetClass = allCls.find(c => c.id === targetClassId);
+    const className = targetClass ? targetClass.name : `Lớp #${targetClassId}`;
+    const newLesson = await this.createLesson(targetClassId, `Unit 1: Chuyên đề Từ vựng 1 - ${className}`);
+    return newLesson.id;
+  },
+
+  /**
    * Thêm từ vựng mới (Tự động gắn class_id và lesson_id)
    */
   async addVocabulary(vocabData) {
     const class_id = Number(vocabData.class_id) || 1;
-    const lesson_id = Number(vocabData.lesson_id) || 1;
+    let lesson_id = Number(vocabData.lesson_id);
+    
+    if (!lesson_id || isNaN(lesson_id)) {
+      lesson_id = await this.ensureClassLesson(class_id);
+    } else {
+      const currentLessons = await this.getLessons(class_id);
+      if (!currentLessons.some(l => l.id === lesson_id)) {
+        lesson_id = await this.ensureClassLesson(class_id);
+      }
+    }
+
     const item = {
       class_id: class_id,
       lesson_id: lesson_id,
@@ -541,9 +567,18 @@ export const SupabaseService = {
   /**
    * Lưu hàng loạt từ vựng từ Bảng Nhập Liệu (Batch Insert with Class & Lesson Isolation)
    */
-  async bulkInsertVocabulary(vocabList, classId = 1, lessonId = 1) {
+  async bulkInsertVocabulary(vocabList, classId = 1, lessonId = null) {
     const targetClassId = Number(classId) || 1;
-    const targetLessonId = Number(lessonId) || 1;
+    let targetLessonId = Number(lessonId);
+
+    if (!targetLessonId || isNaN(targetLessonId)) {
+      targetLessonId = await this.ensureClassLesson(targetClassId);
+    } else {
+      const currentLessons = await this.getLessons(targetClassId);
+      if (!currentLessons.some(l => l.id === targetLessonId)) {
+        targetLessonId = await this.ensureClassLesson(targetClassId);
+      }
+    }
 
     const records = vocabList.map(v => ({
       class_id: targetClassId,

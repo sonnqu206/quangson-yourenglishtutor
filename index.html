@@ -208,12 +208,13 @@
         <span>Quản Lý & Cấp Tài Khoản</span>
       </a>
 
-      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('lessons')" data-nav-tab="lessons" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
+      <!-- Lessons & Batch Table Accessible to all (Host, Teacher & Student) -->
+      <a href="javascript:void(0)" onclick="App.switchTab('lessons')" data-nav-tab="lessons" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">auto_stories</span>
         <span>Quản Lý Bài Học</span>
       </a>
 
-      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('table_input')" data-nav-tab="table_input" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
+      <a href="javascript:void(0)" onclick="App.switchTab('table_input')" data-nav-tab="table_input" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-medium">
         <span class="material-symbols-outlined text-xl">table_rows</span>
         <span>Bảng Nhập Từ Hàng Loạt</span>
       </a>
@@ -584,6 +585,201 @@
         <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30">
           <button type="button" onclick="App.closeModal('create-lesson-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
           <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Thêm Bài Học</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Thêm 1 Từ Vựng Mới -->
+  <div id="create-vocabulary-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-lg w-full p-6 relative border border-outline-variant/30 max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between mb-4 shrink-0">
+        <h3 class="font-headline-md text-base font-bold text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">add_circle</span>
+          <span>Thêm 1 Từ Vựng Mới</span>
+        </h3>
+        <button onclick="App.closeModal('create-vocabulary-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="App.handleCreateSingleVocabulary(event)" class="space-y-3.5 text-xs overflow-y-auto pr-1 flex-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-on-surface mb-1">Lớp Học (*)</label>
+            <select id="input-vocab-class" onchange="App.handleVocabModalClassChange(this.value, 'create')" class="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-bold text-primary focus:outline-none text-xs"></select>
+          </div>
+          <div>
+            <label class="block font-bold text-on-surface mb-1">Bài Học / Unit (*)</label>
+            <select id="input-vocab-lesson" class="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-semibold focus:outline-none text-xs"></select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Từ / Cụm từ Tiếng Anh (*)</label>
+          <div class="flex gap-2">
+            <input 
+              type="text" 
+              id="input-vocab-word" 
+              placeholder="Ví dụ: ubiquitous, perseverance, used to..." 
+              required
+              class="flex-1 px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-bold text-primary focus:outline-none focus:border-primary text-xs"
+            />
+            <button 
+              type="button" 
+              id="btn-ai-enrich-create"
+              onclick="App.autoEnrichCreateVocab()" 
+              class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shrink-0"
+              title="Dùng AI để tự tra IPA và câu ví dụ"
+            >
+              <span class="material-symbols-outlined text-sm">auto_awesome</span>
+              <span>AI Điền</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Nghĩa Tiếng Việt (*)</label>
+          <input 
+            type="text" 
+            id="input-vocab-meaning" 
+            placeholder="Ví dụ: phổ biến, xuất hiện ở khắp mọi nơi" 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-medium"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Phiên Âm IPA (Tùy chọn)</label>
+          <input 
+            type="text" 
+            id="input-vocab-ipa" 
+            placeholder="Ví dụ: /juːˈbɪk.wə.təs/" 
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-mono focus:outline-none focus:border-primary text-xs text-outline"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Câu Ví Dụ Tiếng Anh (Tùy chọn)</label>
+          <textarea 
+            id="input-vocab-example" 
+            rows="2"
+            placeholder="Ví dụ: Smartphones have become ubiquitous in modern life."
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="input-vocab-is-grammar" class="w-4 h-4 rounded text-primary focus:ring-primary border-outline-variant/50" />
+          <label for="input-vocab-is-grammar" class="text-xs font-bold text-on-surface cursor-pointer select-none">
+            Đây là Cấu trúc Ngữ pháp / Mẫu câu đặc biệt
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30 shrink-0">
+          <button type="button" onclick="App.closeModal('create-vocabulary-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
+          <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Lưu Từ Vựng</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Chỉnh Sửa Từ Vựng (Edit Vocabulary Modal) -->
+  <div id="edit-vocabulary-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-lg w-full p-6 relative border border-outline-variant/30 max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between mb-4 shrink-0">
+        <h3 class="font-headline-md text-base font-bold text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">edit_note</span>
+          <span>Chỉnh Sửa Từ Vựng</span>
+        </h3>
+        <button onclick="App.closeModal('edit-vocabulary-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="App.handleSaveEditVocabulary(event)" class="space-y-3.5 text-xs overflow-y-auto pr-1 flex-1">
+        <input type="hidden" id="input-edit-vocab-id" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-on-surface mb-1">Lớp Học</label>
+            <input type="text" id="input-edit-vocab-class-name" readonly class="w-full px-3 py-2.5 bg-surface-container border border-outline-variant/30 rounded-xl font-bold text-primary text-xs cursor-not-allowed" />
+          </div>
+          <div>
+            <label class="block font-bold text-on-surface mb-1">Bài Học / Unit (*)</label>
+            <select id="input-edit-vocab-lesson" class="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-semibold focus:outline-none text-xs"></select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Từ / Cụm từ Tiếng Anh (*)</label>
+          <div class="flex gap-2">
+            <input 
+              type="text" 
+              id="input-edit-vocab-word" 
+              placeholder="Ví dụ: ubiquitous..." 
+              required
+              class="flex-1 px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-bold text-primary focus:outline-none focus:border-primary text-xs"
+            />
+            <button 
+              type="button" 
+              id="btn-ai-enrich-edit"
+              onclick="App.autoEnrichEditVocab()" 
+              class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shrink-0"
+              title="Dùng AI để cập nhật lại IPA và câu ví dụ"
+            >
+              <span class="material-symbols-outlined text-sm">auto_awesome</span>
+              <span>AI Cập nhật</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Nghĩa Tiếng Việt (*)</label>
+          <input 
+            type="text" 
+            id="input-edit-vocab-meaning" 
+            placeholder="Ví dụ: phổ biến, xuất hiện ở khắp mọi nơi" 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-medium"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Phiên Âm IPA</label>
+          <input 
+            type="text" 
+            id="input-edit-vocab-ipa" 
+            placeholder="Ví dụ: /juːˈbɪk.wə.təs/" 
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-mono focus:outline-none focus:border-primary text-xs text-outline"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Câu Ví Dụ Tiếng Anh</label>
+          <textarea 
+            id="input-edit-vocab-example" 
+            rows="2"
+            placeholder="Câu ví dụ..."
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="input-edit-vocab-is-grammar" class="w-4 h-4 rounded text-primary focus:ring-primary border-outline-variant/50" />
+          <label for="input-edit-vocab-is-grammar" class="text-xs font-bold text-on-surface cursor-pointer select-none">
+            Đây là Cấu trúc Ngữ pháp / Mẫu câu đặc biệt
+          </label>
+        </div>
+
+        <div class="flex justify-between items-center pt-3 border-t border-outline-variant/30 shrink-0">
+          <button type="button" id="btn-edit-vocab-delete" class="text-error hover:underline font-bold text-xs flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">delete</span> Xóa từ này
+          </button>
+          <div class="flex gap-2">
+            <button type="button" onclick="App.closeModal('edit-vocabulary-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
+            <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Lưu Thay Đổi</button>
+          </div>
         </div>
       </form>
     </div>
