@@ -169,8 +169,8 @@ window.App = {
       state.usersList = users || AuthService.getAllUsers();
       state.studySessions = studySessions || [];
 
-      // For students, lock selectedClassId strictly to their assigned class
-      if (state.currentUser && state.currentUser.role === 'student') {
+      // For students and assistant teachers, lock selectedClassId strictly to their assigned class
+      if (state.currentUser && (state.currentUser.role === 'student' || state.currentUser.role === 'assistant_teacher')) {
         state.selectedClassId = Number(state.currentUser.class_id) || 1;
         state.selectedClassDetailId = state.selectedClassId;
       } else if (!state.selectedClassId && state.classes.length > 0) {
@@ -508,6 +508,11 @@ window.App = {
   // =========================================================================
 
   openClassDetail(classId, tab = 'units') {
+    const isRestricted = state.currentUser?.role === 'student' || state.currentUser?.role === 'assistant_teacher';
+    if (isRestricted && Number(classId) !== Number(state.currentUser.class_id)) {
+      showToast("Bạn chỉ được phép truy cập lớp học được phân công!", "error");
+      return;
+    }
     state.selectedClassId = Number(classId);
     state.selectedClassDetailId = Number(classId);
     state.classDetailTab = tab;
@@ -533,8 +538,8 @@ window.App = {
         return;
       }
     }
-    // If in class detail view and is teacher/host, return to classes list
-    if (state.currentTab === 'classes' && state.selectedClassDetailId && state.currentUser?.role !== 'student') {
+    // If in class detail view and is host, return to classes list
+    if (state.currentTab === 'classes' && state.selectedClassDetailId && state.currentUser?.role === 'host') {
       state.selectedClassDetailId = null;
       this.render();
       return;
@@ -560,9 +565,9 @@ window.App = {
   },
 
   selectClass(classId) {
-    // If user is a student, forbid switching classes
-    if (state.currentUser?.role === 'student') {
-      showToast("Học sinh chỉ được phép truy cập lớp học được phân công của mình!", "error");
+    // If user is a student or assistant teacher, forbid switching classes
+    if (state.currentUser?.role === 'student' || state.currentUser?.role === 'assistant_teacher') {
+      showToast("Bạn chỉ được phép truy cập lớp học được phân công của mình!", "error");
       return;
     }
 
@@ -983,11 +988,12 @@ window.App = {
     if (modal) {
       const classSelect = document.getElementById('modal-lesson-class');
       const isStudent = state.currentUser?.role === 'student';
-      const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
+      const isAssistant = state.currentUser?.role === 'assistant_teacher';
+      const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
       if (classSelect) {
-        if (isStudent) {
-          const studentClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
-          classSelect.innerHTML = `<option value="${targetClassId}">${studentClass ? studentClass.name : 'Lớp của bạn'}</option>`;
+        if (isStudent || isAssistant) {
+          const userClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
+          classSelect.innerHTML = `<option value="${targetClassId}">${userClass ? userClass.name : 'Lớp của bạn'}</option>`;
           classSelect.disabled = true;
         } else {
           classSelect.disabled = false;
@@ -1003,7 +1009,8 @@ window.App = {
   async handleCreateLesson(e) {
     e.preventDefault();
     const isStudent = state.currentUser?.role === 'student';
-    const classId = isStudent 
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const classId = (isStudent || isAssistant)
       ? Number(state.currentUser.class_id || 1)
       : Number(document.getElementById('modal-lesson-class')?.value || state.selectedClassId || 1);
     const title = document.getElementById('input-lesson-title')?.value.trim();
@@ -1043,14 +1050,15 @@ window.App = {
 
   openCreateVocabularyModal(preselectedLessonId = null) {
     const isStudent = state.currentUser?.role === 'student';
-    const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
 
     const classSelect = document.getElementById('input-vocab-class');
     if (classSelect) {
-      if (isStudent) {
-        const studentClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
-        classSelect.innerHTML = `<option value="${targetClassId}">${studentClass ? studentClass.name : 'Lớp của bạn'}</option>`;
+      if (isStudent || isAssistant) {
+        const userClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
+        classSelect.innerHTML = `<option value="${targetClassId}">${userClass ? userClass.name : 'Lớp của bạn'}</option>`;
         classSelect.disabled = true;
       } else {
         classSelect.disabled = false;
@@ -2246,7 +2254,8 @@ window.App = {
   // 2. Batch Vocabulary Input Table View (Quantity Selector & Excel-Style Keyboard Navigation)
   renderTableInputView() {
     const isStudent = state.currentUser?.role === 'student';
-    const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
     const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
 
@@ -2254,9 +2263,9 @@ window.App = {
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
         <!-- Navigation Back Header -->
         <div class="flex items-center justify-between">
-          <button onclick="App.safeGoBack('vocabulary')" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all hover-lift">
+          <button onclick="App.safeGoBack('classes')" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all hover-lift">
             <span class="material-symbols-outlined text-base">arrow_back</span>
-            <span>← Quay lại Kho từ vựng</span>
+            <span>← Quay lại Lớp học</span>
           </button>
           <span class="text-xs font-bold text-primary uppercase">Thêm từ vựng nhiều dòng • ${activeClass.name}</span>
         </div>
@@ -2273,7 +2282,7 @@ window.App = {
           <div class="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
             <div>
               <label class="block text-xs font-bold text-outline uppercase mb-1">Lớp học đích (*)</label>
-              ${isStudent ? `
+              ${(isStudent || isAssistant) ? `
                 <input type="text" readonly value="${activeClass.name}" class="py-2.5 px-3.5 bg-surface-container border border-outline-variant/30 rounded-xl text-sm font-bold text-primary cursor-not-allowed" />
                 <input type="hidden" id="table-input-class" value="${targetClassId}" />
               ` : `
@@ -2417,16 +2426,16 @@ window.App = {
   // 3. Classes View (Admin / Teacher List & Student Direct Drilldown)
   renderClassesView() {
     const isStudent = state.currentUser?.role === 'student';
-    const isHost = state.currentUser?.role === 'host';
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const isHost = state.currentUser?.role === 'host';
     const assistantClassId = Number(state.currentUser?.class_id || 1);
 
-    // If student, directly render their assigned class detail view
-    if (isStudent) {
-      return this.renderClassDetailView(Number(state.currentUser.class_id || 1));
+    // If student or assistant teacher, directly render their assigned class detail view
+    if (isStudent || isAssistant) {
+      return this.renderClassDetailView(assistantClassId);
     }
 
-    // If teacher/host has a class selected to drilldown into, render its detail
+    // If host has a class selected to drilldown into, render its detail
     if (state.selectedClassDetailId) {
       return this.renderClassDetailView(state.selectedClassDetailId);
     }
@@ -2498,10 +2507,14 @@ window.App = {
 
   // 3.1. Class Detail View (Class-Centric Hub: Units, Vocabulary, and Teacher-Only Student Reports)
   renderClassDetailView(classId) {
-    const targetClassId = Number(classId) || 1;
-    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: `Lớp #${targetClassId}`, class_code: "QS9A" };
     const isStudent = state.currentUser?.role === 'student';
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const isHost = state.currentUser?.role === 'host';
     const isTeacher = !isStudent;
+
+    // For assistant teacher, always enforce their assigned class
+    const targetClassId = isAssistant ? Number(state.currentUser.class_id || 1) : (Number(classId) || 1);
+    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: `Lớp #${targetClassId}`, class_code: "QS9A" };
 
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
     const classVocab = state.vocabulary.filter(v => v.class_id === targetClassId);
@@ -2517,7 +2530,7 @@ window.App = {
         <!-- Class Hub Header -->
         <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-primary/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div class="flex items-start sm:items-center gap-3.5">
-            ${isTeacher ? `
+            ${isHost ? `
               <button onclick="App.state.selectedClassDetailId = null; App.render();" class="p-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors shrink-0" title="Danh sách các lớp">
                 <span class="material-symbols-outlined text-lg">arrow_back</span>
               </button>
