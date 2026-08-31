@@ -259,6 +259,34 @@ const SEED_DATA = {
         { question: "Nghĩa của từ 'ubiquitous'?", user_answer: "Hiếm gặp", correct_answer: "Phổ biến, có mặt ở khắp nơi", is_correct: false, explanation: "Ubiquitous nghĩa là có mặt khắp nơi." }
       ]
     }
+  ],
+  study_sessions: [
+    {
+      id: 1,
+      user_id: "00000000-0000-0000-0000-000000000002",
+      user_name: "Nguyễn Văn An",
+      class_id: 1,
+      lesson_id: 1,
+      activity_type: "flashcard",
+      duration_seconds: 360,
+      cards_viewed: 18,
+      cards_mastered: 15,
+      score: null,
+      created_at: "2026-08-28T09:30:00Z"
+    },
+    {
+      id: 2,
+      user_id: "00000000-0000-0000-0000-000000000003",
+      user_name: "Trần Thị Mai",
+      class_id: 1,
+      lesson_id: 2,
+      activity_type: "flashcard",
+      duration_seconds: 420,
+      cards_viewed: 22,
+      cards_mastered: 19,
+      score: null,
+      created_at: "2026-08-29T10:15:00Z"
+    }
   ]
 };
 
@@ -268,7 +296,9 @@ function getLocalData() {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!parsed.study_sessions) parsed.study_sessions = [];
+      return parsed;
     }
   } catch (e) {
     console.warn("Could not read local data:", e);
@@ -749,5 +779,67 @@ export const SupabaseService = {
       return local.test_sessions.filter(s => s.class_id === Number(classId));
     }
     return local.test_sessions;
+  },
+
+  /**
+   * Lưu phiên học tập (Flashcard, Quiz, v.v.) ghi nhận toàn bộ thời gian học sinh vào học
+   */
+  async saveStudySession(sessionData) {
+    const record = {
+      user_id: sessionData.user_id || "anonymous",
+      user_name: sessionData.user_name || "Học sinh",
+      class_id: Number(sessionData.class_id) || 1,
+      lesson_id: sessionData.lesson_id ? Number(sessionData.lesson_id) : null,
+      activity_type: sessionData.activity_type || 'flashcard', // 'flashcard' | 'quiz' | 'vocabulary'
+      duration_seconds: Math.max(1, Number(sessionData.duration_seconds) || 1),
+      cards_viewed: Number(sessionData.cards_viewed) || 0,
+      cards_mastered: Number(sessionData.cards_mastered) || 0,
+      score: sessionData.score !== undefined ? Number(sessionData.score) : null,
+      created_at: new Date().toISOString()
+    };
+
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { data, error } = await client.from('study_sessions').insert([record]).select();
+        if (!error && data && data[0]) {
+          return data[0];
+        }
+      } catch (err) {
+        console.warn("Supabase saveStudySession fallback:", err);
+      }
+    }
+
+    const local = getLocalData();
+    if (!local.study_sessions) local.study_sessions = [];
+    const newId = local.study_sessions.length ? Math.max(...local.study_sessions.map(s => s.id)) + 1 : 1;
+    const saved = { id: newId, ...record };
+    local.study_sessions.unshift(saved);
+    saveLocalData(local);
+    return saved;
+  },
+
+  /**
+   * Lấy danh sách nhật ký học tập theo lớp
+   */
+  async getStudySessions(classId = null) {
+    const client = getSupabase();
+    if (client) {
+      try {
+        let query = client.from('study_sessions').select('*').order('id', { ascending: false });
+        if (classId) query = query.eq('class_id', Number(classId));
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) return data;
+      } catch (err) {
+        console.warn("Supabase study_sessions query fallback:", err);
+      }
+    }
+
+    const local = getLocalData();
+    const list = local.study_sessions || [];
+    if (classId) {
+      return list.filter(s => s.class_id === Number(classId));
+    }
+    return list;
   }
 };

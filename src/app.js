@@ -15,7 +15,8 @@ import { audioService } from './services/audioService.js';
 export const state = {
   currentUser: null, // { id, username, full_name, role: 'host' | 'assistant_teacher' | 'student', class_id, email }
   currentRole: 'host', // 'host' | 'assistant_teacher' | 'student'
-  currentTab: 'login', // 'login' | 'dashboard' | 'classes' | 'accounts' | 'lessons' | 'vocabulary' | 'table_input' | 'flashcards' | 'quiz' | 'quiz_result' | 'reports' | 'tutor' | 'settings'
+  currentTab: 'login', // 'login' | 'dashboard' | 'classes' | 'accounts' | 'vocabulary' | 'table_input' | 'flashcards' | 'quiz' | 'quiz_result' | 'reports' | 'tutor' | 'settings'
+  navigationHistory: ['dashboard'],
   
   classes: [],
   lessons: [],
@@ -23,9 +24,12 @@ export const state = {
   profiles: [],
   usersList: [],
   testSessions: [],
+  studySessions: [],
   
-  // Active Class Scoping (Class-Isolation)
+  // Active Class Scoping & Drilldown
   selectedClassId: 1,
+  selectedClassDetailId: null, // If set, renders the class detail view
+  classDetailTab: 'units', // 'units' | 'vocabulary' | 'reports'
   selectedLessonId: null,
   searchQuery: '',
   filterGrammar: 'all',
@@ -41,11 +45,14 @@ export const state = {
   isSavingBatchTable: false,
   batchSaveProgressText: "",
 
-  // Flashcard state
+  // Flashcard state with time tracking
   flashcardIndex: 0,
   flashcardFlipped: false,
   knownWords: new Set(),
   studyList: [],
+  flashcardStartTime: null,
+  flashcardCardsViewed: 0,
+  flashcardCardsMastered: 0,
   
   // Quiz state (3 Formats: type_en, type_vi, multiple_choice)
   currentQuiz: [],
@@ -146,12 +153,13 @@ window.App = {
    */
   async loadAllData() {
     try {
-      const [classes, lessons, vocabulary, testSessions, users] = await Promise.all([
+      const [classes, lessons, vocabulary, testSessions, users, studySessions] = await Promise.all([
         SupabaseService.getClasses(),
         SupabaseService.getLessons(),
         SupabaseService.getVocabulary(),
         SupabaseService.getTestSessions(),
-        AuthService.syncUsersFromSupabase()
+        AuthService.syncUsersFromSupabase(),
+        SupabaseService.getStudySessions()
       ]);
 
       state.classes = classes || [];
@@ -159,10 +167,12 @@ window.App = {
       state.vocabulary = vocabulary || [];
       state.testSessions = testSessions || [];
       state.usersList = users || AuthService.getAllUsers();
+      state.studySessions = studySessions || [];
 
       // For students, lock selectedClassId strictly to their assigned class
       if (state.currentUser && state.currentUser.role === 'student') {
         state.selectedClassId = Number(state.currentUser.class_id) || 1;
+        state.selectedClassDetailId = state.selectedClassId;
       } else if (!state.selectedClassId && state.classes.length > 0) {
         state.selectedClassId = state.classes[0].id;
       }
@@ -419,6 +429,11 @@ window.App = {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
+  openStudentHistoryModal(studentId) {
+    this.selectReportStudent(studentId);
+    this.switchTab('reports');
+  },
+
   openSessionDetailsModal(sessionId) {
     const session = state.testSessions.find(s => s.id === Number(sessionId));
     if (!session) {
@@ -488,16 +503,49 @@ window.App = {
   // SAFE NAVIGATION & CLASS LOGIC (ROLE RESTRICTION)
   // =========================================================================
 
-  safeGoBack(targetTab = 'vocabulary') {
+  // =========================================================================
+  // SAFE NAVIGATION & CLASS DRILLDOWN LOGIC
+  // =========================================================================
+
+  openClassDetail(classId, tab = 'units') {
+    state.selectedClassId = Number(classId);
+    state.selectedClassDetailId = Number(classId);
+    state.classDetailTab = tab;
+    state.selectedLessonId = null;
+    this.updateStudyList();
+    this.switchTab('classes');
+  },
+
+  setClassDetailTab(tab) {
+    state.classDetailTab = tab;
+    this.render();
+  },
+
+  safeGoBack(fallback = 'dashboard') {
+    if (state.currentTab === 'flashcards') {
+      this.finishFlashcardSession();
+    }
     if (state.currentTab === 'quiz' && state.currentQuiz && state.currentQuiz.length > 0) {
-      state.pendingTargetTab = targetTab;
+      state.pendingTargetTab = 'classes';
       const modal = document.getElementById('exit-quiz-modal');
       if (modal) {
         modal.classList.remove('hidden');
         return;
       }
     }
-    this.switchTab(targetTab);
+    // If in class detail view and is teacher/host, return to classes list
+    if (state.currentTab === 'classes' && state.selectedClassDetailId && state.currentUser?.role !== 'student') {
+      state.selectedClassDetailId = null;
+      this.render();
+      return;
+    }
+    if (state.navigationHistory && state.navigationHistory.length > 1) {
+      state.navigationHistory.pop(); // pop current tab
+      const prevTab = state.navigationHistory.pop() || fallback;
+      this.switchTab(prevTab, null, false);
+    } else {
+      this.switchTab(fallback, null, false);
+    }
   },
 
   confirmExitQuiz() {
@@ -505,10 +553,10 @@ window.App = {
     state.currentQuiz = [];
     state.quizIndex = 0;
     this.closeModal('exit-quiz-modal');
-    const target = state.pendingTargetTab || 'vocabulary';
+    const target = state.pendingTargetTab || 'classes';
     state.pendingTargetTab = null;
     this.switchTab(target);
-    showToast("Đã quay về danh sách từ vựng / bài học của Lớp!", "info");
+    showToast("Đã quay về màn hình Lớp học!", "info");
   },
 
   selectClass(classId) {
@@ -519,16 +567,42 @@ window.App = {
     }
 
     state.selectedClassId = Number(classId);
-    const classLessons = state.lessons.filter(l => l.class_id === state.selectedClassId);
-    state.selectedLessonId = classLessons.length > 0 ? classLessons[0].id : null;
+    state.selectedClassDetailId = Number(classId);
+    state.selectedLessonId = null;
     this.updateStudyList();
     
     const activeClass = state.classes.find(c => c.id === state.selectedClassId);
-    showToast(`Đã chuyển sang ${activeClass ? activeClass.name : 'Lớp học'}!`, 'info');
+    showToast(`Đã chọn ${activeClass ? activeClass.name : 'Lớp học'}!`, 'info');
     this.render();
   },
 
-  switchTab(tabName, payload = null) {
+  finishFlashcardSession() {
+    if (state.flashcardStartTime) {
+      const elapsedSeconds = Math.round((Date.now() - state.flashcardStartTime) / 1000);
+      if (elapsedSeconds >= 3 && state.currentUser) {
+        const sessionPayload = {
+          user_id: state.currentUser.id,
+          user_name: state.currentUser.full_name,
+          class_id: state.selectedClassId || state.currentUser.class_id || 1,
+          lesson_id: state.selectedLessonId,
+          activity_type: 'flashcard',
+          duration_seconds: elapsedSeconds,
+          cards_viewed: Math.max(1, state.flashcardCardsViewed),
+          cards_mastered: state.flashcardCardsMastered
+        };
+        SupabaseService.saveStudySession(sessionPayload).then(saved => {
+          if (saved) {
+            state.studySessions.unshift(saved);
+          }
+        });
+      }
+      state.flashcardStartTime = null;
+      state.flashcardCardsViewed = 0;
+      state.flashcardCardsMastered = 0;
+    }
+  },
+
+  switchTab(tabName, payload = null, pushHistory = true) {
     // If not logged in, force login screen
     if (!state.currentUser && tabName !== 'login') {
       state.currentTab = 'login';
@@ -536,26 +610,39 @@ window.App = {
       return;
     }
 
-    // Role-based restrictions: Students cannot access system admin tabs (classes, accounts)
-    if (state.currentUser?.role === 'student') {
-      const restrictedTabs = ['classes', 'accounts'];
-      if (restrictedTabs.includes(tabName)) {
-        showToast("Học sinh chỉ được phép truy cập vào các phần liên quan đến học tập của lớp mình!", "error");
-        state.currentTab = 'dashboard';
-        this.render();
-        return;
+    if (state.currentTab === 'flashcards' && tabName !== 'flashcards') {
+      this.finishFlashcardSession();
+    }
+
+    // Role-based restrictions: Students cannot access accounts management
+    if (state.currentUser?.role === 'student' && tabName === 'accounts') {
+      showToast("Chỉ Quản trị viên và Giáo viên mới có quyền quản lý tài khoản!", "error");
+      state.currentTab = 'dashboard';
+      this.render();
+      return;
+    }
+
+    if (pushHistory) {
+      if (!state.navigationHistory) state.navigationHistory = [];
+      if (state.navigationHistory[state.navigationHistory.length - 1] !== tabName) {
+        state.navigationHistory.push(tabName);
       }
     }
 
     state.currentTab = tabName;
     this.closeMobileSidebar();
+
     if (tabName === 'flashcards') {
       state.flashcardIndex = 0;
       state.flashcardFlipped = false;
+      state.flashcardStartTime = Date.now();
+      state.flashcardCardsViewed = 0;
+      state.flashcardCardsMastered = 0;
       this.updateStudyList();
     } else if (tabName === 'quiz' && payload?.startNew) {
       this.startNewQuiz(payload.lessonId, payload.isRandom);
     }
+
     this.render();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   },
@@ -573,6 +660,9 @@ window.App = {
     this.updateStudyList();
     state.flashcardIndex = 0;
     state.flashcardFlipped = false;
+    state.flashcardStartTime = Date.now();
+    state.flashcardCardsViewed = 0;
+    state.flashcardCardsMastered = 0;
     this.switchTab('flashcards');
   },
 
@@ -1273,9 +1363,12 @@ window.App = {
 
   nextFlashcard(isKnown = false) {
     if (state.studyList.length === 0) return;
+    state.flashcardCardsViewed = (state.flashcardCardsViewed || 0) + 1;
+
     const currentWord = state.studyList[state.flashcardIndex];
     if (isKnown && currentWord) {
       state.knownWords.add(currentWord.id);
+      state.flashcardCardsMastered = (state.flashcardCardsMastered || 0) + 1;
     }
 
     state.flashcardFlipped = false;
@@ -1286,6 +1379,7 @@ window.App = {
       state.flashcardIndex += 1;
     } else {
       showToast(`Chúc mừng em đã hoàn thành toàn bộ ${state.studyList.length} thẻ từ vựng của lớp! 🎉`, "success");
+      this.finishFlashcardSession();
       state.flashcardIndex = 0;
     }
     this.render();
@@ -1526,8 +1620,12 @@ window.App = {
 
   bindGlobalEvents() {
     window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (e.key === 'Escape') {
+        App.safeGoBack();
+        return;
+      }
       if (state.currentTab === 'flashcards') {
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
         if (e.code === 'Space' || e.key === ' ') {
           e.preventDefault();
           this.flipFlashcard();
@@ -1604,9 +1702,63 @@ window.App = {
     // Role-based sidebar menu items filtering
     this.updateSidebarNavigationUI();
 
+    // Update active nav indicators in Desktop/Drawer Sidebar
+    document.querySelectorAll('[data-nav-tab]').forEach(el => {
+      const tab = el.getAttribute('data-nav-tab');
+      if (tab === state.currentTab) {
+        el.classList.add('bg-primary-container', 'text-on-primary-container', 'font-bold', 'shadow-sm');
+        el.classList.remove('text-on-surface-variant');
+      } else {
+        el.classList.remove('bg-primary-container', 'text-on-primary-container', 'font-bold', 'shadow-sm');
+        el.classList.add('text-on-surface-variant');
+      }
+    });
+
+    // Update active nav indicators in Mobile Bottom Navigation
+    document.querySelectorAll('[data-mobile-tab]').forEach(el => {
+      const tab = el.getAttribute('data-mobile-tab');
+      if (tab === state.currentTab) {
+        el.classList.add('text-primary', 'font-bold');
+        el.classList.remove('text-on-surface-variant');
+      } else {
+        el.classList.remove('text-primary', 'font-bold');
+        el.classList.add('text-on-surface-variant');
+      }
+    });
+
+    // Update persistent top-left back button visibility
+    const backBtn = document.getElementById('global-header-back-btn');
+    if (backBtn) {
+      if (state.currentTab === 'dashboard' && !state.selectedClassDetailId) {
+        backBtn.classList.add('invisible');
+      } else {
+        backBtn.classList.remove('invisible');
+      }
+    }
+
+    // Update breadcrumbs
+    const breadcrumbPage = document.getElementById('breadcrumb-current-page');
+    if (breadcrumbPage) {
+      const activeClass = state.classes.find(c => c.id === state.selectedClassId);
+      const titles = {
+        dashboard: 'Trang Chủ',
+        classes: state.selectedClassDetailId ? (activeClass?.name || 'Chi Tiết Lớp Học') : 'Lớp Học & Chuyên Đề',
+        accounts: 'Quản Lý Tài Khoản',
+        flashcards: `Flashcard 3D • ${activeClass?.name || ''}`,
+        quiz: `Luyện Đề Vào 10 • ${activeClass?.name || ''}`,
+        quiz_result: 'Kết Quả Bài Thi',
+        table_input: `Bảng Nhập Từ • ${activeClass?.name || ''}`,
+        vocabulary: `Kho Từ Vựng • ${activeClass?.name || ''}`,
+        tutor: 'Gia Sư AI Quang Son',
+        settings: 'Cài Đặt Hệ Thống'
+      };
+      breadcrumbPage.textContent = titles[state.currentTab] || 'Ôn Thi Tiếng Anh Vào 10';
+    }
+
     const viewRenderers = {
       dashboard: this.renderDashboardView,
       classes: this.renderClassesView,
+      class_detail: this.renderClassDetailView,
       accounts: this.renderAccountManagementView,
       lessons: this.renderLessonsView,
       vocabulary: this.renderVocabularyView,
@@ -1800,7 +1952,7 @@ window.App = {
     `;
   },
 
-  // 1. Dashboard View (Locked to assigned class for students)
+  // 1. Dashboard View (Active Class Hub, Personal Learning Stats & AI Tutor)
   renderDashboardView() {
     const user = state.currentUser;
     const isStudent = user.role === 'student';
@@ -1812,165 +1964,158 @@ window.App = {
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
     const classStudents = state.usersList.filter(u => u.role === 'student' && u.class_id === targetClassId);
 
+    // Compute personal learning time & test stats for this user
+    const userStudySessions = (state.studySessions || []).filter(s => s.user_id === user.id || (user.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+    const userTestSessions = (state.testSessions || []).filter(s => s.user_id === user.id || (user.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+
+    const flashcardSeconds = userStudySessions.filter(s => s.activity_type === 'flashcard').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+    const quizSeconds = userTestSessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+    const totalStudyMinutes = Math.max(1, Math.round((flashcardSeconds + quizSeconds) / 60));
+
+    const totalTests = userTestSessions.length;
+    const avgScore = totalTests > 0 ? Math.round(userTestSessions.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / totalTests) : 0;
+    const userStreak = user.streak || 12;
+
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
         
-        <!-- Active Class Banner -->
-        <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-              <span class="material-symbols-outlined text-2xl">school</span>
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <h3 class="font-headline-md text-base font-bold text-on-surface">${activeClass.name}</h3>
-                <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary text-xs font-mono font-bold">Mã: ${activeClass.class_code}</span>
-              </div>
-              <p class="text-xs text-on-surface-variant">
-                ${isStudent ? `Lớp học của em: Toàn bộ từ vựng và bài kiểm tra được thiết kế riêng cho lớp ${activeClass.name}.` : user.role === 'host' ? 'Quản trị viên tối cao: Toàn quyền truy cập mọi lớp học & quản lý tài khoản.' : 'Giáo viên phụ: Quản lý bài học và kho từ vựng lớp này.'}
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            ${!isStudent ? `
-              <select onchange="App.selectClass(this.value)" class="py-2 px-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-bold text-primary focus:outline-none">
-                ${state.classes.map(c => `<option value="${c.id}" ${c.id === state.selectedClassId ? 'selected' : ''}>Chuyển lớp: ${c.name}</option>`).join('')}
-              </select>
-            ` : `
-              <button onclick="App.openChangeMyPasswordModal()" class="px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1.5 transition-colors">
-                <span class="material-symbols-outlined text-sm">key</span> Đổi Mật Khẩu
-              </button>
-            `}
-          </div>
-        </div>
-
         <!-- Welcome Hero -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-surface-container-lowest to-surface-container-low p-6 md:p-8 rounded-2xl ambient-shadow border border-outline-variant/30">
+        <div class="bg-gradient-to-r from-surface-container-lowest via-surface-container-low to-surface-container-lowest p-6 md:p-8 rounded-3xl ambient-shadow border border-primary/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
-            <div class="flex items-center gap-2 text-primary font-bold text-xs mb-1">
-              <span class="material-symbols-outlined text-base">verified</span>
+            <div class="flex items-center gap-2 text-primary font-bold text-xs mb-2">
+              <span class="material-symbols-outlined text-lg">verified</span>
               <span>${CONFIG.BRAND.NAME}</span>
             </div>
-            <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">
+            <h1 class="font-display-lg text-2xl md:text-3xl font-bold text-on-surface">
               Xin chào, <span class="text-primary">${user.full_name}!</span> 👋
-            </h2>
-            <p class="font-body-md text-sm text-on-surface-variant mt-1">
-              Lớp <strong class="text-primary">${activeClass.name}</strong> hiện có <strong class="text-primary">${classVocab.length} từ vựng</strong> thuộc <strong class="text-primary">${classLessons.length} chuyên đề</strong>.
+            </h1>
+            <p class="font-body-md text-sm text-on-surface-variant mt-2 max-w-xl">
+              Chào mừng em quay trở lại không gian ôn thi Tiếng Anh vào 10. Hãy sẵn sàng bứt phá điểm số hôm nay!
             </p>
           </div>
-          <div class="flex items-center gap-2.5 flex-wrap">
-            <button onclick="App.openCreateVocabularyModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs btn-press flex items-center gap-1.5 hover-lift shadow-sm">
-              <span class="material-symbols-outlined text-base">add_circle</span>
-              + Thêm Từ Vựng
+
+          <div class="flex items-center gap-3 flex-wrap">
+            <button onclick="App.openClassDetail(${targetClassId})" class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3.5 rounded-2xl font-bold text-sm btn-press flex items-center gap-2 hover-lift shadow-md">
+              <span class="material-symbols-outlined text-xl">school</span>
+              <span>👉 Vào Học Lớp: ${activeClass.name.split(' - ')[0]}</span>
             </button>
-            <button onclick="App.openBatchTableModal()" class="bg-surface-container text-primary px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover:bg-surface-container-high border border-primary/20">
-              <span class="material-symbols-outlined text-base">table_rows</span>
-              Bảng Nhập Từ
-            </button>
-            <button onclick="App.switchTab('flashcards')" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
-              <span class="material-symbols-outlined text-base">style</span>
-              Luyện Flashcard 3D
-            </button>
-            <button onclick="App.startNewQuiz(null, true)" class="bg-primary-container text-on-primary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
-              <span class="material-symbols-outlined text-base">casino</span>
-              Test Random Toàn Lớp
+            
+            <button onclick="App.switchTab('tutor')" class="bg-secondary-container text-on-secondary-container px-4 py-3 rounded-2xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-base">psychology</span>
+              <span>Gia Sư AI</span>
             </button>
           </div>
         </div>
 
-        <!-- Bento Stats Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
-          <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
-            <div class="flex justify-between items-start mb-3">
-              <div class="w-12 h-12 rounded-xl bg-primary-container/15 flex items-center justify-center text-primary">
-                <span class="material-symbols-outlined text-2xl">menu_book</span>
-              </div>
-              <span class="bg-surface-container-highest text-primary font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">${activeClass.name.split(' - ')[0]}</span>
+        <!-- Active Class Hub Spotlight Card -->
+        <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div class="flex items-start gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/20 text-primary flex items-center justify-center font-bold text-2xl shrink-0 shadow-sm">
+              <span class="material-symbols-outlined text-3xl">school</span>
             </div>
-            <h3 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Từ Vựng Của Lớp</h3>
-            <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${classVocab.length} <span class="text-xs font-normal text-outline">từ</span></p>
-          </div>
-
-          <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
-            <div class="flex justify-between items-start mb-3">
-              <div class="w-12 h-12 rounded-xl bg-secondary-container/15 flex items-center justify-center text-secondary">
-                <span class="material-symbols-outlined text-2xl">auto_stories</span>
-              </div>
-              <span class="bg-surface-container-highest text-secondary font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">${classLessons.length} Unit</span>
-            </div>
-            <h3 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Chuyên Đề Bài Học</h3>
-            <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${classLessons.length} <span class="text-xs font-normal text-outline">chuyên đề</span></p>
-          </div>
-
-          <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
-            <div class="flex justify-between items-start mb-3">
-              <div class="w-12 h-12 rounded-xl bg-tertiary-container/15 flex items-center justify-center text-tertiary">
-                <span class="material-symbols-outlined text-2xl">military_tech</span>
-              </div>
-              <span class="bg-surface-container-highest text-tertiary font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Mục tiêu</span>
-            </div>
-            <h3 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Mục Tiêu Thi Vào 10</h3>
-            <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">9.0+ <span class="text-xs font-normal text-outline">điểm</span></p>
-          </div>
-
-          <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
-            <div class="flex justify-between items-start mb-3">
-              <div class="w-12 h-12 rounded-xl bg-green-500/15 flex items-center justify-center text-green-700">
-                <span class="material-symbols-outlined text-2xl">local_fire_department</span>
-              </div>
-              <span class="bg-green-100 text-green-800 font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Chăm chỉ</span>
-            </div>
-            <h3 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Chuỗi Ngày Học</h3>
-            <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">12 <span class="text-xs font-normal text-outline">ngày liên tiếp</span></p>
-          </div>
-        </div>
-
-        <!-- Lessons List -->
-        <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30">
-          <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="font-headline-md text-lg font-bold text-on-surface">Chuyên Đề Bài Học - ${activeClass.name}</h3>
-              <p class="text-xs text-on-surface-variant">Luyện tập từ vựng hoặc làm bài kiểm tra 3 dạng bài theo từng Unit</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="App.openCreateVocabularyModal()" class="text-secondary font-bold text-xs flex items-center gap-1 hover:underline">
-                <span class="material-symbols-outlined text-sm">add_circle</span> Thêm từ vựng
-              </button>
-              <button onclick="App.openCreateLessonModal()" class="text-primary font-bold text-xs flex items-center gap-1 hover:underline ml-2">
-                <span class="material-symbols-outlined text-sm">add</span> Thêm bài học
-              </button>
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <span class="px-3 py-1 rounded-full bg-primary-container/20 text-primary font-mono font-bold text-xs">Mã lớp: ${activeClass.class_code}</span>
+                <h2 class="font-headline-md text-lg font-bold text-on-surface">${activeClass.name}</h2>
+              </div>
+              <p class="text-xs text-on-surface-variant mt-1.5">
+                ${isStudent ? `Lớp học của em gồm đầy đủ chuyên đề bài học, kho từ vựng và bài thi chuẩn format vào 10.` : `Quản trị viên & Giáo viên: Truy cập các Unit bài học, kho từ và theo dõi báo cáo học sinh của lớp.`}
+              </p>
+              <div class="flex items-center gap-4 text-xs font-semibold text-outline mt-3">
+                <span class="flex items-center gap-1 text-primary"><span class="material-symbols-outlined text-base">auto_stories</span> <strong>${classLessons.length}</strong> bài học</span>
+                <span class="flex items-center gap-1 text-secondary"><span class="material-symbols-outlined text-base">menu_book</span> <strong>${classVocab.length}</strong> từ vựng</span>
+                <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">groups</span> <strong>${classStudents.length}</strong> học sinh</span>
+              </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            ${classLessons.map(lesson => {
-              const count = classVocab.filter(v => v.lesson_id === lesson.id).length;
-              return `
-                <div class="p-5 rounded-xl bg-surface-container-low border border-outline-variant/40 hover:border-primary/50 transition-all hover-lift flex flex-col justify-between">
-                  <div>
-                    <div class="flex items-center justify-between mb-2">
-                      <span class="px-2.5 py-0.5 bg-surface-container-high rounded-full text-xs font-bold text-primary">Unit #${lesson.id}</span>
-                      <span class="text-xs text-outline">${count} từ vựng</span>
-                    </div>
-                    <h4 class="font-headline-md text-sm font-bold text-on-surface mb-3">${lesson.title}</h4>
-                  </div>
-                  <div class="flex items-center gap-1.5 pt-3 border-t border-outline-variant/30 flex-wrap">
-                    <button onclick="App.openCreateVocabularyModal(${lesson.id})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
-                      <span class="material-symbols-outlined text-sm">add</span>
-                    </button>
-                    <button onclick="App.startLessonFlashcard(${lesson.id})" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
-                      <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
-                    </button>
-                    <button onclick="App.startNewQuiz(${lesson.id}, false)" class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-bold text-xs hover:bg-primary-container transition-colors text-center flex items-center justify-center gap-1">
-                      <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
-                    </button>
-                  </div>
-                </div>
-              `;
-            }).join('')}
+          <div class="flex items-center gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+            <button onclick="App.openClassDetail(${targetClassId}, 'units')" class="flex-1 lg:flex-none bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-xs btn-press flex items-center justify-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-base">list_alt</span> Xem Bài Học (Units)
+            </button>
+            <button onclick="App.startLessonFlashcard(null)" class="flex-1 lg:flex-none bg-surface-container text-primary px-4 py-3 rounded-xl font-bold text-xs border border-primary/20 flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors">
+              <span class="material-symbols-outlined text-base">style</span> Luyện Flashcard
+            </button>
+            <button onclick="App.startNewQuiz(null, true)" class="flex-1 lg:flex-none bg-surface-container text-on-surface px-4 py-3 rounded-xl font-bold text-xs border border-outline-variant/40 flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors">
+              <span class="material-symbols-outlined text-base">quiz</span> Thi Thử
+            </button>
           </div>
         </div>
+
+        <!-- Personal Progress & Time Analytics Grid -->
+        <div>
+          <h3 class="font-headline-md text-base font-bold text-on-surface mb-3 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">insights</span>
+            <span>Tiến Độ & Thời Gian Học Tập Cá Nhân</span>
+          </h3>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+            <!-- Total Study Time Card -->
+            <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
+              <div class="flex justify-between items-start mb-3">
+                <div class="w-12 h-12 rounded-xl bg-blue-500/15 flex items-center justify-center text-primary">
+                  <span class="material-symbols-outlined text-2xl">timer</span>
+                </div>
+                <span class="bg-blue-100 text-blue-900 font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Ghi nhận tự động</span>
+              </div>
+              <h4 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Tổng Thời Gian Đã Học</h4>
+              <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${totalStudyMinutes} <span class="text-xs font-normal text-outline">phút</span></p>
+            </div>
+
+            <!-- Streak Card -->
+            <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
+              <div class="flex justify-between items-start mb-3">
+                <div class="w-12 h-12 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-600">
+                  <span class="material-symbols-outlined text-2xl">local_fire_department</span>
+                </div>
+                <span class="bg-amber-100 text-amber-900 font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Chuỗi ngày</span>
+              </div>
+              <h4 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Chuỗi Học Tập</h4>
+              <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${userStreak} <span class="text-xs font-normal text-outline">ngày liên tiếp</span></p>
+            </div>
+
+            <!-- Tests Completed Card -->
+            <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
+              <div class="flex justify-between items-start mb-3">
+                <div class="w-12 h-12 rounded-xl bg-green-500/15 flex items-center justify-center text-green-700">
+                  <span class="material-symbols-outlined text-2xl">task_alt</span>
+                </div>
+                <span class="bg-green-100 text-green-800 font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Đã làm</span>
+              </div>
+              <h4 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Bài Thi Hoàn Thành</h4>
+              <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${totalTests} <span class="text-xs font-normal text-outline">lần nộp</span></p>
+            </div>
+
+            <!-- Average Score Card -->
+            <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
+              <div class="flex justify-between items-start mb-3">
+                <div class="w-12 h-12 rounded-xl bg-purple-500/15 flex items-center justify-center text-purple-700">
+                  <span class="material-symbols-outlined text-2xl">military_tech</span>
+                </div>
+                <span class="bg-purple-100 text-purple-800 font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Mục tiêu 9.0+</span>
+              </div>
+              <h4 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Điểm Trung Bình</h4>
+              <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${avgScore > 0 ? avgScore + '%' : '92%'} <span class="text-xs font-normal text-outline">${avgScore >= 80 ? '🌟 Giỏi' : 'Đạt'}</span></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick AI Tutor Assistant Box -->
+        <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-2xl">psychology</span>
+            </div>
+            <div>
+              <h4 class="font-headline-md text-base font-bold text-on-surface">Cần Thầy Giải Thích Từ Vựng Hoặc Ngữ Pháp?</h4>
+              <p class="text-xs text-on-surface-variant">Gia Sư AI Quang Son luôn sẵn sàng 24/7 giải đáp mọi cấu trúc và đề thi vào 10.</p>
+            </div>
+          </div>
+          <button onclick="App.switchTab('tutor')" class="bg-secondary-container text-on-secondary-container px-5 py-2.5 rounded-xl font-bold text-xs hover-lift shadow-sm whitespace-nowrap">
+            💬 Nhắn Tin Cho Gia Sư AI
+          </button>
+        </div>
+
       </div>
     `;
   },
@@ -2269,13 +2414,22 @@ window.App = {
     `;
   },
 
-  // 3. Classes View (Admin / Teacher Only)
+  // 3. Classes View (Admin / Teacher List & Student Direct Drilldown)
   renderClassesView() {
-    if (state.currentUser?.role === 'student') return this.renderDashboardView();
-
+    const isStudent = state.currentUser?.role === 'student';
     const isHost = state.currentUser?.role === 'host';
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
     const assistantClassId = Number(state.currentUser?.class_id || 1);
+
+    // If student, directly render their assigned class detail view
+    if (isStudent) {
+      return this.renderClassDetailView(Number(state.currentUser.class_id || 1));
+    }
+
+    // If teacher/host has a class selected to drilldown into, render its detail
+    if (state.selectedClassDetailId) {
+      return this.renderClassDetailView(state.selectedClassDetailId);
+    }
 
     const visibleClasses = isHost 
       ? state.classes 
@@ -2286,10 +2440,10 @@ window.App = {
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">
-              ${isHost ? 'Quản lý Lớp học & Học viên' : 'Lớp học của bạn'}
+              ${isHost ? 'Quản lý Lớp học & Chuyên đề' : 'Lớp học của bạn'}
             </h2>
             <p class="font-body-md text-sm text-on-surface-variant">
-              ${isHost ? 'Tạo lớp học mới, chia sẻ Mã lớp và quản lý kho từ vựng.' : 'Theo dõi học sinh và kho từ vựng của lớp bạn phụ trách.'}
+              ${isHost ? 'Bấm vào từng lớp học để xem các bài học, kho từ vựng và báo cáo học sinh.' : 'Theo dõi học sinh, bài học và báo cáo lớp bạn phụ trách.'}
             </p>
           </div>
           ${isHost ? `
@@ -2305,30 +2459,31 @@ window.App = {
             const classVocab = state.vocabulary.filter(v => v.class_id === c.id);
             const classLessons = state.lessons.filter(l => l.class_id === c.id);
             const classStudents = state.usersList.filter(u => u.class_id === c.id && u.role === 'student');
-            const isSelected = c.id === state.selectedClassId;
 
             return `
-              <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border-2 ${isSelected ? 'border-primary' : 'border-outline-variant/30'} flex flex-col justify-between hover-lift">
+              <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift">
                 <div>
                   <div class="flex items-center justify-between mb-3">
-                    <span class="px-3 py-1 rounded-full ${isSelected ? 'bg-primary text-on-primary font-bold' : 'bg-primary-container/20 text-primary font-bold'} text-xs">Mã: ${c.class_code}</span>
+                    <span class="px-3 py-1 rounded-full bg-primary-container/20 text-primary font-mono font-bold text-xs">Mã: ${c.class_code}</span>
                     <button onclick="navigator.clipboard.writeText('${c.class_code}'); App.showToast('Đã copy mã lớp ${c.class_code}!', 'success')" class="text-outline hover:text-primary p-1" title="Copy mã lớp">
                       <span class="material-symbols-outlined text-base">content_copy</span>
                     </button>
                   </div>
-                  <h3 class="font-headline-md text-base font-bold text-on-surface mb-2">${c.name}</h3>
+                  <h3 class="font-headline-md text-lg font-bold text-on-surface mb-2">${c.name}</h3>
                   <div class="flex items-center gap-3 text-xs text-on-surface-variant mb-4">
-                    <span>📚 ${classVocab.length} từ</span>
-                    <span>📖 ${classLessons.length} bài</span>
-                    <span>👥 ${classStudents.length} học sinh</span>
+                    <span>📖 <strong>${classLessons.length}</strong> bài học</span>
+                    <span>•</span>
+                    <span>📚 <strong>${classVocab.length}</strong> từ</span>
+                    <span>•</span>
+                    <span>👥 <strong>${classStudents.length}</strong> học sinh</span>
                   </div>
                 </div>
-                <div class="flex items-center gap-2 pt-3 border-t border-outline-variant/30">
-                  <button onclick="App.selectClass(${c.id}); App.switchTab('vocabulary');" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center">
-                    Kho từ vựng
+                <div class="flex items-center gap-2 pt-4 border-t border-outline-variant/30">
+                  <button onclick="App.openClassDetail(${c.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift transition-colors text-center flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-base">school</span> 👉 Vào Lớp Học
                   </button>
                   ${isHost ? `
-                    <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl">
+                    <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa lớp">
                       <span class="material-symbols-outlined text-base">delete</span>
                     </button>
                   ` : ''}
@@ -2337,6 +2492,406 @@ window.App = {
             `;
           }).join('')}
         </div>
+      </div>
+    `;
+  },
+
+  // 3.1. Class Detail View (Class-Centric Hub: Units, Vocabulary, and Teacher-Only Student Reports)
+  renderClassDetailView(classId) {
+    const targetClassId = Number(classId) || 1;
+    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: `Lớp #${targetClassId}`, class_code: "QS9A" };
+    const isStudent = state.currentUser?.role === 'student';
+    const isTeacher = !isStudent;
+
+    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
+    const classVocab = state.vocabulary.filter(v => v.class_id === targetClassId);
+    const classStudents = state.usersList.filter(u => u.role === 'student' && u.class_id === targetClassId);
+    const classStudySessions = (state.studySessions || []).filter(s => s.class_id === targetClassId);
+    const classTestSessions = (state.testSessions || []).filter(s => s.class_id === targetClassId);
+
+    const currentTab = state.classDetailTab || 'units';
+
+    return `
+      <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+        
+        <!-- Class Hub Header -->
+        <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-primary/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div class="flex items-start sm:items-center gap-3.5">
+            ${isTeacher ? `
+              <button onclick="App.state.selectedClassDetailId = null; App.render();" class="p-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors shrink-0" title="Danh sách các lớp">
+                <span class="material-symbols-outlined text-lg">arrow_back</span>
+              </button>
+            ` : ''}
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary flex items-center justify-center font-bold text-xl shadow-md shrink-0">
+              <span class="material-symbols-outlined text-2xl">school</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="font-display-lg text-xl sm:text-2xl font-bold text-on-surface">${activeClass.name}</h2>
+                <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary text-xs font-mono font-bold">Mã: ${activeClass.class_code}</span>
+              </div>
+              <div class="flex items-center gap-3 text-xs text-on-surface-variant mt-1 flex-wrap">
+                <span>📖 <strong>${classLessons.length}</strong> bài học</span>
+                <span>•</span>
+                <span>📚 <strong>${classVocab.length}</strong> từ vựng</span>
+                <span>•</span>
+                <span>👥 <strong>${classStudents.length}</strong> học sinh</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fast Launcher Actions -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="App.startLessonFlashcard(null)" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">style</span> Luyện Flashcard Lớp
+            </button>
+            <button onclick="App.startNewQuiz(null, true)" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs btn-press flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">quiz</span> Thi Thử Toàn Lớp
+            </button>
+          </div>
+        </div>
+
+        <!-- Class Section Navigation Tabs -->
+        <div class="flex items-center gap-2 border-b border-outline-variant/30 pb-2 overflow-x-auto">
+          <button onclick="App.setClassDetailTab('units')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'units' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+            <span class="material-symbols-outlined text-base">auto_stories</span>
+            <span>Danh Sách Bài Học (${classLessons.length})</span>
+          </button>
+          
+          <button onclick="App.setClassDetailTab('vocabulary')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'vocabulary' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+            <span class="material-symbols-outlined text-base">menu_book</span>
+            <span>Kho Từ Vựng (${classVocab.length})</span>
+          </button>
+
+          ${isTeacher ? `
+            <button onclick="App.setClassDetailTab('reports')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'reports' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+              <span class="material-symbols-outlined text-base">analytics</span>
+              <span>Báo Cáo Học Sinh & Thời Gian Học (Giáo Viên)</span>
+            </button>
+          ` : ''}
+        </div>
+
+        <!-- TAB 1: UNITS / LESSONS -->
+        ${currentTab === 'units' ? `
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="font-headline-md text-base font-bold text-on-surface">Các Chuyên Đề & Bài Học (Units)</h3>
+                <p class="text-xs text-on-surface-variant">Luyện tập từ vựng, flashcard 3D và thi thử theo từng Unit của lớp.</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="App.openCreateLessonModal()" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                  <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
+                </button>
+                <button onclick="App.openCreateVocabularyModal()" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
+                  <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
+                </button>
+                <button onclick="App.openBatchTableModal()" class="bg-surface-container text-primary px-3.5 py-2 rounded-xl font-bold text-xs border border-primary/30 flex items-center gap-1.5 hover:bg-surface-container-high">
+                  <span class="material-symbols-outlined text-sm">table_rows</span> + Bảng Nhập Từ Hàng Loạt
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+              ${classLessons.length > 0 ? classLessons.map(l => {
+                const count = classVocab.filter(v => v.lesson_id === l.id).length;
+                return `
+                  <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift">
+                    <div>
+                      <div class="flex items-center justify-between mb-2.5">
+                        <span class="px-2.5 py-0.5 bg-surface-container-high rounded-full text-xs font-bold text-primary">Unit #${l.id}</span>
+                        <span class="text-xs text-outline">${count} từ vựng</span>
+                      </div>
+                      <h4 class="font-headline-md text-base font-bold text-on-surface mb-3">${l.title}</h4>
+                    </div>
+                    <div class="flex items-center gap-1.5 pt-3 border-t border-outline-variant/30 flex-wrap">
+                      <button onclick="App.openCreateVocabularyModal(${l.id})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
+                        <span class="material-symbols-outlined text-sm">add</span>
+                      </button>
+                      <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
+                      </button>
+                      <button onclick="App.startNewQuiz(${l.id}, false)" class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-bold text-xs hover:bg-primary-container transition-colors text-center flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
+                      </button>
+                      ${isTeacher ? `
+                        <button onclick="App.deleteLesson(${l.id})" class="p-2 text-outline hover:text-error rounded-lg hover:bg-error-container/20 transition-colors" title="Xóa bài học">
+                          <span class="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('') : `
+                <div class="col-span-full p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
+                  <p class="text-outline font-semibold">Chưa có bài học nào trong lớp này.</p>
+                  <button onclick="App.openCreateLessonModal()" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold">
+                    + Tạo Bài Học Đầu Tiên
+                  </button>
+                </div>
+              `}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- TAB 2: VOCABULARY INVENTORY -->
+        ${currentTab === 'vocabulary' ? `
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="font-headline-md text-base font-bold text-on-surface">Kho Từ Vựng Của Lớp</h3>
+                <p class="text-xs text-on-surface-variant">Tra cứu và quản lý toàn bộ từ vựng ôn thi vào 10 của lớp.</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="App.openCreateVocabularyModal()" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                  <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
+                </button>
+                <button onclick="App.openBatchTableModal()" class="bg-primary-container text-on-primary-container px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                  <span class="material-symbols-outlined text-sm">table_rows</span> + Thêm Dạng Bảng
+                </button>
+                <button onclick="App.ExcelService.exportVocabulary(classVocab)" class="bg-surface-container text-on-surface px-3.5 py-2 rounded-xl font-bold text-xs border border-outline-variant/40 flex items-center gap-1 hover:bg-surface-container-high">
+                  <span class="material-symbols-outlined text-sm">download</span> Xuất Excel
+                </button>
+              </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="bg-surface-container-lowest p-4 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col md:flex-row items-center gap-3">
+              <div class="relative flex-1 w-full">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm từ vựng, phiên âm hoặc nghĩa..." 
+                  value="${state.searchQuery}"
+                  oninput="App.state.searchQuery = this.value; App.render();"
+                  class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <select 
+                onchange="App.state.selectedLessonId = this.value ? Number(this.value) : null; App.render();"
+                class="w-full md:w-56 py-2 px-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-semibold focus:outline-none"
+              >
+                <option value="">📚 Toàn bộ bài học (${classVocab.length} từ)</option>
+                ${classLessons.map(l => `<option value="${l.id}" ${state.selectedLessonId === l.id ? 'selected' : ''}>📖 ${l.title} (${classVocab.filter(v => v.lesson_id === l.id).length} từ)</option>`).join('')}
+              </select>
+            </div>
+
+            <!-- Vocab Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+              ${(() => {
+                const filtered = classVocab.filter(v => {
+                  const matchLesson = !state.selectedLessonId || v.lesson_id === Number(state.selectedLessonId);
+                  const matchSearch = !state.searchQuery || 
+                    v.word.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
+                    v.meaning.toLowerCase().includes(state.searchQuery.toLowerCase());
+                  return matchLesson && matchSearch;
+                });
+
+                if (filtered.length === 0) {
+                  return `
+                    <div class="col-span-full p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
+                      <p class="text-outline font-semibold">Không tìm thấy từ vựng nào.</p>
+                    </div>
+                  `;
+                }
+
+                return filtered.map(item => {
+                  const lessonObj = classLessons.find(l => l.id === item.lesson_id);
+                  const lessonLabel = lessonObj ? lessonObj.title : `Unit #${item.lesson_id}`;
+                  const safeWord = item.word.replace(/'/g, "\\'");
+
+                  return `
+                    <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift">
+                      <div>
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <h4 class="font-headline-md text-lg font-bold text-primary flex items-center gap-2">
+                              ${item.word}
+                              <button onclick="App.speakWord('${safeWord}')" class="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors" title="Nghe phát âm">
+                                <span class="material-symbols-outlined text-sm">volume_up</span>
+                              </button>
+                            </h4>
+                            <span class="font-mono text-xs text-outline">${item.ipa || ''}</span>
+                          </div>
+                          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${item.is_grammar ? 'bg-amber-100 text-amber-800' : 'bg-primary-container/20 text-primary'}">
+                            ${item.is_grammar ? 'Ngữ pháp' : 'Từ vựng'}
+                          </span>
+                        </div>
+                        <p class="font-body-md text-sm font-semibold text-on-surface mb-3">${item.meaning}</p>
+                        ${item.example ? `
+                          <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/20 mb-3">
+                            <p class="text-xs text-on-surface-variant italic">"${item.example}"</p>
+                          </div>
+                        ` : ''}
+                      </div>
+
+                      <div class="flex items-center justify-between pt-3 border-t border-outline-variant/30 text-xs">
+                        <span class="text-outline text-[11px]">${lessonLabel}</span>
+                        <div class="flex items-center gap-1">
+                          <button onclick="App.openEditVocabularyModal(${item.id})" class="p-1.5 text-outline hover:text-primary rounded-lg hover:bg-surface-container" title="Sửa từ">
+                            <span class="material-symbols-outlined text-base">edit</span>
+                          </button>
+                          <button onclick="App.deleteVocabulary(${item.id})" class="p-1.5 text-outline hover:text-error rounded-lg hover:bg-error-container/20" title="Xóa từ">
+                            <span class="material-symbols-outlined text-base">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('');
+              })()}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- TAB 3: TEACHER-ONLY STUDENT ACTIVITY & STUDY TIME REPORT -->
+        ${(currentTab === 'reports' && isTeacher) ? `
+          <div class="flex flex-col gap-5">
+            
+            <!-- Summary Stats for the whole Class -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+              <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-outline-variant/30">
+                <div class="flex justify-between items-start mb-2">
+                  <div class="w-10 h-10 rounded-xl bg-blue-500/15 text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-xl">groups</span>
+                  </div>
+                  <span class="bg-surface-container text-outline px-2 py-0.5 rounded text-[11px] font-bold">Học viên</span>
+                </div>
+                <p class="text-xs text-outline uppercase font-bold">Tổng Học Sinh</p>
+                <p class="text-2xl font-bold text-on-surface mt-1">${classStudents.length} <span class="text-xs font-normal text-outline">em</span></p>
+              </div>
+
+              <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-outline-variant/30">
+                <div class="flex justify-between items-start mb-2">
+                  <div class="w-10 h-10 rounded-xl bg-green-500/15 text-green-700 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-xl">timer</span>
+                  </div>
+                  <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[11px] font-bold">Tổng thời gian</span>
+                </div>
+                <p class="text-xs text-outline uppercase font-bold">Thời Gian Cả Lớp Đã Học</p>
+                <p class="text-2xl font-bold text-on-surface mt-1">
+                  ${Math.max(1, Math.round((classStudySessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) + classTestSessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0)) / 60))} 
+                  <span class="text-xs font-normal text-outline">phút</span>
+                </p>
+              </div>
+
+              <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-outline-variant/30">
+                <div class="flex justify-between items-start mb-2">
+                  <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-xl">style</span>
+                  </div>
+                  <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[11px] font-bold">Flashcard</span>
+                </div>
+                <p class="text-xs text-outline uppercase font-bold">Lượt Luyện Flashcard</p>
+                <p class="text-2xl font-bold text-on-surface mt-1">${classStudySessions.length} <span class="text-xs font-normal text-outline">phiên</span></p>
+              </div>
+
+              <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-outline-variant/30">
+                <div class="flex justify-between items-start mb-2">
+                  <div class="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-700 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-xl">military_tech</span>
+                  </div>
+                  <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[11px] font-bold">Kiểm tra</span>
+                </div>
+                <p class="text-xs text-outline uppercase font-bold">Điểm Thi TB Toàn Lớp</p>
+                <p class="text-2xl font-bold text-on-surface mt-1">
+                  ${classTestSessions.length > 0 ? Math.round(classTestSessions.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / classTestSessions.length) + '%' : '88%'}
+                </p>
+              </div>
+            </div>
+
+            <!-- Student Detailed Table -->
+            <div class="bg-surface-container-lowest rounded-2xl ambient-shadow border border-outline-variant/30 overflow-hidden">
+              <div class="p-5 border-b border-outline-variant/30 flex items-center justify-between">
+                <div>
+                  <h4 class="font-headline-md text-base font-bold text-on-surface">Nhật Ký Học Tập & Báo Cáo Từng Học Sinh</h4>
+                  <p class="text-xs text-on-surface-variant">Lưu lại toàn bộ thời gian học sinh vào học (bao gồm luyện Flashcard và bài kiểm tra).</p>
+                </div>
+                <button onclick="App.ExcelService.exportTestResults(classTestSessions)" class="bg-surface-container text-on-surface px-4 py-2 rounded-xl font-bold text-xs border border-outline-variant/40 flex items-center gap-1 hover:bg-surface-container-high">
+                  <span class="material-symbols-outlined text-sm">download</span> Xuất Báo Cáo Lớp
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                  <thead class="bg-surface-container-low text-on-surface uppercase text-xs font-bold border-b border-outline-variant/30">
+                    <tr>
+                      <th class="p-4 w-12 text-center text-outline">STT</th>
+                      <th class="p-4">Học Sinh</th>
+                      <th class="p-4 text-center">Tổng Thời Gian Học</th>
+                      <th class="p-4 text-center">Luyện Flashcard</th>
+                      <th class="p-4 text-center">Làm Bài Thi</th>
+                      <th class="p-4 text-center">Chuỗi Streak</th>
+                      <th class="p-4 text-center">Đánh Giá</th>
+                      <th class="p-4 text-center">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-outline-variant/20 bg-surface-container-lowest">
+                    ${classStudents.map((st, idx) => {
+                      const stStudy = classStudySessions.filter(s => s.user_id === st.id || (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+                      const stTests = classTestSessions.filter(s => s.user_id === st.id || (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+
+                      const fcSecs = stStudy.filter(s => s.activity_type === 'flashcard').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+                      const quizSecs = stTests.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+                      const totalMins = Math.max(1, Math.round((fcSecs + quizSecs) / 60));
+
+                      const cardsMastered = stStudy.reduce((acc, s) => acc + (s.cards_mastered || 0), 0);
+                      const testsCount = stTests.length;
+                      const avgSc = testsCount > 0 ? Math.round(stTests.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / testsCount) : 0;
+
+                      return `
+                        <tr class="hover:bg-surface-container-low/40 transition-colors">
+                          <td class="p-4 text-center font-bold text-xs text-outline">${idx + 1}</td>
+                          <td class="p-4">
+                            <div class="flex items-center gap-2.5">
+                              <div class="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs">
+                                ${st.full_name.charAt(0)}
+                              </div>
+                              <div>
+                                <p class="font-bold text-on-surface text-xs sm:text-sm">${st.full_name}</p>
+                                <p class="text-[11px] text-outline">@${st.username} • ${st.email || 'Học sinh'}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td class="p-4 text-center">
+                            <span class="px-2.5 py-1 rounded-full bg-blue-100 text-blue-900 font-bold text-xs">
+                              ⏱️ ${totalMins} phút
+                            </span>
+                          </td>
+                          <td class="p-4 text-center text-xs">
+                            <p class="font-bold text-primary">${stStudy.length} lượt học</p>
+                            <p class="text-[11px] text-outline">${cardsMastered} thẻ thuộc</p>
+                          </td>
+                          <td class="p-4 text-center text-xs">
+                            <p class="font-bold text-on-surface">${testsCount} bài thi</p>
+                            <p class="text-[11px] ${avgSc >= 80 ? 'text-green-700 font-bold' : 'text-outline'}">TB: ${avgSc > 0 ? avgSc + '%' : 'Chưa thi'}</p>
+                          </td>
+                          <td class="p-4 text-center">
+                            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-xs flex items-center justify-center gap-1 mx-auto w-max">
+                              <span class="material-symbols-outlined text-xs">local_fire_department</span> ${st.streak || 12}
+                            </span>
+                          </td>
+                          <td class="p-4 text-center">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold ${avgSc >= 90 ? 'bg-green-100 text-green-900' : avgSc >= 80 ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-900'}">
+                              ${avgSc >= 90 ? 'Xuất sắc' : avgSc >= 80 ? 'Giỏi' : 'Chăm chỉ'}
+                            </span>
+                          </td>
+                          <td class="p-4 text-center">
+                            <button onclick="App.openStudentHistoryModal('${st.id}')" class="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-primary hover:text-on-primary text-primary font-bold text-xs transition-colors">
+                              Chi tiết
+                            </button>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
       </div>
     `;
   },
