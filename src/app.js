@@ -2753,29 +2753,27 @@ window.App = {
           </div>
         </div>
 
-        <!-- Class Section Navigation Tabs -->
+        <!-- Class Section Navigation Tabs (Always 4 Tabs) -->
         <div class="flex items-center gap-2 border-b border-outline-variant/30 pb-2 overflow-x-auto">
           <button onclick="App.setClassDetailTab('units')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'units' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
             <span class="material-symbols-outlined text-base">auto_stories</span>
-            <span>Danh Sách Bài Học (${classLessons.length})</span>
+            <span>1. Danh Sách Bài Học (${classLessons.length})</span>
           </button>
           
           <button onclick="App.setClassDetailTab('vocabulary')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'vocabulary' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
             <span class="material-symbols-outlined text-base">menu_book</span>
-            <span>Kho Từ Vựng (${classVocab.length})</span>
+            <span>2. Kho Từ Vựng (${classVocab.length})</span>
           </button>
 
-          ${isTeacher ? `
-            <button onclick="App.setClassDetailTab('accounts')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'accounts' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
-              <span class="material-symbols-outlined text-base">manage_accounts</span>
-              <span>Học Sinh & Cấp Tài Khoản (${classStudents.length})</span>
-            </button>
+          <button onclick="App.setClassDetailTab('accounts')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'accounts' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+            <span class="material-symbols-outlined text-base">manage_accounts</span>
+            <span>3. ${isTeacher ? `Học Sinh & Cấp Tài Khoản (${classStudents.length})` : `Danh Sách Thành Viên Lớp (${classStudents.length})`}</span>
+          </button>
 
-            <button onclick="App.setClassDetailTab('reports')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'reports' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
-              <span class="material-symbols-outlined text-base">analytics</span>
-              <span>Báo Cáo Học Sinh & Thời Gian Học</span>
-            </button>
-          ` : ''}
+          <button onclick="App.setClassDetailTab('reports')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'reports' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+            <span class="material-symbols-outlined text-base">analytics</span>
+            <span>4. ${isTeacher ? 'Báo Cáo Học Sinh & Thời Gian Học' : 'Báo Cáo Học Tập Cá Nhân'}</span>
+          </button>
         </div>
 
         <!-- TAB 1: UNITS / LESSONS -->
@@ -2947,19 +2945,26 @@ window.App = {
           </div>
         ` : ''}
 
-        <!-- TAB 3: CLASS ACCOUNTS & STUDENT PROVISIONING (TEACHER / HOST) -->
-        ${(currentTab === 'accounts' && isTeacher) ? `
+        <!-- TAB 3: CLASS ACCOUNTS & STUDENT PROVISIONING (ACCESSIBLE TO ALL USERS) -->
+        ${currentTab === 'accounts' ? `
           <div class="flex flex-col gap-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 class="font-headline-md text-base font-bold text-on-surface">Quản Lý & Cấp Tài Khoản Học Sinh</h3>
-                <p class="text-xs text-on-surface-variant">Danh sách học sinh thuộc lớp <strong>${activeClass.name}</strong>, cấp tài khoản và quản lý mật khẩu.</p>
+                <h3 class="font-headline-md text-base font-bold text-on-surface">${isTeacher ? 'Quản Lý & Cấp Tài Khoản Học Sinh' : 'Danh Sách Học Sinh Cùng Lớp'}</h3>
+                <p class="text-xs text-on-surface-variant">
+                  ${isTeacher 
+                    ? `Danh sách học sinh thuộc lớp <strong>${activeClass.name}</strong>, cấp tài khoản và quản lý mật khẩu.` 
+                    : `Danh sách các bạn học sinh trong lớp <strong>${activeClass.name}</strong> cùng chuỗi ngày học.`
+                  }
+                </p>
               </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="App.openCreateUserModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
-                  <span class="material-symbols-outlined text-sm">person_add</span> + Cấp Tài Khoản Mới
-                </button>
-              </div>
+              ${isTeacher ? `
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button onclick="App.openCreateUserModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                    <span class="material-symbols-outlined text-sm">person_add</span> + Cấp Tài Khoản Mới
+                  </button>
+                </div>
+              ` : ''}
             </div>
 
             <!-- Student Search & Filter Bar -->
@@ -3085,8 +3090,8 @@ window.App = {
           </div>
         ` : ''}
 
-        <!-- TAB 4: TEACHER-ONLY STUDENT ACTIVITY & STUDY TIME REPORT -->
-        ${(currentTab === 'reports' && isTeacher) ? `
+        <!-- TAB 4: STUDENT ACTIVITY & STUDY TIME REPORT -->
+        ${currentTab === 'reports' ? `
           <div class="flex flex-col gap-5">
             
             <!-- Summary Stats for the whole Class -->
