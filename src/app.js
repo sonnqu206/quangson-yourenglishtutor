@@ -1263,58 +1263,14 @@ window.App = {
 
             <button 
               type="submit" 
-              class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3.5 rounded-xl font-bold text-sm btn-press flex items-center justify-center gap-2 hover-lift shadow-md mt-2"
+              class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3.5 rounded-xl font-bold text-sm btn-press flex items-center justify-center gap-2 hover-lift shadow-md mt-3"
             >
               <span class="material-symbols-outlined text-lg">login</span>
               <span>Đăng Nhập Vào Hệ Thống</span>
             </button>
           </form>
 
-          <!-- Quick Demo Accounts Helper -->
-          <div class="bg-surface-container-low rounded-2xl p-3.5 border border-outline-variant/30 text-xs">
-            <div class="flex items-center justify-between font-bold text-on-surface mb-2">
-              <span class="flex items-center gap-1.5 text-primary">
-                <span class="material-symbols-outlined text-base">key</span>
-                Tài khoản mẫu đăng nhập nhanh:
-              </span>
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <button 
-                type="button"
-                onclick="App.fillQuickLogin('sonnqu206', 'Son@04102006')"
-                class="p-2 rounded-xl bg-surface hover:bg-white border border-outline-variant/30 text-left transition-all hover-lift flex flex-col items-start"
-              >
-                <div class="font-bold text-amber-700 flex items-center gap-1 text-[11px]">
-                  <span>👑</span> Host Thầy Sơn
-                </div>
-                <div class="font-mono text-[10px] text-outline mt-0.5">@sonnqu206</div>
-              </button>
-
-              <button 
-                type="button"
-                onclick="App.fillQuickLogin('trogiang_linh', '123456')"
-                class="p-2 rounded-xl bg-surface hover:bg-white border border-outline-variant/30 text-left transition-all hover-lift flex flex-col items-start"
-              >
-                <div class="font-bold text-blue-700 flex items-center gap-1 text-[11px]">
-                  <span>👩‍🏫</span> Cô Linh (Trợ giảng)
-                </div>
-                <div class="font-mono text-[10px] text-outline mt-0.5">@trogiang_linh</div>
-              </button>
-
-              <button 
-                type="button"
-                onclick="App.fillQuickLogin('an_nguyen', '123456')"
-                class="p-2 rounded-xl bg-surface hover:bg-white border border-outline-variant/30 text-left transition-all hover-lift flex flex-col items-start"
-              >
-                <div class="font-bold text-green-700 flex items-center gap-1 text-[11px]">
-                  <span>🎓</span> Học sinh (An)
-                </div>
-                <div class="font-mono text-[10px] text-outline mt-0.5">@an_nguyen</div>
-              </button>
-            </div>
-          </div>
-
-          <div class="text-center text-[11px] text-outline pt-2 border-t border-outline-variant/30">
+          <div class="text-center text-[11px] text-outline pt-3 border-t border-outline-variant/30">
             © 2026 Quang Son - Your English Tutor. All rights reserved.
           </div>
         </div>
