@@ -182,13 +182,16 @@ window.App = {
   },
 
   /**
-   * Cập nhật danh sách từ vựng ôn tập
+   * Cập nhật danh sách từ vựng ôn tập (Hỗ trợ cách ly theo Lớp và Chuyên đề bài học)
    */
   updateStudyList() {
-    const classVocab = state.vocabulary.filter(v => v.class_id === Number(state.selectedClassId));
+    const isStudent = state.currentUser?.role === 'student';
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
+    
+    const classVocab = state.vocabulary.filter(v => v.class_id === targetClassId);
     if (state.selectedLessonId) {
-      const lessonVocab = classVocab.filter(v => v.lesson_id === Number(state.selectedLessonId));
-      state.studyList = lessonVocab.length > 0 ? lessonVocab : classVocab;
+      state.studyList = classVocab.filter(v => v.lesson_id === Number(state.selectedLessonId));
     } else {
       state.studyList = classVocab;
     }
@@ -566,8 +569,24 @@ window.App = {
   },
 
   // =========================================================================
-  // GIAO DIỆN THÊM TỪ VỰNG DẠNG BẢNG
+  // GIAO DIỆN THÊM TỪ VỰNG DẠNG BẢNG & FLASHCARD THEO BÀI HỌC
   // =========================================================================
+
+  startLessonFlashcard(lessonId) {
+    state.selectedLessonId = lessonId ? Number(lessonId) : null;
+    this.updateStudyList();
+    state.flashcardIndex = 0;
+    state.flashcardFlipped = false;
+    this.switchTab('flashcards');
+  },
+
+  selectFlashcardLesson(lessonId) {
+    state.selectedLessonId = lessonId ? Number(lessonId) : null;
+    this.updateStudyList();
+    state.flashcardIndex = 0;
+    state.flashcardFlipped = false;
+    this.render();
+  },
 
   openBatchTableModal() {
     if (state.currentUser?.role === 'student') {
@@ -576,18 +595,51 @@ window.App = {
     this.switchTab('table_input');
   },
 
-  addBatchTableRow() {
-    const nextId = state.batchTableRows.length ? Math.max(...state.batchTableRows.map(r => r.id)) + 1 : 1;
-    state.batchTableRows.push({ id: nextId, word: "", meaning: "" });
-    this.render();
+  addBatchTableRow(shouldFocus = true) {
+    this.addBatchTableRows(1, shouldFocus);
   },
 
   addBatchTable5Rows() {
+    this.addBatchTableRows(5, true);
+  },
+
+  addBatchTableRows(count = 1, shouldFocus = true) {
+    const num = Math.max(1, Math.min(100, parseInt(count) || 1));
     let nextId = state.batchTableRows.length ? Math.max(...state.batchTableRows.map(r => r.id)) + 1 : 1;
-    for (let i = 0; i < 5; i++) {
+    const startIdx = state.batchTableRows.length;
+    for (let i = 0; i < num; i++) {
       state.batchTableRows.push({ id: nextId++, word: "", meaning: "" });
     }
     this.render();
+    if (shouldFocus) {
+      setTimeout(() => {
+        const input = document.querySelector(`input[data-row-idx="${startIdx}"][data-col="0"]`);
+        if (input) {
+          input.focus();
+          input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 50);
+    }
+  },
+
+  addCustomBatchRows() {
+    const input = document.getElementById('custom-row-count');
+    const count = input ? parseInt(input.value) : 5;
+    this.addBatchTableRows(count || 5, true);
+  },
+
+  clearBatchTable() {
+    if (confirm("Bạn có chắc muốn làm mới lại bảng (xóa trắng các dòng hiện tại)?")) {
+      state.batchTableRows = [
+        { id: 1, word: "", meaning: "" },
+        { id: 2, word: "", meaning: "" },
+        { id: 3, word: "", meaning: "" },
+        { id: 4, word: "", meaning: "" },
+        { id: 5, word: "", meaning: "" }
+      ];
+      this.render();
+      showToast("Đã làm mới bảng nhập từ!", "info");
+    }
   },
 
   removeBatchTableRow(id) {
@@ -603,6 +655,94 @@ window.App = {
     const row = state.batchTableRows.find(r => r.id === id);
     if (row) {
       row[field] = value;
+    }
+  },
+
+  // Điều khiển bàn phím chuẩn Excel (Enter, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Tab)
+  handleBatchTableKeyNav(e, rowIndex, colIndex) {
+    const totalRows = state.batchTableRows.length;
+    const totalCols = 2; // 0: word, 1: meaning
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (rowIndex === totalRows - 1) {
+        // Tự động thêm dòng mới khi nhấn Enter ở dòng cuối cùng
+        this.addBatchTableRow(false);
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+          if (nextInput) {
+            nextInput.focus();
+            nextInput.select();
+          }
+        }, 30);
+      } else {
+        const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (rowIndex === totalRows - 1) {
+        // Tự động tạo dòng mới khi mũi tên xuống ở dòng cuối
+        this.addBatchTableRow(false);
+        setTimeout(() => {
+          const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+          if (nextInput) {
+            nextInput.focus();
+            nextInput.select();
+          }
+        }, 30);
+      } else {
+        const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      if (rowIndex > 0) {
+        e.preventDefault();
+        const prevInput = document.querySelector(`input[data-row-idx="${rowIndex - 1}"][data-col="${colIndex}"]`);
+        if (prevInput) {
+          prevInput.focus();
+          prevInput.select();
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowRight') {
+      const input = e.target;
+      if (input.selectionStart === input.value.length && colIndex < totalCols - 1) {
+        e.preventDefault();
+        const nextInput = document.querySelector(`input[data-row-idx="${rowIndex}"][data-col="${colIndex + 1}"]`);
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowLeft') {
+      const input = e.target;
+      if (input.selectionStart === 0 && colIndex > 0) {
+        e.preventDefault();
+        const prevInput = document.querySelector(`input[data-row-idx="${rowIndex}"][data-col="${colIndex - 1}"]`);
+        if (prevInput) {
+          prevInput.focus();
+          prevInput.select();
+        }
+      }
+      return;
     }
   },
 
@@ -1391,13 +1531,19 @@ window.App = {
   bindGlobalEvents() {
     window.addEventListener('keydown', (e) => {
       if (state.currentTab === 'flashcards') {
-        if (e.code === 'Space') {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+        if (e.code === 'Space' || e.key === ' ') {
           e.preventDefault();
           this.flipFlashcard();
-        } else if (e.code === 'ArrowRight') {
+        } else if (e.code === 'ArrowRight' || e.key === 'Enter') {
+          e.preventDefault();
           this.nextFlashcard(false);
         } else if (e.code === 'ArrowLeft') {
+          e.preventDefault();
           this.prevFlashcard();
+        } else if (e.key === 'v' || e.key === 'V') {
+          e.preventDefault();
+          this.nextFlashcard(true);
         }
       }
     });
@@ -1817,7 +1963,7 @@ window.App = {
                     <button onclick="App.openCreateVocabularyModal(${lesson.id})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
                       <span class="material-symbols-outlined text-sm">add</span>
                     </button>
-                    <button onclick="App.state.selectedLessonId = ${lesson.id}; App.switchTab('flashcards');" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
+                    <button onclick="App.startLessonFlashcard(${lesson.id})" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
                       <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
                     </button>
                     <button onclick="App.startNewQuiz(${lesson.id}, false)" class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-bold text-xs hover:bg-primary-container transition-colors text-center flex items-center justify-center gap-1">
@@ -1956,7 +2102,7 @@ window.App = {
     `;
   },
 
-  // 2. Batch Vocabulary Input Table View
+  // 2. Batch Vocabulary Input Table View (Quantity Selector & Excel-Style Keyboard Navigation)
   renderTableInputView() {
     const isStudent = state.currentUser?.role === 'student';
     const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
@@ -1977,13 +2123,13 @@ window.App = {
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Bảng Nhập Từ Vựng Hàng Loạt</h2>
-            <p class="font-body-md text-sm text-on-surface-variant">Nhập từ vựng, hỗ trợ dán Clipboard và tự động tạo IPA + Ví dụ bằng Gemini AI.</p>
+            <p class="font-body-md text-sm text-on-surface-variant">Nhập từ vựng nhanh với phím điều hướng Excel, hỗ trợ dán Clipboard và tự động tạo IPA + Ví dụ bằng AI.</p>
           </div>
         </div>
 
-        <!-- Target Class & Lesson Card -->
-        <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div class="flex items-center gap-4 w-full sm:w-auto">
+        <!-- Target Class & Lesson Card + Quantity Selector -->
+        <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div class="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
             <div>
               <label class="block text-xs font-bold text-outline uppercase mb-1">Lớp học đích (*)</label>
               ${isStudent ? `
@@ -2003,17 +2149,41 @@ window.App = {
             </div>
           </div>
 
-          <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
+          <!-- Quantity Controls & Actions -->
+          <div class="flex items-center gap-2 flex-wrap w-full lg:w-auto justify-start lg:justify-end">
             <button onclick="App.pasteClipboardToTable()" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
-              <span class="material-symbols-outlined text-sm">content_paste</span> Dán từ Clipboard
+              <span class="material-symbols-outlined text-sm">content_paste</span> Dán Clipboard
             </button>
-            <button onclick="App.addBatchTableRow()" class="bg-surface-container text-primary px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1 hover:bg-surface-container-high">
-              <span class="material-symbols-outlined text-sm">add</span> +1 Dòng
-            </button>
-            <button onclick="App.addBatchTable5Rows()" class="bg-surface-container text-primary px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1 hover:bg-surface-container-high">
-              <span class="material-symbols-outlined text-sm">add_box</span> +5 Dòng
+
+            <!-- Quantity Selector Controls -->
+            <div class="flex items-center bg-surface-container-low p-1 rounded-xl border border-outline-variant/40 gap-1">
+              <span class="text-[11px] font-bold text-outline px-2">Thêm dòng:</span>
+              <button onclick="App.addBatchTableRows(1)" class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors" title="Thêm 1 dòng">+1</button>
+              <button onclick="App.addBatchTableRows(5)" class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors" title="Thêm 5 dòng">+5</button>
+              <button onclick="App.addBatchTableRows(10)" class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors" title="Thêm 10 dòng">+10</button>
+              <button onclick="App.addBatchTableRows(20)" class="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors" title="Thêm 20 dòng">+20</button>
+              
+              <div class="flex items-center ml-1 border-l border-outline-variant/30 pl-1.5 gap-1">
+                <input type="number" id="custom-row-count" min="1" max="50" value="5" class="w-12 px-1.5 py-1 bg-surface-container-lowest border border-outline-variant/40 rounded-lg text-xs text-center font-bold text-primary focus:outline-none" title="Nhập số dòng tùy ý" />
+                <button onclick="App.addCustomBatchRows()" class="bg-primary text-on-primary px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-0.5 hover-lift" title="Thêm số dòng đã nhập">
+                  <span class="material-symbols-outlined text-xs">add</span>
+                </button>
+              </div>
+            </div>
+
+            <button onclick="App.clearBatchTable()" class="p-2 text-outline hover:text-error rounded-xl bg-surface-container hover:bg-error-container/20 transition-colors" title="Xóa trắng bảng">
+              <span class="material-symbols-outlined text-base">restart_alt</span>
             </button>
           </div>
+        </div>
+
+        <!-- Keyboard Navigation Tip Banner -->
+        <div class="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-on-surface">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-base">keyboard</span>
+            <span><strong>Phím tắt:</strong> Nhấn <kbd class="px-1.5 py-0.5 bg-surface-container rounded font-mono font-bold text-primary">Enter</kbd> hoặc <kbd class="px-1.5 py-0.5 bg-surface-container rounded font-mono font-bold text-primary">↓</kbd> để xuống dòng (tự tạo dòng mới ở cuối). Dùng <kbd class="px-1.5 py-0.5 bg-surface-container rounded font-mono font-bold text-primary">↑</kbd> <kbd class="px-1.5 py-0.5 bg-surface-container rounded font-mono font-bold text-primary">←</kbd> <kbd class="px-1.5 py-0.5 bg-surface-container rounded font-mono font-bold text-primary">→</kbd> để di chuyển.</span>
+          </div>
+          <span class="text-[11px] text-outline font-semibold">Hiện có <strong>${state.batchTableRows.length} dòng</strong></span>
         </div>
 
         <!-- Table -->
@@ -2032,25 +2202,31 @@ window.App = {
                 ${state.batchTableRows.map((row, idx) => `
                   <tr class="hover:bg-surface-container-low/40 transition-colors">
                     <td class="p-4 text-center font-bold text-xs text-outline">${idx + 1}</td>
-                    <td class="p-3">
+                    <td class="p-2.5">
                       <input 
                         type="text" 
+                        data-row-idx="${idx}"
+                        data-col="0"
                         value="${row.word.replace(/"/g, '&quot;')}"
-                        placeholder="Nhập từ vựng (ví dụ: ubiquitous, perseverance...)"
+                        placeholder="Nhập từ vựng (ví dụ: ubiquitous, breakthrough...)"
                         oninput="App.updateBatchTableCell(${row.id}, 'word', this.value)"
+                        onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 0)"
                         class="w-full px-3.5 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-sm font-semibold text-primary focus:outline-none focus:border-primary focus:bg-white transition-all"
                       />
                     </td>
-                    <td class="p-3">
+                    <td class="p-2.5">
                       <input 
                         type="text" 
+                        data-row-idx="${idx}"
+                        data-col="1"
                         value="${row.meaning.replace(/"/g, '&quot;')}"
                         placeholder="Nhập ý nghĩa tiếng Việt..."
                         oninput="App.updateBatchTableCell(${row.id}, 'meaning', this.value)"
+                        onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 1)"
                         class="w-full px-3.5 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-sm text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
                       />
                     </td>
-                    <td class="p-3 text-center">
+                    <td class="p-2.5 text-center">
                       <button onclick="App.removeBatchTableRow(${row.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa dòng này">
                         <span class="material-symbols-outlined text-lg">delete</span>
                       </button>
@@ -2063,12 +2239,12 @@ window.App = {
 
           <div class="p-5 bg-surface-container-low border-t border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="text-xs text-on-surface-variant">
-              💡 <strong>Mẹo:</strong> Điền <em>Từ vựng</em> và <em>Nghĩa</em>, <strong>Gemini AI</strong> sẽ tự động bổ sung <strong>Phiên âm IPA chuẩn</strong> và <strong>Câu ví dụ tiếng Anh</strong>!
+              💡 <strong>Mẹo AI:</strong> Chỉ cần gõ <em>Từ vựng</em> và <em>Nghĩa</em>, <strong>Gemini AI</strong> sẽ tự động tạo <strong>Phiên âm IPA</strong> và <strong>Câu ví dụ</strong> khi lưu!
             </div>
 
             <div class="flex items-center gap-3">
-              <button onclick="App.addBatchTableRow()" class="px-4 py-2.5 rounded-xl border border-outline-variant text-primary font-bold text-xs hover:bg-surface-container">
-                + Thêm Dòng
+              <button onclick="App.addBatchTableRows(1)" class="px-4 py-2.5 rounded-xl border border-outline-variant text-primary font-bold text-xs hover:bg-surface-container flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">add</span> +1 Dòng
               </button>
               <button 
                 onclick="App.saveBatchTableToSupabase()" 
@@ -2209,11 +2385,14 @@ window.App = {
                   </div>
                   <h3 class="font-headline-md text-base font-bold text-on-surface mb-2">${l.title}</h3>
                 </div>
-                <div class="flex items-center gap-2 pt-4 border-t border-outline-variant/30 flex-wrap">
+                <div class="flex items-center gap-1.5 pt-4 border-t border-outline-variant/30 flex-wrap">
                   <button onclick="App.openCreateVocabularyModal(${l.id})" class="p-2 bg-surface-container text-primary font-bold text-xs rounded-xl hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
                     <span class="material-symbols-outlined text-base">add</span>
                   </button>
-                  <button onclick="App.state.selectedLessonId = ${l.id}; App.switchTab('vocabulary');" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center">
+                  <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
+                  </button>
+                  <button onclick="App.state.selectedLessonId = ${l.id}; App.switchTab('vocabulary');" class="flex-1 bg-surface-container-low text-on-surface font-bold text-xs py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-center">
                     Kho từ
                   </button>
                   <button onclick="App.startNewQuiz(${l.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary-container transition-colors text-center">
@@ -2268,6 +2447,9 @@ window.App = {
           </div>
 
           <div class="flex items-center gap-2.5 flex-wrap">
+            <button onclick="App.startLessonFlashcard(state.selectedLessonId)" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">style</span> Luyện Flashcard
+            </button>
             <button onclick="App.openCreateVocabularyModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
             </button>
@@ -2380,20 +2562,57 @@ window.App = {
     `;
   },
 
-  // 6. Flashcards 3D View
+  // 6. Flashcards 3D View (Lesson-Specific & Class-Wide)
   renderFlashcardsView() {
-    const list = state.studyList;
-    const activeClass = state.classes.find(c => c.id === state.selectedClassId) || state.classes[0];
+    const isStudent = state.currentUser?.role === 'student';
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
+    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
+    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
+    const classVocab = state.vocabulary.filter(v => v.class_id === targetClassId);
+
+    const list = state.studyList || [];
+    const activeLesson = state.selectedLessonId ? classLessons.find(l => l.id === state.selectedLessonId) : null;
 
     if (list.length === 0) {
       return `
-        <div class="flex-1 flex flex-col items-center justify-center p-12 text-center max-w-lg mx-auto">
-          <button onclick="App.safeGoBack('dashboard')" class="mb-4 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-on-surface font-bold text-xs">
+        <div class="flex-1 flex flex-col items-center justify-center p-8 md:p-12 text-center max-w-lg mx-auto">
+          <button onclick="App.safeGoBack('dashboard')" class="mb-4 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover-lift">
             <span class="material-symbols-outlined text-base">arrow_back</span> Về Menu
           </button>
-          <span class="material-symbols-outlined text-6xl text-outline mb-3">style</span>
-          <h2 class="font-headline-md text-lg font-bold text-on-surface">Chưa có từ vựng nào trong ${activeClass.name}</h2>
-          <p class="text-xs text-outline mt-1 mb-4">Hãy chờ thầy cô thêm từ vựng mới để bắt đầu luyện Flashcard nhé.</p>
+          
+          <div class="w-20 h-20 rounded-3xl bg-primary-container/20 flex items-center justify-center text-primary mb-4">
+            <span class="material-symbols-outlined text-4xl">style</span>
+          </div>
+
+          <h2 class="font-headline-md text-lg font-bold text-on-surface">
+            ${activeLesson ? `Chưa có từ vựng trong ${activeLesson.title}` : `Chưa có từ vựng nào trong ${activeClass.name}`}
+          </h2>
+          <p class="text-xs text-outline mt-1 mb-5">Chọn bài học khác hoặc thêm từ vựng mới để bắt đầu luyện Flashcard 3D.</p>
+
+          <!-- Lesson Switcher Dropdown -->
+          <div class="w-full mb-4">
+            <select 
+              onchange="App.selectFlashcardLesson(this.value)" 
+              class="w-full py-2.5 px-3.5 bg-surface-container-low border border-primary/30 rounded-xl text-xs font-bold text-primary focus:outline-none"
+            >
+              <option value="">📚 Toàn bộ bài học (${classVocab.length} từ)</option>
+              ${classLessons.map(l => `
+                <option value="${l.id}" ${state.selectedLessonId === l.id ? 'selected' : ''}>
+                  📖 ${l.title} (${classVocab.filter(v => v.lesson_id === l.id).length} từ)
+                </option>
+              `).join('')}
+            </select>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button onclick="App.openCreateVocabularyModal(${state.selectedLessonId || 'null'})" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs btn-press hover-lift">
+              + Thêm Từ Vựng Ngay
+            </button>
+            <button onclick="App.openBatchTableModal()" class="bg-surface-container text-primary px-4 py-2.5 rounded-xl font-bold text-xs border border-primary/30">
+              Bảng Nhập Từ
+            </button>
+          </div>
         </div>
       `;
     }
@@ -2403,23 +2622,46 @@ window.App = {
 
     return `
       <div class="flex-1 flex flex-col items-center max-w-2xl mx-auto w-full gap-stack-md">
-        <!-- Top Navigation Bar -->
-        <div class="w-full flex items-center justify-between">
-          <button onclick="App.safeGoBack('dashboard')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all hover-lift">
-            <span class="material-symbols-outlined text-base">arrow_back</span>
-            <span>🏠 Về Menu</span>
-          </button>
-          
-          <div class="text-center">
-            <span class="text-[11px] font-bold text-primary uppercase">${activeClass.name}</span>
-            <h2 class="font-headline-md text-sm font-bold text-on-surface">Thẻ ${state.flashcardIndex + 1} / ${list.length}</h2>
+        <!-- Top Navigation Bar & Lesson Selector -->
+        <div class="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface-container-lowest p-4 rounded-2xl ambient-shadow border border-outline-variant/30">
+          <div class="flex items-center gap-2">
+            <button onclick="App.safeGoBack('dashboard')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all hover-lift">
+              <span class="material-symbols-outlined text-base">arrow_back</span>
+              <span>Về Menu</span>
+            </button>
+            
+            <div class="text-left">
+              <span class="text-[10px] font-bold text-primary uppercase block">${activeClass.name}</span>
+              <h2 class="font-headline-md text-xs font-bold text-on-surface">Thẻ ${state.flashcardIndex + 1} / ${list.length}</h2>
+            </div>
           </div>
 
+          <!-- Unit Selector Dropdown -->
           <div class="flex items-center gap-2">
-            <span class="text-xs font-bold text-secondary bg-secondary-container/20 px-3 py-1 rounded-full flex items-center gap-1">
+            <select 
+              onchange="App.selectFlashcardLesson(this.value)" 
+              class="py-2 px-3 bg-surface-container-low border border-primary/30 rounded-xl text-xs font-bold text-primary focus:outline-none"
+            >
+              <option value="">📚 Toàn bộ lớp (${classVocab.length} từ)</option>
+              ${classLessons.map(l => `
+                <option value="${l.id}" ${state.selectedLessonId === l.id ? 'selected' : ''}>
+                  📖 ${l.title} (${classVocab.filter(v => v.lesson_id === l.id).length} từ)
+                </option>
+              `).join('')}
+            </select>
+
+            <span class="text-xs font-bold text-secondary bg-secondary-container/20 px-2.5 py-1.5 rounded-xl flex items-center gap-1 whitespace-nowrap">
               <span class="material-symbols-outlined text-sm">local_fire_department</span> Chuỗi 12 ngày
             </span>
           </div>
+        </div>
+
+        <!-- Active Topic Badge -->
+        <div class="w-full flex items-center justify-between px-1 text-xs">
+          <span class="text-outline font-semibold">
+            Đang luyện: <strong class="text-primary">${activeLesson ? activeLesson.title : 'Tất cả bài học trong lớp'}</strong>
+          </span>
+          <span class="text-primary font-bold">${progressPct}% Hoàn thành</span>
         </div>
 
         <!-- Progress Bar -->
@@ -2437,13 +2679,15 @@ window.App = {
             <!-- Front -->
             <div class="flashcard-inner absolute inset-0 bg-surface-container-lowest rounded-3xl p-8 ambient-shadow border-2 border-primary/20 flex flex-col justify-between backface-hidden">
               <div class="flex justify-between items-center text-xs text-outline">
-                <span class="font-bold text-primary uppercase">Mặt trước (Bấm để lật)</span>
+                <span class="font-bold text-primary uppercase flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">touch_app</span> Mặt trước (Bấm để lật)
+                </span>
                 <span class="px-2.5 py-0.5 rounded-full bg-surface-container font-semibold">${currentWord.is_grammar ? 'Ngữ pháp' : 'Từ vựng'}</span>
               </div>
               <div class="text-center my-auto">
                 <h1 class="font-display-lg text-4xl font-bold text-primary tracking-tight mb-2">${currentWord.word}</h1>
                 <p class="font-mono text-base text-outline mb-4">${currentWord.ipa || ''}</p>
-                <button onclick="event.stopPropagation(); App.speakWord('${currentWord.word}')" class="w-12 h-12 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-all shadow-sm mx-auto">
+                <button onclick="event.stopPropagation(); App.speakWord('${currentWord.word}')" class="w-12 h-12 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-all shadow-sm mx-auto" title="Nghe phát âm">
                   <span class="material-symbols-outlined text-2xl">volume_up</span>
                 </button>
               </div>
@@ -2455,7 +2699,9 @@ window.App = {
             <!-- Back -->
             <div class="flashcard-inner absolute inset-0 bg-gradient-to-br from-surface-container-low to-surface-container-lowest rounded-3xl p-8 ambient-shadow border-2 border-secondary/40 flex flex-col justify-between backface-hidden rotate-y-180">
               <div class="flex justify-between items-center text-xs text-outline">
-                <span class="font-bold text-secondary uppercase">Mặt sau (Giải nghĩa)</span>
+                <span class="font-bold text-secondary uppercase flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">visibility</span> Mặt sau (Giải nghĩa)
+                </span>
                 <button onclick="event.stopPropagation(); App.speakWord('${currentWord.word}')" class="text-primary hover:underline font-bold flex items-center gap-1">
                   <span class="material-symbols-outlined text-sm">volume_up</span> Nghe lại
                 </button>
@@ -2476,10 +2722,10 @@ window.App = {
           </div>
         </div>
 
-        <!-- Controls -->
+        <!-- Controls & Hotkey Hints -->
         <div class="w-full flex items-center justify-between gap-4">
-          <button onclick="App.prevFlashcard()" ${state.flashcardIndex === 0 ? 'disabled' : ''} class="px-5 py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs disabled:opacity-30">
-            ← Trước
+          <button onclick="App.prevFlashcard()" ${state.flashcardIndex === 0 ? 'disabled' : ''} class="px-5 py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs disabled:opacity-30 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">arrow_back</span> Trước
           </button>
           <div class="flex items-center gap-2">
             <button onclick="App.nextFlashcard(false)" class="px-5 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs hover-lift">
@@ -2489,9 +2735,14 @@ window.App = {
               ✓ Đã thuộc
             </button>
           </div>
-          <button onclick="App.nextFlashcard(false)" class="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs btn-press">
-            Tiếp →
+          <button onclick="App.nextFlashcard(false)" class="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs btn-press flex items-center gap-1">
+            Tiếp <span class="material-symbols-outlined text-sm">arrow_forward</span>
           </button>
+        </div>
+
+        <!-- Hotkeys Footer -->
+        <div class="text-center text-[11px] text-outline mt-1">
+          💡 <strong>Phím tắt:</strong> [ <kbd class="font-mono font-bold">Space</kbd> ] Lật thẻ • [ <kbd class="font-mono font-bold">←</kbd> ] Thẻ trước • [ <kbd class="font-mono font-bold">→</kbd> ] / [ <kbd class="font-mono font-bold">Enter</kbd> ] Thẻ tiếp • [ <kbd class="font-mono font-bold">V</kbd> ] Đã thuộc
         </div>
       </div>
     `;
