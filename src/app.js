@@ -167,12 +167,8 @@ window.App = {
         state.selectedClassId = state.classes[0].id;
       }
 
-      const currentClassLessons = state.lessons.filter(l => l.class_id === Number(state.selectedClassId));
-      if (currentClassLessons.length > 0) {
-        state.selectedLessonId = currentClassLessons[0].id;
-      } else {
-        state.selectedLessonId = null;
-      }
+      // Mặc định selectedLessonId = null để hiển thị toàn bộ bài học, không bị lọc ẩn từ vựng
+      state.selectedLessonId = null;
 
       this.updateStudyList();
     } catch (err) {
