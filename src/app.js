@@ -339,23 +339,25 @@ window.App = {
   // USER PROVISIONING & ACCOUNT MANAGEMENT (HOST / TEACHER)
   // =========================================================================
 
-  openCreateUserModal() {
+  openCreateUserModal(prefilledClassId = null) {
     const modal = document.getElementById('create-user-modal');
     if (!modal) return;
 
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
-    const assistantClassId = Number(state.currentUser?.class_id || 1);
+    const targetClassId = Number(prefilledClassId || state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || 1);
 
     const classSelect = document.getElementById('modal-user-class');
     if (classSelect) {
       if (isAssistant) {
-        const assistantClass = state.classes.find(c => c.id === assistantClassId) || state.classes[0];
-        classSelect.innerHTML = `<option value="${assistantClassId}">${assistantClass ? assistantClass.name : 'Lớp của bạn'}</option>`;
-        classSelect.disabled = true;
+        const managedClasses = this.getManagedClasses(state.currentUser);
+        classSelect.innerHTML = managedClasses.map(c => 
+          `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
+        ).join('');
+        classSelect.disabled = false;
       } else {
         classSelect.disabled = false;
         classSelect.innerHTML = state.classes.map(c => 
-          `<option value="${c.id}" ${state.selectedClassId === c.id ? 'selected' : ''}>${c.name}</option>`
+          `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
         ).join('');
       }
     }
@@ -368,7 +370,7 @@ window.App = {
       } else {
         roleSelect.disabled = false;
         roleSelect.innerHTML = `
-          <option value="student">🎓 Học sinh</option>
+          <option value="student" selected>🎓 Học sinh</option>
           <option value="assistant_teacher">👩‍🏫 Giáo viên phụ (Trợ giảng)</option>
         `;
       }
@@ -388,13 +390,12 @@ window.App = {
   async handleCreateUser(e) {
     if (e) e.preventDefault();
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
-    const assistantClassId = Number(state.currentUser?.class_id || 1);
 
     const fullName = document.getElementById('input-user-fullname')?.value.trim();
     const username = document.getElementById('input-user-username')?.value.trim();
     const password = document.getElementById('input-user-password')?.value.trim();
     const role = isAssistant ? 'student' : (document.getElementById('input-user-role')?.value || 'student');
-    const classId = isAssistant ? assistantClassId : Number(document.getElementById('modal-user-class')?.value || 1);
+    const classId = Number(document.getElementById('modal-user-class')?.value || state.selectedClassDetailId || state.currentUser?.class_id || 1);
 
     if (!fullName || !username || !password) {
       showToast("Vui lòng điền đầy đủ các thông tin bắt buộc!", "error");
@@ -2792,9 +2793,14 @@ window.App = {
           </button>
 
           ${isTeacher ? `
+            <button onclick="App.setClassDetailTab('accounts')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'accounts' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+              <span class="material-symbols-outlined text-base">manage_accounts</span>
+              <span>Học Sinh & Cấp Tài Khoản (${classStudents.length})</span>
+            </button>
+
             <button onclick="App.setClassDetailTab('reports')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'reports' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
               <span class="material-symbols-outlined text-base">analytics</span>
-              <span>Báo Cáo Học Sinh & Thời Gian Học (Giáo Viên)</span>
+              <span>Báo Cáo Học Sinh & Thời Gian Học</span>
             </button>
           ` : ''}
         </div>
@@ -2968,7 +2974,145 @@ window.App = {
           </div>
         ` : ''}
 
-        <!-- TAB 3: TEACHER-ONLY STUDENT ACTIVITY & STUDY TIME REPORT -->
+        <!-- TAB 3: CLASS ACCOUNTS & STUDENT PROVISIONING (TEACHER / HOST) -->
+        ${(currentTab === 'accounts' && isTeacher) ? `
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="font-headline-md text-base font-bold text-on-surface">Quản Lý & Cấp Tài Khoản Học Sinh</h3>
+                <p class="text-xs text-on-surface-variant">Danh sách học sinh thuộc lớp <strong>${activeClass.name}</strong>, cấp tài khoản và quản lý mật khẩu.</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="App.openCreateUserModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                  <span class="material-symbols-outlined text-sm">person_add</span> + Cấp Tài Khoản Mới
+                </button>
+              </div>
+            </div>
+
+            <!-- Student Search & Filter Bar -->
+            <div class="bg-surface-container-lowest p-4 rounded-2xl ambient-shadow border border-outline-variant/30 flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-2 flex-1 min-w-[240px]">
+                <span class="material-symbols-outlined text-outline text-lg">search</span>
+                <input 
+                  type="text" 
+                  id="class-student-search" 
+                  placeholder="Tìm kiếm học sinh theo tên hoặc username..." 
+                  oninput="App.state.studentSearchQuery = this.value; App.render();"
+                  value="${state.studentSearchQuery || ''}"
+                  class="bg-transparent text-xs text-on-surface focus:outline-none w-full font-medium"
+                />
+                ${state.studentSearchQuery ? `
+                  <button onclick="App.state.studentSearchQuery = ''; App.render();" class="text-outline hover:text-on-surface p-1">
+                    <span class="material-symbols-outlined text-base">close</span>
+                  </button>
+                ` : ''}
+              </div>
+              <span class="text-xs text-outline font-bold">
+                Tổng số: ${classStudents.length} học sinh
+              </span>
+            </div>
+
+            <!-- Class Students Table -->
+            <div class="bg-surface-container-lowest rounded-2xl ambient-shadow border border-outline-variant/30 overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead class="bg-surface-container-low text-outline uppercase font-bold border-b border-outline-variant/30">
+                    <tr>
+                      <th class="p-3.5 w-12 text-center">STT</th>
+                      <th class="p-3.5">Họ và Tên</th>
+                      <th class="p-3.5">Tên Đăng Nhập</th>
+                      <th class="p-3.5">Mật Khẩu</th>
+                      <th class="p-3.5 text-center">Chuỗi Streak</th>
+                      <th class="p-3.5 text-center">Tiến Độ Học</th>
+                      <th class="p-3.5 text-center">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-outline-variant/20">
+                    ${(() => {
+                      const filteredStudents = classStudents.filter(u => {
+                        if (!state.studentSearchQuery) return true;
+                        const q = state.studentSearchQuery.toLowerCase();
+                        return (u.full_name || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q);
+                      });
+
+                      if (filteredStudents.length === 0) {
+                        return `
+                          <tr>
+                            <td colspan="7" class="p-8 text-center text-outline">
+                              <span class="material-symbols-outlined text-4xl block mb-2 text-outline/60">person_off</span>
+                              ${state.studentSearchQuery ? 'Không tìm thấy học sinh nào khớp với từ khóa tìm kiếm.' : 'Chưa có học sinh nào trong lớp này.'}
+                              <div class="mt-3">
+                                <button onclick="App.openCreateUserModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 hover-lift">
+                                  <span class="material-symbols-outlined text-sm">person_add</span> Cấp Tài Khoản Ngay
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        `;
+                      }
+
+                      return filteredStudents.map((u, idx) => {
+                        const studentStreak = this.getStudentRealtimeStreak(u);
+                        const userFlashcards = classStudySessions.filter(s => s.user_id === u.id || s.user_name === u.full_name);
+                        const userQuizzes = classTestSessions.filter(s => s.user_id === u.id || s.user_name === u.full_name);
+                        const fcSecs = userFlashcards.filter(s => s.activity_type === 'flashcard').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+                        const quizSecs = userQuizzes.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+                        const totalMins = Math.max(0, Math.round((fcSecs + quizSecs) / 60));
+
+                        return `
+                          <tr class="hover:bg-surface-container-low/50 transition-colors">
+                            <td class="p-3.5 text-center font-bold text-outline">${idx + 1}</td>
+                            <td class="p-3.5 font-bold text-on-surface">
+                              <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                                  ${u.full_name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p class="font-bold text-on-surface">${u.full_name}</p>
+                                  <span class="text-[11px] text-outline">Tham gia: ${new Date(u.created_at || Date.now()).toLocaleDateString('vi-VN')}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td class="p-3.5 font-mono font-bold text-primary">@${u.username}</td>
+                            <td class="p-3.5 font-mono text-outline">
+                              <span class="bg-surface-container px-2.5 py-1 rounded-md font-bold text-on-surface">${u.password || '123456'}</span>
+                            </td>
+                            <td class="p-3.5 text-center">
+                              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-xs bg-amber-100 text-amber-900">
+                                🔥 ${studentStreak} ngày
+                              </span>
+                            </td>
+                            <td class="p-3.5 text-center text-on-surface">
+                              <div class="flex flex-col items-center">
+                                <span class="font-bold text-xs text-primary">${userQuizzes.length} bài thi • ${userFlashcards.length} lượt thẻ</span>
+                                <span class="text-[10px] text-outline">⏱️ ${totalMins} phút học</span>
+                              </div>
+                            </td>
+                            <td class="p-3.5 text-center">
+                              <div class="flex items-center justify-center gap-1.5">
+                                <button onclick="App.handleChangePassword('${u.id}', '${u.full_name}')" class="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-[11px] transition-colors" title="Đổi mật khẩu">
+                                  Đổi Pass
+                                </button>
+                                <button onclick="App.selectReportStudent('${u.id}'); App.setClassDetailTab('reports');" class="px-2.5 py-1 rounded-lg bg-primary-container/30 hover:bg-primary-container text-primary font-bold text-[11px] transition-colors" title="Xem báo cáo chi tiết">
+                                  Báo Cáo
+                                </button>
+                                <button onclick="App.handleDeleteUser('${u.id}', '${u.full_name}')" class="p-1.5 text-outline hover:text-error rounded-lg hover:bg-error-container/20 transition-colors" title="Xóa tài khoản">
+                                  <span class="material-symbols-outlined text-base">delete</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        `;
+                      }).join('');
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- TAB 4: TEACHER-ONLY STUDENT ACTIVITY & STUDY TIME REPORT -->
         ${(currentTab === 'reports' && isTeacher) ? `
           <div class="flex flex-col gap-5">
             
