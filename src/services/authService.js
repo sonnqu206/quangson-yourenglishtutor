@@ -603,5 +603,54 @@ export const AuthService = {
     }
 
     return true;
+  },
+
+  /**
+   * Cập nhật chuỗi Streak theo thời gian thực (Lưu vào LocalStorage, Cookies và Supabase)
+   */
+  async updateUserStreak(userId, streak, lastActivityDate = null) {
+    if (!userId) return;
+    const dateStr = lastActivityDate || new Date().toLocaleDateString('en-CA');
+    const numericStreak = Math.max(1, Number(streak) || 1);
+
+    // Cập nhật danh sách người dùng trong LocalStorage
+    const users = getStoredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId);
+    if (idx !== -1) {
+      users[idx].streak = numericStreak;
+      users[idx].last_study_date = dateStr;
+      if (!Array.isArray(users[idx].streak_dates)) {
+        users[idx].streak_dates = [];
+      }
+      if (!users[idx].streak_dates.includes(dateStr)) {
+        users[idx].streak_dates.push(dateStr);
+      }
+      saveStoredUsers(users);
+    }
+
+    // Cập nhật Cookie phiên làm việc hiện tại
+    const cur = this.getCurrentUser();
+    if (cur && (cur.id === userId || cur.username === userId)) {
+      cur.streak = numericStreak;
+      cur.last_study_date = dateStr;
+      if (!Array.isArray(cur.streak_dates)) cur.streak_dates = [];
+      if (!cur.streak_dates.includes(dateStr)) cur.streak_dates.push(dateStr);
+      setCookie(COOKIE_NAME, JSON.stringify(cur), 30);
+    }
+
+    // Đồng bộ lên Supabase Cloud
+    try {
+      const client = getSupabase();
+      if (client) {
+        await client.from('app_users').update({ 
+          streak: numericStreak,
+          last_study_date: dateStr
+        }).eq('id', userId);
+      }
+    } catch (e) {
+      console.warn("Supabase streak update fallback:", e);
+    }
+
+    return numericStreak;
   }
 };

@@ -434,6 +434,125 @@ window.App = {
     this.switchTab('reports');
   },
 
+  /**
+   * Tính toán chuỗi Streak theo thời gian thực (Dựa trên toàn bộ lịch sử học tập & ngày thực tế)
+   */
+  getStudentRealtimeStreak(studentUser) {
+    if (!studentUser) return 0;
+    const stId = studentUser.id;
+    const stUsername = studentUser.username;
+
+    // Lấy toàn bộ các phiên học flashcard và bài thi của học sinh này
+    const studySessions = (state.studySessions || []).filter(s => 
+      s.user_id === stId || (stUsername === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
+    );
+    const testSessions = (state.testSessions || []).filter(s => 
+      s.user_id === stId || (stUsername === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
+    );
+
+    const activeDates = new Set();
+
+    studySessions.forEach(s => {
+      if (s.created_at) {
+        const d = new Date(s.created_at);
+        if (!isNaN(d.getTime())) {
+          activeDates.add(d.toLocaleDateString('en-CA'));
+        }
+      }
+    });
+
+    testSessions.forEach(s => {
+      if (s.created_at) {
+        const d = new Date(s.created_at);
+        if (!isNaN(d.getTime())) {
+          activeDates.add(d.toLocaleDateString('en-CA'));
+        }
+      }
+    });
+
+    if (Array.isArray(studentUser.streak_dates)) {
+      studentUser.streak_dates.forEach(d => activeDates.add(d));
+    }
+
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('en-CA');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+
+    const hasToday = activeDates.has(todayStr);
+    const hasYesterday = activeDates.has(yesterdayStr);
+
+    let baseStreak = Number(studentUser.streak || 0);
+
+    if (activeDates.size === 0) {
+      return Math.max(1, baseStreak);
+    }
+
+    // Đếm ngược từng ngày liên tục
+    let streakCount = 0;
+    let curr = new Date();
+
+    if (!hasToday) {
+      if (!hasYesterday) {
+        return (studentUser.last_study_date === yesterdayStr && baseStreak > 0) ? baseStreak : 0;
+      }
+      curr.setDate(curr.getDate() - 1);
+    }
+
+    while (true) {
+      const dateKey = curr.toLocaleDateString('en-CA');
+      if (activeDates.has(dateKey)) {
+        streakCount++;
+        curr.setDate(curr.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    if (hasToday && baseStreak > 0 && streakCount <= 1) {
+      return baseStreak;
+    }
+
+    return Math.max(streakCount, (hasToday && baseStreak > 0) ? baseStreak : streakCount);
+  },
+
+  /**
+   * Ghi nhận hoạt động học tập và tự động tăng/cập nhật chuỗi Streak theo thời gian thực
+   */
+  async recordRealtimeActivity() {
+    if (!state.currentUser) return;
+    const user = state.currentUser;
+    const todayStr = new Date().toLocaleDateString('en-CA');
+
+    if (!Array.isArray(user.streak_dates)) {
+      user.streak_dates = [];
+    }
+    if (!user.streak_dates.includes(todayStr)) {
+      user.streak_dates.push(todayStr);
+    }
+
+    const prevStreak = user.streak || 0;
+    const newStreak = Math.max(1, this.getStudentRealtimeStreak(user));
+
+    user.streak = newStreak;
+    user.last_study_date = todayStr;
+    await AuthService.updateUserStreak(user.id, newStreak, todayStr);
+
+    // Update in usersList as well
+    const foundIdx = state.usersList.findIndex(u => u.id === user.id);
+    if (foundIdx !== -1) {
+      state.usersList[foundIdx].streak = newStreak;
+      state.usersList[foundIdx].last_study_date = todayStr;
+    }
+
+    if (newStreak > prevStreak) {
+      showToast(`🔥 Tuyệt vời! Chuỗi Streak học tập của em đã tăng lên ${newStreak} ngày liên tiếp!`, "success");
+    }
+
+    this.render();
+  },
+
   openSessionDetailsModal(sessionId) {
     const session = state.testSessions.find(s => s.id === Number(sessionId));
     if (!session) {
@@ -595,10 +714,11 @@ window.App = {
           cards_viewed: Math.max(1, state.flashcardCardsViewed),
           cards_mastered: state.flashcardCardsMastered
         };
-        SupabaseService.saveStudySession(sessionPayload).then(saved => {
+        SupabaseService.saveStudySession(sessionPayload).then(async saved => {
           if (saved) {
             state.studySessions.unshift(saved);
           }
+          await this.recordRealtimeActivity();
         });
       }
       state.flashcardStartTime = null;
@@ -1575,10 +1695,12 @@ window.App = {
         details: details
       };
       await this.loadAllData();
+      await this.recordRealtimeActivity();
       this.switchTab('quiz_result');
     } catch (err) {
       console.error(err);
       state.lastQuizResult = { ...sessionRecord, details };
+      await this.recordRealtimeActivity();
       this.switchTab('quiz_result');
     }
   },
@@ -1841,12 +1963,17 @@ window.App = {
     if (!user) return;
 
     const roleLabel = user.role === 'host' ? '👑 Host' : user.role === 'assistant_teacher' ? '👩‍🏫 Trợ giảng' : '🎓 Học sinh';
+    const realtimeStreak = this.getStudentRealtimeStreak(user);
     
     // Header Badge
     const headerBadge = document.getElementById('header-user-badge');
     if (headerBadge) {
       headerBadge.innerHTML = `
-        <div class="w-2.5 h-2.5 rounded-full ${user.role === 'host' ? 'bg-amber-500' : 'bg-green-500'}"></div>
+        <div class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 font-bold text-xs shadow-sm" title="Chuỗi ngày học tập liên tục">
+          <span class="material-symbols-outlined text-xs text-amber-500">local_fire_department</span>
+          <span>${realtimeStreak}d</span>
+        </div>
+        <div class="w-2 h-2 rounded-full ${user.role === 'host' ? 'bg-amber-500' : 'bg-green-500'}"></div>
         <span class="text-xs font-bold text-on-surface">${user.full_name}</span>
         <span class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono font-bold">${roleLabel}</span>
       `;
@@ -1982,7 +2109,13 @@ window.App = {
 
     const totalTests = userTestSessions.length;
     const avgScore = totalTests > 0 ? Math.round(userTestSessions.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / totalTests) : 0;
-    const userStreak = user.streak || 12;
+    
+    // Real-Time Streak Engine
+    const userStreak = this.getStudentRealtimeStreak(user);
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const studiedToday = (user.streak_dates && user.streak_dates.includes(todayStr)) || 
+      userStudySessions.some(s => s.created_at && new Date(s.created_at).toLocaleDateString('en-CA') === todayStr) ||
+      userTestSessions.some(s => s.created_at && new Date(s.created_at).toLocaleDateString('en-CA') === todayStr);
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
@@ -2074,12 +2207,17 @@ window.App = {
             <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
               <div class="flex justify-between items-start mb-3">
                 <div class="w-12 h-12 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-600">
-                  <span class="material-symbols-outlined text-2xl">local_fire_department</span>
+                  <span class="material-symbols-outlined text-2xl ${studiedToday ? 'text-amber-500 font-bold animate-pulse' : ''}">local_fire_department</span>
                 </div>
-                <span class="bg-amber-100 text-amber-900 font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Chuỗi ngày</span>
+                <span class="${studiedToday ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-900'} font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
+                  ${studiedToday ? '🔥 Đã học hôm nay' : '⏳ Chưa học hôm nay'}
+                </span>
               </div>
-              <h4 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Chuỗi Học Tập</h4>
+              <h4 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Chuỗi Học Tập (Streak)</h4>
               <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${userStreak} <span class="text-xs font-normal text-outline">ngày liên tiếp</span></p>
+              <p class="text-[11px] text-outline mt-1 font-semibold">
+                ${studiedToday ? '✨ Tuyệt vời! Em đã giữ vững chuỗi hôm nay.' : 'Luyện Flashcard hoặc làm 1 bài thi để tăng chuỗi!'}
+              </p>
             </div>
 
             <!-- Tests Completed Card -->
@@ -2881,9 +3019,24 @@ window.App = {
                             <p class="text-[11px] ${avgSc >= 80 ? 'text-green-700 font-bold' : 'text-outline'}">TB: ${avgSc > 0 ? avgSc + '%' : 'Chưa thi'}</p>
                           </td>
                           <td class="p-4 text-center">
-                            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-xs flex items-center justify-center gap-1 mx-auto w-max">
-                              <span class="material-symbols-outlined text-xs">local_fire_department</span> ${st.streak || 12}
-                            </span>
+                            ${(() => {
+                              const stStreak = this.getStudentRealtimeStreak(st);
+                              const todayStr = new Date().toLocaleDateString('en-CA');
+                              const stStudiedToday = (st.streak_dates && st.streak_dates.includes(todayStr)) ||
+                                stStudy.some(s => s.created_at && new Date(s.created_at).toLocaleDateString('en-CA') === todayStr) ||
+                                stTests.some(s => s.created_at && new Date(s.created_at).toLocaleDateString('en-CA') === todayStr);
+                              
+                              return `
+                                <div class="flex flex-col items-center gap-0.5">
+                                  <span class="px-2.5 py-0.5 rounded-full ${stStudiedToday ? 'bg-amber-100 text-amber-900 font-bold border border-amber-300' : 'bg-surface-container text-outline'} text-xs flex items-center justify-center gap-1 mx-auto w-max shadow-sm">
+                                    <span class="material-symbols-outlined text-xs text-amber-500">local_fire_department</span> ${stStreak} ngày
+                                  </span>
+                                  <span class="text-[10px] font-semibold ${stStudiedToday ? 'text-green-700' : 'text-outline'}">
+                                    ${stStudiedToday ? '✓ Đã học hôm nay' : 'Chưa học'}
+                                  </span>
+                                </div>
+                              `;
+                            })()}
                           </td>
                           <td class="p-4 text-center">
                             <span class="px-2.5 py-1 rounded-full text-xs font-bold ${avgSc >= 90 ? 'bg-green-100 text-green-900' : avgSc >= 80 ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-900'}">
@@ -3782,8 +3935,8 @@ window.App = {
                 </div>
                 <p class="text-xs text-outline font-mono mt-0.5">Username: <strong>@${st.username}</strong> • Lớp: <strong>${activeClass.name}</strong></p>
                 <div class="flex items-center gap-3 text-xs text-on-surface-variant mt-2">
-                  <span class="flex items-center gap-1 text-secondary font-bold">
-                    <span class="material-symbols-outlined text-sm">local_fire_department</span> Chuỗi ${st.streak || 12} ngày
+                  <span class="flex items-center gap-1 text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    <span class="material-symbols-outlined text-sm text-amber-500">local_fire_department</span> Chuỗi ${this.getStudentRealtimeStreak(st)} ngày
                   </span>
                   <span>•</span>
                   <span>Mục tiêu vào 10: <strong class="text-primary">9.0+ Điểm</strong></span>
@@ -4049,7 +4202,7 @@ window.App = {
                     <td class="p-4 text-center font-semibold">${m.totalTests} bài</td>
                     <td class="p-4 text-center font-bold text-primary text-sm">${m.avgScore}%</td>
                     <td class="p-4 text-center font-bold text-green-700">${m.maxScore}%</td>
-                    <td class="p-4 text-center text-secondary font-bold">🔥 ${m.student.streak || 12} ngày</td>
+                    <td class="p-4 text-center font-bold text-amber-600">🔥 ${this.getStudentRealtimeStreak(m.student)} ngày</td>
                     <td class="p-4 text-center">
                       <span class="px-2.5 py-1 rounded-full font-bold text-[11px] border ${m.evalClass}">
                         ${m.evalLabel}
