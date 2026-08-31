@@ -306,24 +306,60 @@ window.App = {
 
   openCreateUserModal() {
     const modal = document.getElementById('create-user-modal');
-    if (modal) {
-      const classSelect = document.getElementById('modal-user-class');
-      if (classSelect) {
+    if (!modal) return;
+
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const assistantClassId = Number(state.currentUser?.class_id || 1);
+
+    const classSelect = document.getElementById('modal-user-class');
+    if (classSelect) {
+      if (isAssistant) {
+        const assistantClass = state.classes.find(c => c.id === assistantClassId) || state.classes[0];
+        classSelect.innerHTML = `<option value="${assistantClassId}">${assistantClass ? assistantClass.name : 'Lớp của bạn'}</option>`;
+        classSelect.disabled = true;
+      } else {
+        classSelect.disabled = false;
         classSelect.innerHTML = state.classes.map(c => 
           `<option value="${c.id}" ${state.selectedClassId === c.id ? 'selected' : ''}>${c.name}</option>`
         ).join('');
       }
-      modal.classList.remove('hidden');
     }
+
+    const roleSelect = document.getElementById('input-user-role');
+    if (roleSelect) {
+      if (isAssistant) {
+        roleSelect.innerHTML = `<option value="student" selected>🎓 Học sinh</option>`;
+        roleSelect.disabled = true;
+      } else {
+        roleSelect.disabled = false;
+        roleSelect.innerHTML = `
+          <option value="student">🎓 Học sinh</option>
+          <option value="assistant_teacher">👩‍🏫 Giáo viên phụ (Trợ giảng)</option>
+        `;
+      }
+    }
+
+    // Reset inputs
+    const fullNameInput = document.getElementById('input-user-fullname');
+    if (fullNameInput) fullNameInput.value = '';
+    const usernameInput = document.getElementById('input-user-username');
+    if (usernameInput) usernameInput.value = '';
+    const passwordInput = document.getElementById('input-user-password');
+    if (passwordInput) passwordInput.value = '123456';
+
+    modal.classList.remove('hidden');
   },
 
   async handleCreateUser(e) {
     if (e) e.preventDefault();
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const assistantClassId = Number(state.currentUser?.class_id || 1);
+
     const fullName = document.getElementById('input-user-fullname')?.value.trim();
     const username = document.getElementById('input-user-username')?.value.trim();
     const password = document.getElementById('input-user-password')?.value.trim();
-    const role = document.getElementById('input-user-role')?.value || 'student';
-    const classId = document.getElementById('modal-user-class')?.value || 1;
+    const role = isAssistant ? 'student' : (document.getElementById('input-user-role')?.value || 'student');
+    const classId = isAssistant ? assistantClassId : Number(document.getElementById('modal-user-class')?.value || 1);
 
     if (!fullName || !username || !password) {
       showToast("Vui lòng điền đầy đủ các thông tin bắt buộc!", "error");
@@ -1803,8 +1839,15 @@ window.App = {
       return this.renderDashboardView();
     }
 
-    const users = state.usersList;
     const isHost = state.currentUser?.role === 'host';
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const assistantClassId = Number(state.currentUser?.class_id || 0);
+    const assignedClass = state.classes.find(c => c.id === assistantClassId) || { name: `Lớp #${assistantClassId}` };
+
+    // Assistant teacher ONLY sees student accounts belonging to their assigned class
+    const users = isHost 
+      ? state.usersList 
+      : state.usersList.filter(u => u.role === 'student' && Number(u.class_id) === assistantClassId);
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
@@ -1813,10 +1856,15 @@ window.App = {
           <div>
             <div class="flex items-center gap-2 text-primary font-bold text-xs mb-1">
               <span class="material-symbols-outlined text-base">manage_accounts</span>
-              <span>PHÂN HỆ QUẢN TRỊ TÀI KHOẢN & PHÂN QUYỀN</span>
+              <span>${isHost ? 'PHÂN HỆ QUẢN TRỊ TÀI KHOẢN & PHÂN QUYỀN TOÀN HỆ THỐNG' : `DANH SÁCH HỌC SINH • ${assignedClass.name}`}</span>
             </div>
-            <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Quản Lý & Cấp Tài Khoản</h2>
-            <p class="font-body-md text-sm text-on-surface-variant">Cấp tài khoản mới cho Giáo viên phụ và Học sinh, quản lý mật khẩu và phân quyền lớp học.</p>
+            <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">${isHost ? 'Quản Lý & Cấp Tài Khoản' : `Quản Lý Học Sinh: ${assignedClass.name}`}</h2>
+            <p class="font-body-md text-sm text-on-surface-variant">
+              ${isHost 
+                ? 'Cấp tài khoản mới cho Giáo viên phụ và Học sinh, quản lý mật khẩu và phân quyền lớp học.' 
+                : `Danh sách và cấp tài khoản học sinh thuộc lớp ${assignedClass.name} do bạn phụ trách.`
+              }
+            </p>
           </div>
 
           <button onclick="App.openCreateUserModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm btn-press flex items-center gap-2 hover-lift shadow-sm self-start sm:self-auto">
@@ -1828,7 +1876,12 @@ window.App = {
         <!-- Accounts Table -->
         <div class="bg-surface-container-lowest rounded-2xl ambient-shadow border border-outline-variant/30 overflow-hidden">
           <div class="p-5 border-b border-outline-variant/30 flex items-center justify-between">
-            <h3 class="font-headline-md text-base font-bold text-on-surface">Danh sách tài khoản hệ thống (${users.length} tài khoản)</h3>
+            <h3 class="font-headline-md text-base font-bold text-on-surface">
+              ${isHost 
+                ? `Danh sách tài khoản hệ thống (${users.length} tài khoản)` 
+                : `Danh sách học sinh lớp ${assignedClass.name} (${users.length} học sinh)`
+              }
+            </h3>
           </div>
 
           <div class="overflow-x-auto">
@@ -1845,8 +1898,8 @@ window.App = {
                 </tr>
               </thead>
               <tbody class="divide-y divide-outline-variant/20">
-                ${users.map((u, idx) => {
-                  const assignedClass = state.classes.find(c => c.id === u.class_id);
+                ${users.length > 0 ? users.map((u, idx) => {
+                  const itemClass = state.classes.find(c => c.id === u.class_id);
                   const isUserHost = u.role === 'host';
 
                   return `
@@ -1871,14 +1924,14 @@ window.App = {
                         </span>
                       </td>
                       <td class="p-4 text-on-surface">
-                        ${isUserHost ? '<span class="text-primary font-bold">Toàn bộ các lớp</span>' : assignedClass ? assignedClass.name : 'Chưa gán'}
+                        ${isUserHost ? '<span class="text-primary font-bold">Toàn bộ các lớp</span>' : itemClass ? itemClass.name : 'Chưa gán'}
                       </td>
                       <td class="p-4 text-center">
                         <div class="flex items-center justify-center gap-2">
                           <button onclick="App.handleChangePassword('${u.id}', '${u.full_name}')" class="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-[11px] transition-colors" title="Đổi mật khẩu">
                             Đổi Pass
                           </button>
-                          ${!isUserHost && isHost ? `
+                          ${!isUserHost ? `
                             <button onclick="App.handleDeleteUser('${u.id}', '${u.full_name}')" class="p-1.5 text-outline hover:text-error rounded-lg hover:bg-error-container/20 transition-colors" title="Xóa tài khoản">
                               <span class="material-symbols-outlined text-base">delete</span>
                             </button>
@@ -1887,7 +1940,14 @@ window.App = {
                       </td>
                     </tr>
                   `;
-                }).join('')}
+                }).join('') : `
+                  <tr>
+                    <td colspan="7" class="p-8 text-center text-outline">
+                      <span class="material-symbols-outlined text-4xl block mb-2 text-outline/60">person_off</span>
+                      Chưa có học sinh nào trong lớp này. Nhấn <strong>"+ Cấp Tài Khoản Mới"</strong> để thêm học sinh.
+                    </td>
+                  </tr>
+                `}
               </tbody>
             </table>
           </div>
@@ -2041,21 +2101,35 @@ window.App = {
   renderClassesView() {
     if (state.currentUser?.role === 'student') return this.renderDashboardView();
 
+    const isHost = state.currentUser?.role === 'host';
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const assistantClassId = Number(state.currentUser?.class_id || 1);
+
+    const visibleClasses = isHost 
+      ? state.classes 
+      : state.classes.filter(c => c.id === assistantClassId);
+
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Quản lý Lớp học & Học viên</h2>
-            <p class="font-body-md text-sm text-on-surface-variant">Tạo lớp học mới, chia sẻ Mã lớp và quản lý kho từ vựng.</p>
+            <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">
+              ${isHost ? 'Quản lý Lớp học & Học viên' : 'Lớp học của bạn'}
+            </h2>
+            <p class="font-body-md text-sm text-on-surface-variant">
+              ${isHost ? 'Tạo lớp học mới, chia sẻ Mã lớp và quản lý kho từ vựng.' : 'Theo dõi học sinh và kho từ vựng của lớp bạn phụ trách.'}
+            </p>
           </div>
-          <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift self-start sm:self-auto">
-            <span class="material-symbols-outlined">add</span>
-            Tạo Lớp Học Mới
-          </button>
+          ${isHost ? `
+            <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift self-start sm:self-auto">
+              <span class="material-symbols-outlined">add</span>
+              Tạo Lớp Học Mới
+            </button>
+          ` : ''}
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-          ${state.classes.map(c => {
+          ${visibleClasses.map(c => {
             const classVocab = state.vocabulary.filter(v => v.class_id === c.id);
             const classLessons = state.lessons.filter(l => l.class_id === c.id);
             const classStudents = state.usersList.filter(u => u.class_id === c.id && u.role === 'student');
@@ -2081,9 +2155,11 @@ window.App = {
                   <button onclick="App.selectClass(${c.id}); App.switchTab('vocabulary');" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center">
                     Kho từ vựng
                   </button>
-                  <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl">
-                    <span class="material-symbols-outlined text-base">delete</span>
-                  </button>
+                  ${isHost ? `
+                    <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl">
+                      <span class="material-symbols-outlined text-base">delete</span>
+                    </button>
+                  ` : ''}
                 </div>
               </div>
             `;
@@ -2741,7 +2817,8 @@ window.App = {
   // 9. Reports View (Comprehensive Class Overview & Individual Student Drill-Down)
   renderReportsView() {
     const isStudent = state.currentUser?.role === 'student';
-    const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
+    const isAssistant = state.currentUser?.role === 'assistant_teacher';
+    const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
     const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
     
     // Students in this class
@@ -3057,12 +3134,14 @@ window.App = {
           </div>
 
           <div class="flex items-center gap-3 flex-wrap">
-            <select 
-              onchange="App.selectClass(this.value)"
-              class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-bold text-primary focus:outline-none"
-            >
-              ${state.classes.map(c => `<option value="${c.id}" ${c.id === state.selectedClassId ? 'selected' : ''}>Lớp: ${c.name}</option>`).join('')}
-            </select>
+            ${!isStudent && !isAssistant ? `
+              <select 
+                onchange="App.selectClass(this.value)"
+                class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs font-bold text-primary focus:outline-none"
+              >
+                ${state.classes.map(c => `<option value="${c.id}" ${c.id === state.selectedClassId ? 'selected' : ''}>Lớp: ${c.name}</option>`).join('')}
+              </select>
+            ` : ''}
 
             <button onclick="App.ExcelService.exportTestResults(state.testSessions)" class="bg-surface-container text-on-surface px-4 py-2.5 rounded-xl font-bold text-xs border border-outline-variant/40 flex items-center gap-1.5 hover:bg-surface-container-high">
               <span class="material-symbols-outlined text-sm">download</span> Xuất Báo Cáo Lớp
