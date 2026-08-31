@@ -652,5 +652,37 @@ export const AuthService = {
     }
 
     return numericStreak;
+  },
+
+  /**
+   * Cập nhật danh sách các lớp học do giáo viên phụ tự tạo/quản lý
+   */
+  async updateUserManagedClasses(userId, managedClasses = [], primaryClassId = null) {
+    if (!userId) return;
+    const users = getStoredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId);
+    if (idx !== -1) {
+      users[idx].managed_classes = managedClasses;
+      if (primaryClassId) users[idx].class_id = primaryClassId;
+      saveStoredUsers(users);
+    }
+
+    const cur = this.getCurrentUser();
+    if (cur && (cur.id === userId || cur.username === userId)) {
+      cur.managed_classes = managedClasses;
+      if (primaryClassId) cur.class_id = primaryClassId;
+      setCookie(COOKIE_NAME, JSON.stringify(cur), 30);
+    }
+
+    try {
+      const client = getSupabase();
+      if (client) {
+        const updatePayload = { managed_classes: managedClasses };
+        if (primaryClassId) updatePayload.class_id = primaryClassId;
+        await client.from('app_users').update(updatePayload).eq('id', userId);
+      }
+    } catch (e) {
+      console.warn("Supabase managed_classes update fallback:", e);
+    }
   }
 };

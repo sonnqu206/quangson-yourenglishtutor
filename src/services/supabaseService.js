@@ -363,13 +363,14 @@ export const SupabaseService = {
   },
 
   /**
-   * Thêm lớp học mới
+   * Thêm lớp học mới (Hỗ trợ creator_id của Host và Giáo viên phụ)
    */
-  async createClass(name, customCode = null) {
+  async createClass(name, customCode = null, creatorId = null) {
     const code = customCode ? customCode.trim().toUpperCase() : "QS" + Math.random().toString(36).substring(2, 7).toUpperCase();
     const newClass = {
       name: name.trim(),
       class_code: code,
+      creator_id: creatorId || null,
       created_at: new Date().toISOString()
     };
 

@@ -149,6 +149,28 @@ window.App = {
   },
 
   /**
+   * Lấy danh sách các lớp học mà người dùng có quyền quản lý/truy cập
+   */
+  getManagedClasses(user = state.currentUser) {
+    if (!user) return [];
+    if (user.role === 'host') return state.classes;
+    if (user.role === 'student') {
+      return state.classes.filter(c => c.id === Number(user.class_id));
+    }
+    if (user.role === 'assistant_teacher') {
+      const userAssigned = Number(user.class_id);
+      const managedList = Array.isArray(user.managed_classes) ? user.managed_classes.map(Number) : [];
+      return state.classes.filter(c => 
+        c.id === userAssigned || 
+        managedList.includes(c.id) || 
+        c.creator_id === user.id || 
+        c.created_by === user.id
+      );
+    }
+    return [];
+  },
+
+  /**
    * Nạp toàn bộ dữ liệu từ Supabase & AuthService
    */
   async loadAllData() {
@@ -169,10 +191,15 @@ window.App = {
       state.usersList = users || AuthService.getAllUsers();
       state.studySessions = studySessions || [];
 
-      // For students and assistant teachers, lock selectedClassId strictly to their assigned class
-      if (state.currentUser && (state.currentUser.role === 'student' || state.currentUser.role === 'assistant_teacher')) {
+      // For students, lock selectedClassId strictly to their assigned class
+      if (state.currentUser && state.currentUser.role === 'student') {
         state.selectedClassId = Number(state.currentUser.class_id) || 1;
         state.selectedClassDetailId = state.selectedClassId;
+      } else if (state.currentUser && state.currentUser.role === 'assistant_teacher') {
+        const myClasses = this.getManagedClasses(state.currentUser);
+        if (!state.selectedClassId || !myClasses.some(c => c.id === state.selectedClassId)) {
+          state.selectedClassId = myClasses[0]?.id || Number(state.currentUser.class_id) || 1;
+        }
       } else if (!state.selectedClassId && state.classes.length > 0) {
         state.selectedClassId = state.classes[0].id;
       }
@@ -192,14 +219,13 @@ window.App = {
    */
   updateStudyList() {
     const isStudent = state.currentUser?.role === 'student';
-    const isAssistant = state.currentUser?.role === 'assistant_teacher';
-    const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
+    const targetClassId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
     
     const classVocab = state.vocabulary.filter(v => v.class_id === targetClassId);
     if (state.selectedLessonId) {
       state.studyList = classVocab.filter(v => v.lesson_id === Number(state.selectedLessonId));
     } else {
-      state.studyList = classVocab;
+      state.studyList = [...classVocab];
     }
   },
 
@@ -619,21 +645,21 @@ window.App = {
   },
 
   // =========================================================================
-  // SAFE NAVIGATION & CLASS LOGIC (ROLE RESTRICTION)
-  // =========================================================================
-
-  // =========================================================================
   // SAFE NAVIGATION & CLASS DRILLDOWN LOGIC
   // =========================================================================
 
   openClassDetail(classId, tab = 'units') {
-    const isRestricted = state.currentUser?.role === 'student' || state.currentUser?.role === 'assistant_teacher';
-    if (isRestricted && Number(classId) !== Number(state.currentUser.class_id)) {
-      showToast("Bạn chỉ được phép truy cập lớp học được phân công!", "error");
+    const targetId = Number(classId);
+    const allowedClasses = this.getManagedClasses(state.currentUser);
+    const isAllowed = state.currentUser?.role === 'host' || allowedClasses.some(c => c.id === targetId);
+
+    if (!isAllowed) {
+      showToast("Bạn chỉ được phép truy cập lớp học thuộc quyền phụ trách của mình!", "error");
       return;
     }
-    state.selectedClassId = Number(classId);
-    state.selectedClassDetailId = Number(classId);
+
+    state.selectedClassId = targetId;
+    state.selectedClassDetailId = targetId;
     state.classDetailTab = tab;
     state.selectedLessonId = null;
     this.updateStudyList();
@@ -657,8 +683,8 @@ window.App = {
         return;
       }
     }
-    // If in class detail view and is host, return to classes list
-    if (state.currentTab === 'classes' && state.selectedClassDetailId && state.currentUser?.role === 'host') {
+    // If in class detail view and user is teacher/host, return to classes list
+    if (state.currentTab === 'classes' && state.selectedClassDetailId && state.currentUser?.role !== 'student') {
       state.selectedClassDetailId = null;
       this.render();
       return;
@@ -673,10 +699,9 @@ window.App = {
   },
 
   confirmExitQuiz() {
-    if (state.quizTimerInterval) clearInterval(state.quizTimerInterval);
-    state.currentQuiz = [];
-    state.quizIndex = 0;
     this.closeModal('exit-quiz-modal');
+    state.currentQuiz = [];
+    if (state.quizTimerInterval) clearInterval(state.quizTimerInterval);
     const target = state.pendingTargetTab || 'classes';
     state.pendingTargetTab = null;
     this.switchTab(target);
@@ -684,14 +709,17 @@ window.App = {
   },
 
   selectClass(classId) {
-    // If user is a student or assistant teacher, forbid switching classes
-    if (state.currentUser?.role === 'student' || state.currentUser?.role === 'assistant_teacher') {
-      showToast("Bạn chỉ được phép truy cập lớp học được phân công của mình!", "error");
+    const targetId = Number(classId);
+    const allowedClasses = this.getManagedClasses(state.currentUser);
+    const isAllowed = state.currentUser?.role === 'host' || allowedClasses.some(c => c.id === targetId);
+
+    if (!isAllowed) {
+      showToast("Bạn chỉ được phép truy cập lớp học thuộc quyền phụ trách của mình!", "error");
       return;
     }
 
-    state.selectedClassId = Number(classId);
-    state.selectedClassDetailId = Number(classId);
+    state.selectedClassId = targetId;
+    state.selectedClassDetailId = targetId;
     state.selectedLessonId = null;
     this.updateStudyList();
     
@@ -1079,11 +1107,34 @@ window.App = {
       return;
     }
     try {
-      const created = await SupabaseService.createClass(name, code);
-      showToast(`Đã tạo lớp "${name}" với mã [${created.class_code}]!`, "success");
+      const creatorId = state.currentUser?.id;
+      const created = await SupabaseService.createClass(name, code, creatorId);
+
+      // If assistant teacher created the class, track it in managed_classes
+      if (state.currentUser?.role === 'assistant_teacher') {
+        if (!Array.isArray(state.currentUser.managed_classes)) {
+          state.currentUser.managed_classes = [];
+        }
+        if (!state.currentUser.managed_classes.includes(created.id)) {
+          state.currentUser.managed_classes.push(created.id);
+        }
+        if (!state.currentUser.class_id) {
+          state.currentUser.class_id = created.id;
+        }
+        await AuthService.updateUserManagedClasses(state.currentUser.id, state.currentUser.managed_classes, state.currentUser.class_id);
+      }
+
+      showToast(`Đã tạo lớp "${name}" với mã [${created.class_code}] thành công! 🎉`, "success");
       this.closeModal('create-class-modal');
+      const nameInput = document.getElementById('input-class-name');
+      if (nameInput) nameInput.value = '';
+      const codeInput = document.getElementById('input-class-code');
+      if (codeInput) codeInput.value = '';
+
       await this.loadAllData();
       state.selectedClassId = created.id;
+      state.selectedClassDetailId = created.id;
+      this.updateStudyList();
       this.render();
     } catch (err) {
       showToast("Lỗi khi tạo lớp: " + err.message, "error");
@@ -1092,10 +1143,20 @@ window.App = {
 
   async deleteClass(id) {
     if (state.currentUser?.role === 'student') return;
-    if (!confirm("Bạn có chắc chắn muốn xóa lớp học này? Toàn bộ bài học và từ vựng trong lớp sẽ bị xóa.")) return;
+    const targetClass = state.classes.find(c => c.id === Number(id));
+    const isHost = state.currentUser?.role === 'host';
+    const isCreator = targetClass && (targetClass.creator_id === state.currentUser?.id || targetClass.created_by === state.currentUser?.id);
+
+    if (!isHost && !isCreator) {
+      showToast("Bạn chỉ có thể xóa lớp học do chính mình tạo ra!", "error");
+      return;
+    }
+
+    if (!confirm(`Bạn có chắc chắn muốn xóa lớp học "${targetClass ? targetClass.name : ''}"? Toàn bộ bài học và từ vựng trong lớp sẽ bị xóa.`)) return;
     try {
       await SupabaseService.deleteClass(id);
       showToast("Đã xóa lớp học thành công!", "success");
+      state.selectedClassDetailId = null;
       await this.loadAllData();
       this.render();
     } catch (e) {
@@ -1109,12 +1170,25 @@ window.App = {
       const classSelect = document.getElementById('modal-lesson-class');
       const isStudent = state.currentUser?.role === 'student';
       const isAssistant = state.currentUser?.role === 'assistant_teacher';
-      const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
+      const allowedClasses = this.getManagedClasses(state.currentUser);
+      const targetClassId = Number(state.selectedClassId || state.currentUser?.class_id || 1);
+
       if (classSelect) {
-        if (isStudent || isAssistant) {
+        if (isStudent) {
           const userClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
           classSelect.innerHTML = `<option value="${targetClassId}">${userClass ? userClass.name : 'Lớp của bạn'}</option>`;
           classSelect.disabled = true;
+        } else if (isAssistant) {
+          if (allowedClasses.length > 1) {
+            classSelect.disabled = false;
+            classSelect.innerHTML = allowedClasses.map(c => 
+              `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
+            ).join('');
+          } else {
+            const userClass = allowedClasses[0] || state.classes[0];
+            classSelect.innerHTML = `<option value="${userClass.id}">${userClass.name}</option>`;
+            classSelect.disabled = true;
+          }
         } else {
           classSelect.disabled = false;
           classSelect.innerHTML = state.classes.map(c => 
@@ -1129,8 +1203,7 @@ window.App = {
   async handleCreateLesson(e) {
     e.preventDefault();
     const isStudent = state.currentUser?.role === 'student';
-    const isAssistant = state.currentUser?.role === 'assistant_teacher';
-    const classId = (isStudent || isAssistant)
+    const classId = isStudent
       ? Number(state.currentUser.class_id || 1)
       : Number(document.getElementById('modal-lesson-class')?.value || state.selectedClassId || 1);
     const title = document.getElementById('input-lesson-title')?.value.trim();
@@ -1171,15 +1244,27 @@ window.App = {
   openCreateVocabularyModal(preselectedLessonId = null) {
     const isStudent = state.currentUser?.role === 'student';
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
-    const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1);
+    const allowedClasses = this.getManagedClasses(state.currentUser);
+    const targetClassId = Number(state.selectedClassId || state.currentUser?.class_id || 1);
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
 
     const classSelect = document.getElementById('input-vocab-class');
     if (classSelect) {
-      if (isStudent || isAssistant) {
+      if (isStudent) {
         const userClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
         classSelect.innerHTML = `<option value="${targetClassId}">${userClass ? userClass.name : 'Lớp của bạn'}</option>`;
         classSelect.disabled = true;
+      } else if (isAssistant) {
+        if (allowedClasses.length > 1) {
+          classSelect.disabled = false;
+          classSelect.innerHTML = allowedClasses.map(c => 
+            `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
+          ).join('');
+        } else {
+          const userClass = allowedClasses[0] || state.classes[0];
+          classSelect.innerHTML = `<option value="${userClass.id}">${userClass.name}</option>`;
+          classSelect.disabled = true;
+        }
       } else {
         classSelect.disabled = false;
         classSelect.innerHTML = state.classes.map(c => 
@@ -2407,12 +2492,12 @@ window.App = {
           <div class="flex items-center gap-4 w-full lg:w-auto flex-wrap sm:flex-nowrap">
             <div>
               <label class="block text-xs font-bold text-outline uppercase mb-1">Lớp học đích (*)</label>
-              ${(isStudent || isAssistant) ? `
+              ${isStudent ? `
                 <input type="text" readonly value="${activeClass.name}" class="py-2.5 px-3.5 bg-surface-container border border-outline-variant/30 rounded-xl text-sm font-bold text-primary cursor-not-allowed" />
                 <input type="hidden" id="table-input-class" value="${targetClassId}" />
               ` : `
                 <select id="table-input-class" onchange="App.selectClass(this.value)" class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-sm font-bold text-primary focus:outline-none">
-                  ${state.classes.map(c => `<option value="${c.id}" ${c.id === state.selectedClassId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                  ${this.getManagedClasses(state.currentUser).map(c => `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`).join('')}
                 </select>
               `}
             </div>
@@ -2553,21 +2638,19 @@ window.App = {
     const isStudent = state.currentUser?.role === 'student';
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
     const isHost = state.currentUser?.role === 'host';
-    const assistantClassId = Number(state.currentUser?.class_id || 1);
 
-    // If student or assistant teacher, directly render their assigned class detail view
-    if (isStudent || isAssistant) {
-      return this.renderClassDetailView(assistantClassId);
+    // If student, directly render their single assigned class
+    if (isStudent) {
+      const studentClassId = Number(state.currentUser?.class_id || 1);
+      return this.renderClassDetailView(studentClassId);
     }
 
-    // If host has a class selected to drilldown into, render its detail
+    // If teacher has clicked into a specific class, render its detail
     if (state.selectedClassDetailId) {
       return this.renderClassDetailView(state.selectedClassDetailId);
     }
 
-    const visibleClasses = isHost 
-      ? state.classes 
-      : state.classes.filter(c => c.id === assistantClassId);
+    const visibleClasses = this.getManagedClasses(state.currentUser);
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
@@ -2577,22 +2660,21 @@ window.App = {
               ${isHost ? 'Quản lý Lớp học & Chuyên đề' : 'Lớp học của bạn'}
             </h2>
             <p class="font-body-md text-sm text-on-surface-variant">
-              ${isHost ? 'Bấm vào từng lớp học để xem các bài học, kho từ vựng và báo cáo học sinh.' : 'Theo dõi học sinh, bài học và báo cáo lớp bạn phụ trách.'}
+              ${isHost ? 'Bấm vào từng lớp học để xem các bài học, kho từ vựng và báo cáo học sinh.' : 'Quản lý các lớp bạn phụ trách hoặc tự tạo mới.'}
             </p>
           </div>
-          ${isHost ? `
-            <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift self-start sm:self-auto">
-              <span class="material-symbols-outlined">add</span>
-              Tạo Lớp Học Mới
-            </button>
-          ` : ''}
+          <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift self-start sm:self-auto shadow-md">
+            <span class="material-symbols-outlined">add</span>
+            Tạo Lớp Học Mới
+          </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-          ${visibleClasses.map(c => {
+          ${visibleClasses.length > 0 ? visibleClasses.map(c => {
             const classVocab = state.vocabulary.filter(v => v.class_id === c.id);
             const classLessons = state.lessons.filter(l => l.class_id === c.id);
             const classStudents = state.usersList.filter(u => u.class_id === c.id && u.role === 'student');
+            const isCreator = c.creator_id === state.currentUser?.id || c.created_by === state.currentUser?.id;
 
             return `
               <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift">
@@ -2616,7 +2698,7 @@ window.App = {
                   <button onclick="App.openClassDetail(${c.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift transition-colors text-center flex items-center justify-center gap-1">
                     <span class="material-symbols-outlined text-base">school</span> 👉 Vào Lớp Học
                   </button>
-                  ${isHost ? `
+                  ${(isHost || isCreator) ? `
                     <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa lớp">
                       <span class="material-symbols-outlined text-base">delete</span>
                     </button>
@@ -2624,7 +2706,16 @@ window.App = {
                 </div>
               </div>
             `;
-          }).join('')}
+          }).join('') : `
+            <div class="col-span-full p-12 bg-surface-container-lowest rounded-3xl border border-outline-variant/30 text-center">
+              <span class="material-symbols-outlined text-5xl text-outline mb-2">school</span>
+              <p class="text-on-surface font-bold text-base mb-1">Chưa có lớp học nào</p>
+              <p class="text-outline text-xs mb-4">Bấm nút "Tạo Lớp Học Mới" ở trên để tạo lớp đầu tiên của bạn!</p>
+              <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 hover-lift">
+                <span class="material-symbols-outlined text-base">add</span> Tạo Lớp Ngay
+              </button>
+            </div>
+          `}
         </div>
       </div>
     `;
@@ -2637,8 +2728,7 @@ window.App = {
     const isHost = state.currentUser?.role === 'host';
     const isTeacher = !isStudent;
 
-    // For assistant teacher, always enforce their assigned class
-    const targetClassId = isAssistant ? Number(state.currentUser.class_id || 1) : (Number(classId) || 1);
+    const targetClassId = Number(classId) || (isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1));
     const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: `Lớp #${targetClassId}`, class_code: "QS9A" };
 
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
@@ -2655,7 +2745,7 @@ window.App = {
         <!-- Class Hub Header -->
         <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-primary/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div class="flex items-start sm:items-center gap-3.5">
-            ${isHost ? `
+            ${!isStudent ? `
               <button onclick="App.state.selectedClassDetailId = null; App.render();" class="p-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors shrink-0" title="Danh sách các lớp">
                 <span class="material-symbols-outlined text-lg">arrow_back</span>
               </button>
