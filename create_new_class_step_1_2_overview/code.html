@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Create New Class - EduVocab</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "error": "#ba1a1a",
+                    "surface-tint": "#005ac2",
+                    "secondary-container": "#fea619",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "secondary": "#855300",
+                    "surface-variant": "#d3e4fe",
+                    "surface-container": "#e5eeff",
+                    "on-primary-fixed-variant": "#004395",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-tertiary-fixed-variant": "#783200",
+                    "tertiary": "#994100",
+                    "outline-variant": "#c2c6d6",
+                    "tertiary-fixed-dim": "#ffb690",
+                    "surface-bright": "#f8f9ff",
+                    "surface-container-high": "#dce9ff",
+                    "surface": "#f8f9ff",
+                    "secondary-fixed-dim": "#ffb95f",
+                    "primary-fixed": "#d8e2ff",
+                    "primary": "#0058be",
+                    "tertiary-fixed": "#ffdbca",
+                    "on-background": "#0b1c30",
+                    "surface-container-low": "#eff4ff",
+                    "surface-container-highest": "#d3e4fe",
+                    "on-secondary-container": "#684000",
+                    "inverse-surface": "#213145",
+                    "tertiary-container": "#c05400",
+                    "error-container": "#ffdad6",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "outline": "#727785",
+                    "inverse-primary": "#adc6ff",
+                    "on-tertiary-container": "#fffbff",
+                    "on-secondary-fixed-variant": "#653e00",
+                    "surface-dim": "#cbdbf5",
+                    "on-surface-variant": "#424754",
+                    "on-tertiary-fixed": "#341100",
+                    "on-secondary-fixed": "#2a1700",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed": "#001a42",
+                    "on-primary-container": "#fefcff",
+                    "background": "#f8f9ff",
+                    "on-surface": "#0b1c30",
+                    "inverse-on-surface": "#eaf1ff",
+                    "secondary-fixed": "#ffddb8",
+                    "primary-container": "#2170e4",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-sm": "8px",
+                    "unit": "8px",
+                    "gutter": "24px",
+                    "margin-desktop": "40px",
+                    "stack-md": "16px",
+                    "container-max": "1280px",
+                    "margin-mobile": "16px",
+                    "stack-lg": "32px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Lexend"],
+                    "body-lg": ["Lexend"],
+                    "label-md": ["Lexend"],
+                    "display-lg": ["Lexend"],
+                    "headline-lg-mobile": ["Lexend"],
+                    "label-sm": ["Lexend"],
+                    "body-md": ["Lexend"],
+                    "headline-md": ["Lexend"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { background-color: #F0F9FF; }
+        .ambient-shadow { box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04); }
+        .glass-overlay { background: rgba(240, 249, 255, 0.85); backdrop-filter: blur(8px); }
+        .primary-btn { border-bottom: 2px solid #004395; }
+        .primary-btn:active { border-bottom: 0px; transform: translateY(2px); }
+    </style>
+</head>
+<body class="h-full text-on-surface overflow-hidden font-body-md">
+<!-- Dimmed Background Context (Classes View) -->
+<div class="absolute inset-0 z-0 opacity-40 pointer-events-none select-none flex">
+<!-- Mock SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface-container-lowest border-r border-outline-variant shadow-md flex flex-col p-stack-md gap-stack-sm">
+<div class="flex items-center gap-2 mb-stack-lg p-2">
+<img alt="Institution Logo" class="w-10 h-10 rounded-lg object-cover" data-alt="A modern, abstract logo for an educational institution featuring stylized geometric shapes resembling an open book and a spark, rendered in bright, friendly blue and orange colors. Clean vector style, flat design, light background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGs6B9LvW_O1sgxWSYS7FrHExoyESLk4FBHdYBEIe2VLcm-z-iYSQOYrb0lpmG3V7mEKNuumO47uh7iD4HX6bJJFMHlZ9fsVGaFVB9jDKY_YME0-HytKtIv9Ue7fcFZ9T8xsX8npBPNcupHcYx0lQYKlzVa_02cN9aOF77lQsXCv-Skqt4lAOG9HnJOv0n4o818JeTqHcDbPJPUi7VNGdrw4SZX2p778izNHq6aWjK2Uarr_FSrWW2ew"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">EduVocab</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Teacher Portal</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-transform hover:translate-x-1 font-label-md text-label-md" href="#"><span class="material-symbols-outlined">dashboard</span> Dashboard</a>
+<a class="flex items-center gap-3 p-3 bg-primary-container text-on-primary-container rounded-lg font-bold font-label-md text-label-md opacity-80" href="#"><span class="material-symbols-outlined">groups</span> Classes</a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-transform hover:translate-x-1 font-label-md text-label-md" href="#"><span class="material-symbols-outlined">school</span> Students</a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-transform hover:translate-x-1 font-label-md text-label-md" href="#"><span class="material-symbols-outlined">menu_book</span> Lessons</a>
+<a class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-transform hover:translate-x-1 font-label-md text-label-md" href="#"><span class="material-symbols-outlined">analytics</span> Reports</a>
+</nav>
+<button class="mt-auto bg-primary text-on-primary font-label-md text-label-md py-3 rounded-lg flex items-center justify-center gap-2 primary-btn transition-transform">
+<span class="material-symbols-outlined">add</span> Create Lesson
+            </button>
+</aside>
+<!-- Mock Main Content Area -->
+<main class="ml-64 flex-1 p-margin-desktop opacity-60">
+<h2 class="font-headline-lg text-headline-lg mb-gutter">My Classes</h2>
+<div class="grid grid-cols-3 gap-gutter">
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-[#E2E8F0] ambient-shadow h-48"></div>
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-[#E2E8F0] ambient-shadow h-48"></div>
+<div class="bg-surface-container-lowest rounded-xl p-6 border border-[#E2E8F0] ambient-shadow h-48"></div>
+</div>
+</main>
+</div>
+<!-- Modal Overlay -->
+<div class="absolute inset-0 z-10 glass-overlay flex items-center justify-center p-margin-desktop">
+<!-- Create Class Card -->
+<div class="bg-surface-container-lowest rounded-xl w-full max-w-2xl ambient-shadow border border-[#E2E8F0] overflow-hidden flex flex-col">
+<!-- Header & Stepper -->
+<header class="px-8 pt-8 pb-6 border-b border-surface-container-high relative">
+<button class="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-6">Create New Class</h2>
+<!-- Progress Stepper -->
+<div class="flex items-center justify-between relative">
+<!-- Progress Line Background -->
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-full h-2 bg-[#DBEAFE] rounded-full z-0"></div>
+<!-- Active Progress Line -->
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1/3 h-2 bg-primary rounded-full z-0 transition-all duration-300" id="progress-line"></div>
+<!-- Steps -->
+<div class="relative z-10 flex flex-col items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shadow-sm" id="step1-indicator">1</div>
+<span class="font-label-sm text-label-sm text-primary font-bold">Details</span>
+</div>
+<div class="relative z-10 flex flex-col items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-lowest text-on-surface-variant border-2 border-[#DBEAFE] flex items-center justify-center font-label-md text-label-md shadow-sm" id="step2-indicator">2</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Access</span>
+</div>
+<div class="relative z-10 flex flex-col items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-lowest text-on-surface-variant border-2 border-[#DBEAFE] flex items-center justify-center font-label-md text-label-md shadow-sm" id="step3-indicator">3</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Students</span>
+</div>
+</div>
+</header>
+<!-- Card Body (Dynamic Steps) -->
+<div class="p-8 flex-1 overflow-y-auto" id="step-container">
+<!-- STEP 1: Details -->
+<div class="block animate-fade-in" id="step1-content">
+<div class="flex flex-col gap-stack-lg">
+<div class="flex flex-col gap-stack-sm">
+<label class="font-label-md text-label-md text-on-surface" for="className">Class Name</label>
+<input class="w-full px-4 py-3 rounded-DEFAULT bg-surface-container-lowest border border-outline-variant text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-shadow" id="className" placeholder="e.g., Grade 9A Spanish" type="text"/>
+</div>
+<div class="flex flex-col gap-stack-sm">
+<label class="font-label-md text-label-md text-on-surface" for="classLevel">Subject / Level</label>
+<div class="relative">
+<select class="w-full px-4 py-3 rounded-DEFAULT bg-surface-container-lowest border border-outline-variant text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 appearance-none transition-shadow" id="classLevel">
+<option disabled="" selected="" value="">Select level...</option>
+<option value="a1">Beginner (A1)</option>
+<option value="a2">Elementary (A2)</option>
+<option value="b1">Intermediate (B1)</option>
+<option value="b2">Upper Intermediate (B2)</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="flex flex-col gap-stack-sm">
+<label class="font-label-md text-label-md text-on-surface" for="classDesc">Description <span class="text-on-surface-variant font-normal">(Optional)</span></label>
+<textarea class="w-full px-4 py-3 rounded-DEFAULT bg-surface-container-lowest border border-outline-variant text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 resize-none transition-shadow" id="classDesc" placeholder="Brief description of the class goals..." rows="3"></textarea>
+</div>
+</div>
+</div>
+<!-- STEP 2: Access (Hidden initially) -->
+<div class="hidden" id="step2-content">
+<div class="text-center flex flex-col items-center gap-stack-md py-4">
+<div class="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center text-primary mb-2">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">vpn_key</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Class Access Code</h3>
+<p class="text-body-md text-on-surface-variant max-w-sm">Share this unique code with your students so they can join your class space.</p>
+<div class="mt-4 p-6 bg-surface-bright rounded-xl border border-surface-container-high w-full max-w-sm relative">
+<div class="font-display-lg text-display-lg text-primary tracking-widest text-center select-all">LM-4892</div>
+<button class="absolute top-2 right-2 p-2 text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-sm text-sm" onclick="alert('Copied!')">
+<span class="material-symbols-outlined text-sm">content_copy</span> Copy
+                            </button>
+</div>
+<button class="mt-4 flex items-center gap-2 text-secondary-container font-label-md text-label-md hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined">qr_code_2</span> Download QR Code Flyer
+                        </button>
+</div>
+</div>
+<!-- STEP 3: Add Students (Hidden initially) -->
+<div class="hidden" id="step3-content">
+<div class="flex flex-col gap-stack-lg">
+<div class="text-center mb-2">
+<h3 class="font-headline-md text-headline-md">Invite Students</h3>
+<p class="text-body-md text-on-surface-variant">You can always do this later from the class dashboard.</p>
+</div>
+<div class="flex flex-col gap-stack-sm">
+<label class="font-label-md text-label-md text-on-surface">Invite by Email</label>
+<div class="flex gap-2">
+<input class="flex-1 px-4 py-3 rounded-DEFAULT bg-surface-container-lowest border border-outline-variant text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" placeholder="student@example.com, student2@example.com" type="email"/>
+<button class="px-6 py-3 bg-surface-container text-primary font-label-md text-label-md rounded-DEFAULT hover:bg-surface-variant transition-colors">Send</button>
+</div>
+</div>
+<div class="flex items-center gap-4 my-2">
+<hr class="flex-1 border-surface-container-high"/>
+<span class="text-label-sm font-label-sm text-on-surface-variant">OR</span>
+<hr class="flex-1 border-surface-container-high"/>
+</div>
+<div class="border-2 border-dashed border-outline-variant rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-surface-bright hover:border-primary transition-colors cursor-pointer group">
+<div class="w-12 h-12 bg-surface-container rounded-full flex items-center justify-center text-on-surface-variant group-hover:text-primary group-hover:bg-primary-fixed mb-4 transition-colors">
+<span class="material-symbols-outlined text-2xl">upload_file</span>
+</div>
+<h4 class="font-label-md text-label-md text-on-surface mb-1">Upload Class Roster</h4>
+<p class="text-label-sm text-on-surface-variant">CSV or Excel file (Max 5MB)</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Actions -->
+<footer class="px-8 py-6 border-t border-surface-container-high flex justify-between items-center bg-surface-bright rounded-b-xl">
+<button class="px-6 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors invisible" id="btn-back">
+                    Back
+                </button>
+<div class="flex gap-4">
+<button class="px-6 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors hidden" id="btn-skip">
+                        Skip for now
+                    </button>
+<button class="px-8 py-3 bg-primary text-on-primary font-label-md text-label-md rounded-lg primary-btn transition-transform shadow-sm" id="btn-next">
+                        Continue
+                    </button>
+</div>
+</footer>
+</div>
+</div>
+<script>
+        let currentStep = 1;
+        const totalSteps = 3;
+
+        const btnNext = document.getElementById('btn-next');
+        const btnBack = document.getElementById('btn-back');
+        const btnSkip = document.getElementById('btn-skip');
+        const progressLine = document.getElementById('progress-line');
+
+        function updateUI() {
+            // Content visibility
+            for (let i = 1; i <= totalSteps; i++) {
+                document.getElementById(`step${i}-content`).classList.toggle('hidden', i !== currentStep);
+                document.getElementById(`step${i}-content`).classList.toggle('block', i === currentStep);
+                
+                // Stepper styling
+                const indicator = document.getElementById(`step${i}-indicator`);
+                const label = indicator.nextElementSibling;
+                
+                if (i < currentStep) {
+                    // Completed
+                    indicator.className = "w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shadow-sm";
+                    indicator.innerHTML = '<span class="material-symbols-outlined text-sm">check</span>';
+                    label.className = "font-label-sm text-label-sm text-on-surface-variant font-bold";
+                } else if (i === currentStep) {
+                    // Current
+                    indicator.className = "w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shadow-sm ring-4 ring-primary/20";
+                    indicator.innerHTML = i;
+                    label.className = "font-label-sm text-label-sm text-primary font-bold";
+                } else {
+                    // Future
+                    indicator.className = "w-8 h-8 rounded-full bg-surface-container-lowest text-on-surface-variant border-2 border-[#DBEAFE] flex items-center justify-center font-label-md text-label-md shadow-sm";
+                    indicator.innerHTML = i;
+                    label.className = "font-label-sm text-label-sm text-on-surface-variant";
+                }
+            }
+
+            // Progress line width
+            if (currentStep === 1) progressLine.style.width = '33%';
+            if (currentStep === 2) progressLine.style.width = '66%';
+            if (currentStep === 3) progressLine.style.width = '100%';
+
+            // Buttons
+            btnBack.classList.toggle('invisible', currentStep === 1);
+            
+            if (currentStep === totalSteps) {
+                btnNext.innerText = 'Go to Class Dashboard';
+                btnNext.classList.remove('bg-primary');
+                btnNext.classList.add('bg-[#10B981]', 'border-b-2', 'border-[#059669]');
+                btnSkip.classList.remove('hidden');
+            } else {
+                btnNext.innerText = 'Continue';
+                btnNext.classList.add('bg-primary');
+                btnNext.classList.remove('bg-[#10B981]', 'border-b-2', 'border-[#059669]');
+                btnSkip.classList.add('hidden');
+            }
+        }
+
+        btnNext.addEventListener('click', () => {
+            if (currentStep < totalSteps) {
+                currentStep++;
+                updateUI();
+            } else {
+                // Simulate finish
+                btnNext.innerHTML = '<span class="material-symbols-outlined animate-spin mr-2">autorenew</span> Creating...';
+                setTimeout(() => {
+                    alert('Class created successfully! Redirecting to dashboard...');
+                }, 1000);
+            }
+        });
+
+        btnBack.addEventListener('click', () => {
+            if (currentStep > 1) {
+                currentStep--;
+                updateUI();
+            }
+        });
+    </script>
+</body></html>

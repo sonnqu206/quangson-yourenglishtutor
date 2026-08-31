@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Announcements Dashboard - Lumina Learning</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "on-secondary-fixed-variant": "#653e00",
+                            "primary-fixed": "#d8e2ff",
+                            "error": "#ba1a1a",
+                            "on-tertiary-fixed": "#341100",
+                            "on-primary": "#ffffff",
+                            "secondary": "#855300",
+                            "on-primary-fixed": "#001a42",
+                            "primary-fixed-dim": "#adc6ff",
+                            "surface-container-lowest": "#ffffff",
+                            "outline": "#727785",
+                            "on-primary-fixed-variant": "#004395",
+                            "surface-container-highest": "#d3e4fe",
+                            "on-tertiary-container": "#fffbff",
+                            "secondary-fixed-dim": "#ffb95f",
+                            "on-error": "#ffffff",
+                            "surface-bright": "#f8f9ff",
+                            "on-secondary": "#ffffff",
+                            "surface-variant": "#d3e4fe",
+                            "tertiary-fixed-dim": "#ffb690",
+                            "surface-tint": "#005ac2",
+                            "primary-container": "#2170e4",
+                            "secondary-container": "#fea619",
+                            "on-background": "#0b1c30",
+                            "outline-variant": "#c2c6d6",
+                            "tertiary": "#994100",
+                            "surface-dim": "#cbdbf5",
+                            "surface-container": "#e5eeff",
+                            "primary": "#0058be",
+                            "secondary-fixed": "#ffddb8",
+                            "surface": "#f8f9ff",
+                            "surface-container-high": "#dce9ff",
+                            "surface-container-low": "#eff4ff",
+                            "on-surface": "#0b1c30",
+                            "on-primary-container": "#fefcff",
+                            "on-surface-variant": "#424754",
+                            "inverse-primary": "#adc6ff",
+                            "on-error-container": "#93000a",
+                            "on-tertiary": "#ffffff",
+                            "inverse-surface": "#213145",
+                            "tertiary-container": "#c05400",
+                            "inverse-on-surface": "#eaf1ff",
+                            "tertiary-fixed": "#ffdbca",
+                            "on-secondary-fixed": "#2a1700",
+                            "on-tertiary-fixed-variant": "#783200",
+                            "background": "#f8f9ff",
+                            "error-container": "#ffdad6",
+                            "on-secondary-container": "#684000"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "1rem",
+                            "lg": "2rem",
+                            "xl": "3rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "unit": "8px",
+                            "margin-desktop": "40px",
+                            "margin-mobile": "16px",
+                            "gutter": "24px",
+                            "stack-sm": "8px",
+                            "container-max": "1280px",
+                            "stack-md": "16px",
+                            "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                            "display-lg": ["Lexend"],
+                            "label-md": ["Lexend"],
+                            "headline-md": ["Lexend"],
+                            "headline-lg-mobile": ["Lexend"],
+                            "label-sm": ["Lexend"],
+                            "body-md": ["Lexend"],
+                            "body-lg": ["Lexend"],
+                            "headline-lg": ["Lexend"]
+                    },
+                    "fontSize": {
+                            "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                            "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                            "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                            "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                            "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                            "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                            "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                            "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+                    },
+                    boxShadow: {
+                        'ambient': '0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04)',
+                        'ambient-hover': '0 8px 16px rgba(0, 88, 190, 0.08), 0 4px 8px rgba(11, 28, 48, 0.06)',
+                    }
+                },
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Lexend', sans-serif; background-color: #F0F9FF; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .icon-fill { font-variation-settings: 'FILL' 1; }
+        .card-border { border: 1px solid #E2E8F0; }
+        
+        /* Subtle background pattern */
+        .bg-pattern {
+            background-image: radial-gradient(#d3e4fe 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="text-on-surface flex min-h-screen">
+<!-- SideNavBar (Shared Component Blueprint) -->
+<nav class="hidden md:flex flex-col h-screen p-4 gap-stack-md fixed left-0 top-0 z-50 bg-surface-container-lowest shadow-md w-64 border-r card-border">
+<div class="flex items-center gap-3 mb-8 px-4">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined icon-fill">school</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-black tracking-tight">Lumina Academy</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Teacher Portal</p>
+</div>
+</div>
+<button class="bg-primary text-on-primary rounded-lg py-3 px-4 font-bold flex items-center justify-center gap-2 hover:bg-surface-tint transition-colors shadow-sm mb-4 border-b-2 border-surface-tint">
+<span class="material-symbols-outlined">add</span>
+            New Lesson
+        </button>
+<ul class="flex flex-col gap-2 flex-grow font-label-md text-label-md">
+<li><a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-lg px-4 py-3 font-bold active:scale-98 duration-200" href="#"><span class="material-symbols-outlined icon-fill">dashboard</span>Dashboard</a></li>
+<li><a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#"><span class="material-symbols-outlined">groups</span>Classes</a></li>
+<li><a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#"><span class="material-symbols-outlined">menu_book</span>Vocabulary</a></li>
+<li><a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#"><span class="material-symbols-outlined">assignment</span>Assignments</a></li>
+<li><a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#"><span class="material-symbols-outlined">settings</span>Settings</a></li>
+</ul>
+<ul class="flex flex-col gap-2 mt-auto font-label-md text-label-md border-t card-border pt-4">
+<li><a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform" href="#"><span class="material-symbols-outlined">help</span>Help Center</a></li>
+<li><a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform" href="#"><span class="material-symbols-outlined">logout</span>Logout</a></li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-64 bg-[#F0F9FF] min-h-screen bg-pattern">
+<!-- TopAppBar (Mobile/Desktop Hybrid) -->
+<header class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-4 sticky top-0 z-40 bg-surface shadow-sm transition-all duration-300 md:hidden bg-opacity-90 backdrop-blur-md">
+<div class="flex items-center gap-3">
+<button class="md:hidden text-primary p-2 -ml-2 rounded-lg hover:bg-surface-container-high active:scale-95 duration-150">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile text-primary font-bold tracking-tight">Lumina Learning</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="text-on-surface-variant p-2 rounded-full hover:bg-surface-container-high active:scale-95 duration-150 transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-on-surface-variant p-2 rounded-full hover:bg-surface-container-high active:scale-95 duration-150 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<img alt="Teacher Profile Avatar" class="w-8 h-8 rounded-full object-cover ml-2 border-2 border-primary-container cursor-pointer" data-alt="A small, circular avatar portrait of a friendly teacher in a bright classroom setting, wearing glasses and a warm smile. High-key lighting, soft modern aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzYweEXS35sjzLmN8Lodd8YPIDybCt1mvILMwS2S3Y9dSRhhOpQn8Nytz7XLsgvLMeLvAoI1BoKaCT2o8jQuyScLBwKYZT_8gCKFzT7IbDMHxtKnHHAn4dOxSpQfEv8K_DYtMVSTu0cGiMHSf4vsQu16p1_5NCF5QV6omODXJQORZKPoYKxerALfjpdVlJ4Y9A1mRqyIQHzZeHl28Njoz3c8gc1CZY6Ax7GZ06SU_-f3Zk5_jxYKOj0g"/>
+</div>
+</header>
+<!-- Desktop Header Area (Not the nav shell, just page context) -->
+<div class="hidden md:flex justify-between items-center w-full px-margin-desktop pt-8 pb-4">
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Announcements Overview</h2>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 rounded-DEFAULT bg-surface border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none w-64 shadow-sm font-body-md text-body-md text-on-surface" placeholder="Search announcements..." type="text"/>
+</div>
+<button class="bg-primary text-on-primary rounded-lg py-2 px-6 font-bold flex items-center gap-2 hover:bg-surface-tint transition-all shadow-ambient hover:shadow-ambient-hover hover:-translate-y-0.5 border-b-2 border-surface-tint">
+<span class="material-symbols-outlined">campaign</span>
+                    New Announcement
+                </button>
+</div>
+</div>
+<div class="p-margin-mobile md:px-margin-desktop pb-12 max-w-container-max mx-auto space-y-stack-lg">
+<!-- Mobile Context Header & Search -->
+<div class="md:hidden space-y-4">
+<div class="flex justify-between items-end">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Announcements</h2>
+<button class="bg-primary text-on-primary rounded-lg py-2 px-4 font-bold flex items-center gap-2 shadow-sm text-sm">
+<span class="material-symbols-outlined text-sm">add</span>
+                        New
+                    </button>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full pl-10 pr-4 py-3 rounded-DEFAULT bg-surface border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none shadow-sm font-body-md text-body-md text-on-surface" placeholder="Search past announcements..." type="text"/>
+</div>
+</div>
+<!-- Metrics Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="bg-surface rounded-xl p-6 shadow-ambient card-border hover:shadow-ambient-hover transition-shadow duration-300">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-label-md text-label-md text-on-surface-variant">Total Reach (30 Days)</h3>
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">group</span>
+</div>
+</div>
+<p class="font-display-lg text-display-lg text-on-surface">12,450</p>
+<p class="font-label-sm text-label-sm text-secondary-container mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> +15% from last month
+                    </p>
+</div>
+<div class="bg-surface rounded-xl p-6 shadow-ambient card-border hover:shadow-ambient-hover transition-shadow duration-300">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-label-md text-label-md text-on-surface-variant">Avg. Engagement Rate</h3>
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">thumb_up</span>
+</div>
+</div>
+<p class="font-display-lg text-display-lg text-on-surface">68%</p>
+<div class="mt-4 flex items-center gap-2">
+<div class="h-3 flex-1 bg-[#DBEAFE] rounded-full overflow-hidden">
+<div class="h-full bg-[#10B981] rounded-full" style="width: 68%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Target: 75%</span>
+</div>
+</div>
+<div class="bg-primary text-on-primary rounded-xl p-6 shadow-ambient hover:shadow-ambient-hover transition-shadow duration-300 relative overflow-hidden flex flex-col justify-between border-b-[4px] border-surface-tint">
+<div class="absolute -right-6 -top-6 text-primary-fixed-dim opacity-30 transform rotate-12 pointer-events-none">
+<span class="material-symbols-outlined text-9xl icon-fill">campaign</span>
+</div>
+<div class="relative z-10">
+<h3 class="font-headline-md text-headline-md mb-1">Boost Visibility</h3>
+<p class="font-body-md text-body-md text-primary-fixed mb-4">Learn how to craft urgent messages that get read.</p>
+</div>
+<button class="relative z-10 bg-on-primary text-primary font-bold py-2 px-4 rounded-lg w-fit text-sm hover:bg-surface-bright transition-colors shadow-sm">
+                        View Tips
+                    </button>
+</div>
+</div>
+<!-- Filtering & List Section -->
+<div class="space-y-stack-md">
+<div class="flex overflow-x-auto pb-2 -mx-margin-mobile px-margin-mobile md:mx-0 md:px-0 gap-3 hide-scrollbar">
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-primary-container text-on-primary-container font-label-md text-label-md shadow-sm border border-primary-container">All Announcements</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface text-on-surface-variant font-label-md text-label-md card-border hover:bg-surface-container-high transition-colors">Academic</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface text-on-surface-variant font-label-md text-label-md card-border hover:bg-surface-container-high transition-colors">Events</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full bg-surface text-on-surface-variant font-label-md text-label-md card-border hover:bg-surface-container-high transition-colors">Urgent</button>
+</div>
+<style>
+                    .hide-scrollbar::-webkit-scrollbar { display: none; }
+                    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                </style>
+<!-- Announcements Grid (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- Card 1: Published / Urgent -->
+<div class="bg-surface rounded-xl p-5 shadow-ambient card-border hover:-translate-y-1 hover:shadow-ambient-hover transition-all duration-300 flex flex-col group border-l-[6px] border-l-error">
+<div class="flex justify-between items-start mb-3">
+<div class="flex gap-2">
+<span class="bg-[#ffdad6] text-[#93000a] font-label-sm text-label-sm px-2 py-1 rounded-DEFAULT flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">error</span> Urgent
+                                </span>
+<span class="bg-surface-container text-primary font-label-sm text-label-sm px-2 py-1 rounded-DEFAULT">Published</span>
+</div>
+<button class="text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-2 leading-tight">Campus Closure due to Extreme Weather</h4>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2 mb-4 flex-grow">All classes are suspended for tomorrow, Tuesday the 14th, due to the incoming winter storm. Please stay safe.</p>
+<div class="flex justify-between items-center pt-4 border-t border-outline-variant/30 mt-auto">
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">visibility</span> 4,502
+                            </div>
+<span class="text-outline font-label-sm text-label-sm">Today, 8:00 AM</span>
+</div>
+</div>
+<!-- Card 2: Scheduled / Event -->
+<div class="bg-surface rounded-xl p-5 shadow-ambient card-border hover:-translate-y-1 hover:shadow-ambient-hover transition-all duration-300 flex flex-col group">
+<div class="flex justify-between items-start mb-3">
+<div class="flex gap-2">
+<span class="bg-secondary-fixed text-on-secondary-container font-label-sm text-label-sm px-2 py-1 rounded-DEFAULT">Event</span>
+<span class="bg-surface-container-high text-on-surface font-label-sm text-label-sm px-2 py-1 rounded-DEFAULT border border-outline-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> Scheduled
+                                </span>
+</div>
+<button class="text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<h4 class="font-headline-md text-headline-md text-on-surface mb-2 leading-tight">Spring Festival Main Stage Lineup</h4>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2 mb-4 flex-grow">Get ready! We are announcing the headline performers for this year's Spring Festival in the main quad.</p>
+<div class="flex justify-between items-center pt-4 border-t border-outline-variant/30 mt-auto">
+<div class="flex items-center gap-1 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">edit_calendar</span> Edit
+                            </div>
+<span class="text-secondary-container font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">timer</span> Sends in 2 days
+                            </span>
+</div>
+</div>
+<!-- Card 3: Draft / Academic -->
+<div class="bg-surface rounded-xl p-5 shadow-ambient card-border hover:-translate-y-1 hover:shadow-ambient-hover transition-all duration-300 flex flex-col group border-dashed border-2 border-outline-variant bg-surface-bright">
+<div class="flex justify-between items-start mb-3">
+<div class="flex gap-2">
+<span class="bg-[#d3e4fe] text-[#001a42] font-label-sm text-label-sm px-2 py-1 rounded-DEFAULT">Academic</span>
+<span class="text-outline font-label-sm text-label-sm px-2 py-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit_document</span> Draft
+                                </span>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md text-outline mb-2 leading-tight">Final Exam Schedule Fall Semester</h4>
+<p class="font-body-md text-body-md text-outline-variant line-clamp-2 mb-4 flex-grow">Pending approval from the dean's office before distribution to student body...</p>
+<div class="flex justify-between items-center pt-4 mt-auto">
+<button class="w-full bg-surface-container text-primary font-bold py-2 rounded-lg hover:bg-surface-container-high transition-colors text-sm border card-border">
+                                Continue Editing
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Teacher Report View - LingoMaster Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#d3e4fe",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container-high": "#dce9ff",
+                        "on-secondary-fixed": "#2a1700",
+                        "outline": "#727785",
+                        "tertiary": "#994100",
+                        "secondary-container": "#fea619",
+                        "on-surface-variant": "#424754",
+                        "on-background": "#0b1c30",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-primary-container": "#fefcff",
+                        "on-tertiary-fixed-variant": "#783200",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-container": "#2170e4",
+                        "tertiary-container": "#c05400",
+                        "secondary": "#855300",
+                        "outline-variant": "#c2c6d6",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "on-tertiary-fixed": "#341100",
+                        "on-error-container": "#93000a",
+                        "on-tertiary": "#ffffff",
+                        "inverse-primary": "#adc6ff",
+                        "surface-container": "#e5eeff",
+                        "on-surface": "#0b1c30",
+                        "primary-fixed-dim": "#adc6ff",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#ffb690",
+                        "background": "#f8f9ff",
+                        "inverse-surface": "#213145",
+                        "on-error": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#005ac2",
+                        "primary": "#0058be",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-container": "#684000",
+                        "on-tertiary-container": "#fffbff",
+                        "secondary-fixed": "#ffddb8",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-bright": "#f8f9ff",
+                        "surface-dim": "#cbdbf5",
+                        "surface": "#f8f9ff",
+                        "surface-container-low": "#eff4ff",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed": "#ffdbca",
+                        "surface-container-highest": "#d3e4fe"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-max": "1280px",
+                        "margin-mobile": "16px",
+                        "unit": "8px",
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "stack-md": "16px",
+                        "gutter": "24px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Lexend"],
+                        "body-md": ["Lexend"],
+                        "label-md": ["Lexend"],
+                        "body-lg": ["Lexend"],
+                        "display-lg": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "headline-lg-mobile": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Lexend', sans-serif; }
+        .ambient-shadow { box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04); }
+        .hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 88, 190, 0.08), 0 4px 8px rgba(11, 28, 48, 0.06); }
+        .chart-area { background: linear-gradient(to bottom, rgba(33, 112, 228, 0.2), rgba(33, 112, 228, 0)); }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex">
+<!-- SideNavBar (Hidden on Mobile) -->
+<aside class="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-surface-container-low p-4 space-y-stack-md z-20">
+<!-- Header -->
+<div class="flex items-center gap-3 px-2 py-4">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="A clean, minimalist abstract geometric logo consisting of overlapping circular shapes in vibrant blue and soft gray on a transparent background. High quality, crisp vectors, corporate identity style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNIikoylXGuk8m0zAVvMsCc6gJdjIEDpm1W6N8fL_Ox9fl2gcOQC894OsCOkcjhEJ9Ob7pbd5Mk9sOsfqOxe6qEj_eutmX-gE6sZhVyWR1vgSiOHeH0jWEvI3cBkETXfPi7FoPqoTzMy9PPxIAVkuU81INp2Z_hB60OoqoEW27Lau76altOEfkn-RfOb95Oi7BxRzpEBipefo6B5jglUQ79obUtVowd-UVAASWWd8oReLcaPfKZj7_ZQ"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary truncate">Vocabulary LMS</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Teacher Dashboard</p>
+</div>
+</div>
+<!-- CTA -->
+<button class="w-full bg-secondary-container text-on-secondary-container font-label-md text-label-md font-bold py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-secondary-fixed-dim transition-colors ambient-shadow hover-lift">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+            Generate Report
+        </button>
+<!-- Main Nav -->
+<nav class="flex-1 space-y-1 overflow-y-auto mt-4">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">groups</span>
+                Classes
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">person</span>
+                Students
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">book</span>
+                Lessons
+            </a>
+<!-- ACTIVE TAB -->
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container font-bold rounded-lg transition-all font-label-md text-label-md scale-[0.98] duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">assessment</span>
+                Reports
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">school</span>
+                My Classes
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">exercise</span>
+                Practice
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">analytics</span>
+                Stats
+            </a>
+</nav>
+<!-- Footer Nav -->
+<div class="mt-auto space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">contact_support</span>
+                Support
+            </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-64 flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-margin-desktop py-4 bg-surface full-width top-0 sticky shadow-sm z-10 h-[72px]">
+<!-- Brand (Visible on mobile, hidden on desktop if side nav is present) -->
+<div class="flex items-center md:hidden">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">LingoMaster Pro</h1>
+</div>
+<!-- Search Bar (Left aligned per JSON) -->
+<div class="hidden md:flex items-center bg-surface-container-low rounded-full px-4 py-2 w-64 focus-within:ring-2 ring-primary transition-all">
+<span class="material-symbols-outlined text-on-surface-variant mr-2">search</span>
+<input class="bg-transparent border-none outline-none text-body-md font-body-md w-full placeholder:text-on-surface-variant/70 text-on-surface" placeholder="Search reports..." type="text"/>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-primary-container/10 transition-colors rounded-full relative hover:scale-95 duration-150">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-2.5 h-2.5 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-primary-container/10 transition-colors rounded-full hover:scale-95 duration-150">
+<span class="material-symbols-outlined">help</span>
+</button>
+<img class="w-10 h-10 rounded-full border-2 border-surface-variant cursor-pointer object-cover ml-2" data-alt="A professional headshot of a friendly, approachable teacher in a modern classroom setting. Warm, natural lighting, high resolution, corporate lifestyle photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8DQkpfQnsPhU9vnBRDsOB8LoQGz9KtyA-G5ZID46iqoJVj48R1fTiNbYy7TqDkWUoYcYNIucgUlovkriig8r00MU-S7C0PyLNz9Dy0IaeeqISeJxiufvM5gI5oVwwLeVXfWTRy18pE4ZOgYf87u_Ch2lVEv3Ndltr4OwpoIBomZM87rG9e8OOulLkmESWVL-gaj8oHI8f9VoXclCF-AvW4yPAQQCuOs-MHjJLIvEnGpoHc25N1YuaHA"/>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-4 md:p-margin-desktop flex-1 space-y-stack-lg max-w-container-max mx-auto w-full">
+<!-- Page Header & Filter -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<div>
+<h2 class="font-display-lg text-headline-lg-mobile md:text-display-lg text-on-surface">Class Performance Report</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Reviewing metrics for the selected class over the current term.</p>
+</div>
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2 pr-10 font-label-md text-label-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ambient-shadow cursor-pointer">
+<option>Lớp 9A - Ôn thi vào 10</option>
+<option>Lớp 8B - Basic Vocab</option>
+<option>Lớp 10C - Advanced I</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+<!-- Overview Stats Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Stat 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 ambient-shadow hover-lift flex flex-col justify-between border border-outline-variant/30">
+<div class="flex justify-between items-start">
+<h3 class="font-label-md text-label-md text-on-surface-variant">Avg. Class Score</h3>
+<div class="p-2 bg-primary-container/20 rounded-full text-primary">
+<span class="material-symbols-outlined">school</span>
+</div>
+</div>
+<div class="mt-4 flex items-end gap-3">
+<span class="font-headline-lg text-display-lg text-on-surface">78%</span>
+<span class="flex items-center text-sm font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mb-2">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> +3.2%
+                        </span>
+</div>
+</div>
+<!-- Stat 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 ambient-shadow hover-lift flex items-center justify-between border border-outline-variant/30">
+<div class="flex flex-col justify-between h-full w-full">
+<h3 class="font-label-md text-label-md text-on-surface-variant">Completion Rate</h3>
+<div class="flex items-center gap-4 mt-4">
+<!-- Circular Progress Mini-Chart -->
+<div class="relative w-16 h-16">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="4"></path>
+<path class="text-secondary-container" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="92, 100" stroke-linecap="round" stroke-width="4"></path>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center font-bold text-label-sm">92%</div>
+</div>
+<div>
+<p class="font-body-md text-body-md text-on-surface font-semibold">Excellent</p>
+<p class="text-sm text-on-surface-variant">22/24 Students on track</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Stat 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 ambient-shadow hover-lift border border-outline-variant/30">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-label-md text-label-md text-on-surface-variant">Most Challenging Words</h3>
+<span class="material-symbols-outlined text-tertiary-container">warning</span>
+</div>
+<div class="space-y-3">
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md font-medium px-3 py-1 bg-error-container text-on-error-container rounded-full">Accommodate</span>
+<span class="text-sm text-on-surface-variant">64% error</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md font-medium px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full">Hierarchy</span>
+<span class="text-sm text-on-surface-variant">58% error</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md font-medium px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full">Maneuver</span>
+<span class="text-sm text-on-surface-variant">51% error</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Content Layout (Chart + Student Table) -->
+<div class="grid grid-cols-1 gap-6">
+<!-- Student Table -->
+<div class="bg-surface-container-lowest rounded-[3rem] p-6 md:p-8 ambient-shadow border border-outline-variant/20 overflow-hidden">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Student Performance</h3>
+<button class="text-primary font-label-md text-label-md hover:underline flex items-center gap-1">
+                            View All <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/30 text-on-surface-variant font-label-md text-label-md">
+<th class="py-4 px-4 font-semibold">Student Name</th>
+<th class="py-4 px-4 font-semibold">Lessons</th>
+<th class="py-4 px-4 font-semibold">Last Active</th>
+<th class="py-4 px-4 font-semibold">Avg. Score</th>
+<th class="py-4 px-4 font-semibold">Progress</th>
+<th class="py-4 px-4 font-semibold text-right">Action</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md text-on-surface">
+<!-- Row 1 -->
+<tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+<td class="py-4 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-bold text-sm">NA</div>
+                                        Nguyễn Văn A
+                                    </td>
+<td class="py-4 px-4">18/20</td>
+<td class="py-4 px-4 text-on-surface-variant">Today</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-[#ecfdf5] text-[#065f46]">85%</span>
+</td>
+<td class="py-4 px-4">
+<div class="w-full bg-[#DBEAFE] rounded-full h-3">
+<div class="bg-[#10B981] h-3 rounded-full" style="width: 90%"></div>
+</div>
+</td>
+<td class="py-4 px-4 text-right">
+<button class="text-primary hover:text-surface-tint font-medium text-sm">View Detail</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+<td class="py-4 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-bold text-sm">TB</div>
+                                        Trần Thị B
+                                    </td>
+<td class="py-4 px-4">12/20</td>
+<td class="py-4 px-4 text-on-surface-variant">2 days ago</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-[#fef3c7] text-[#92400e]">72%</span>
+</td>
+<td class="py-4 px-4">
+<div class="w-full bg-[#DBEAFE] rounded-full h-3">
+<div class="bg-[#fea619] h-3 rounded-full" style="width: 60%"></div>
+</div>
+</td>
+<td class="py-4 px-4 text-right">
+<button class="text-primary hover:text-surface-tint font-medium text-sm">View Detail</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+<td class="py-4 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center font-bold text-sm">LM</div>
+                                        Lê Văn Minh
+                                    </td>
+<td class="py-4 px-4">19/20</td>
+<td class="py-4 px-4 text-on-surface-variant">Yesterday</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-[#ecfdf5] text-[#065f46]">92%</span>
+</td>
+<td class="py-4 px-4">
+<div class="w-full bg-[#DBEAFE] rounded-full h-3">
+<div class="bg-[#10B981] h-3 rounded-full" style="width: 95%"></div>
+</div>
+</td>
+<td class="py-4 px-4 text-right">
+<button class="text-primary hover:text-surface-tint font-medium text-sm">View Detail</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-4 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-error-container text-on-error-container flex items-center justify-center font-bold text-sm">PH</div>
+                                        Phạm Thị Hoa
+                                    </td>
+<td class="py-4 px-4">6/20</td>
+<td class="py-4 px-4 text-on-surface-variant">5 days ago</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-[#fee2e2] text-[#991b1b]">55%</span>
+</td>
+<td class="py-4 px-4">
+<div class="w-full bg-[#DBEAFE] rounded-full h-3">
+<div class="bg-[#ba1a1a] h-3 rounded-full" style="width: 30%"></div>
+</div>
+</td>
+<td class="py-4 px-4 text-right">
+<button class="text-primary hover:text-surface-tint font-medium text-sm">View Detail</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LingoFlow - Practice Quiz</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-dim": "#cbdbf5",
+                        "on-primary-fixed": "#001a42",
+                        "outline": "#727785",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface-container-low": "#eff4ff",
+                        "tertiary-container": "#c05400",
+                        "on-background": "#0b1c30",
+                        "secondary": "#855300",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-fixed": "#ffdbca",
+                        "tertiary": "#994100",
+                        "surface-container-high": "#dce9ff",
+                        "inverse-primary": "#adc6ff",
+                        "primary-container": "#2170e4",
+                        "outline-variant": "#c2c6d6",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb690",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed": "#ffddb8",
+                        "surface": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "surface-container": "#e5eeff",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "surface-tint": "#005ac2",
+                        "surface-variant": "#d3e4fe",
+                        "on-surface": "#0b1c30",
+                        "inverse-surface": "#213145",
+                        "on-surface-variant": "#424754",
+                        "on-secondary-container": "#684000",
+                        "on-tertiary-container": "#fffbff",
+                        "on-primary-fixed-variant": "#004395",
+                        "on-primary-container": "#fefcff",
+                        "surface-bright": "#f8f9ff",
+                        "primary": "#0058be",
+                        "on-secondary-fixed": "#2a1700",
+                        "on-tertiary-fixed": "#341100",
+                        "primary-fixed": "#d8e2ff",
+                        "on-error-container": "#93000a",
+                        "secondary-container": "#fea619",
+                        "background": "#f8f9ff",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "on-tertiary-fixed-variant": "#783200"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "margin-desktop": "40px",
+                        "gutter": "24px",
+                        "unit": "8px",
+                        "container-max": "1280px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Lexend"],
+                        "body-md": ["Lexend"],
+                        "headline-lg": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "headline-lg-mobile": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "body-lg": ["Lexend"],
+                        "label-md": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #F0F9FF; /* Sky Blue Page Background */
+            font-family: 'Lexend', sans-serif;
+        }
+        
+        .ambient-shadow {
+            box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04);
+        }
+        
+        .hover-lift {
+            transition: all 0.2s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 88, 190, 0.08), 0 3px 6px rgba(11, 28, 48, 0.06);
+        }
+
+        .btn-pressable {
+            border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-pressable:active {
+            transform: translateY(2px);
+            border-bottom-width: 0px;
+            margin-bottom: 2px;
+        }
+    </style>
+</head>
+<body class="text-on-background min-h-screen flex">
+<!-- JSON Navigation Shell - Suppressed because this is a focused task/transactional screen (Quiz) -->
+<!-- The user explicitly asked for a close button to exit the test, implying a departure from global nav -->
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col items-center justify-center p-margin-mobile md:p-margin-desktop w-full max-w-container-max mx-auto">
+<!-- Header & Progress -->
+<div class="w-full max-w-3xl mb-stack-lg flex flex-col gap-stack-md">
+<div class="flex items-center justify-between">
+<div>
+<h1 class="font-headline-md text-headline-md text-on-surface">Unit 5: Technology &amp; Innovation</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Fill in the missing vocabulary.</p>
+</div>
+<button aria-label="Close Quiz" class="p-unit rounded-full hover:bg-surface-variant transition-colors flex items-center justify-center text-outline">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">close</span>
+</button>
+</div>
+<!-- Progress Bar -->
+<div class="w-full bg-[#DBEAFE] h-3 rounded-full overflow-hidden flex items-center">
+<div class="bg-[#10B981] h-full rounded-full transition-all duration-500" style="width: 65%;"></div>
+</div>
+<div class="text-right font-label-sm text-label-sm text-outline font-bold">65% Completed</div>
+</div>
+<!-- Question Card (Bento/Glassmorphism inspired, though staying true to brand "Pure White") -->
+<div class="w-full max-w-3xl bg-surface-container-lowest rounded-xl p-margin-desktop ambient-shadow border border-[#E2E8F0] relative overflow-hidden">
+<!-- Decorative Element -->
+<div class="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-primary-fixed opacity-30 rounded-full blur-3xl pointer-events-none"></div>
+<div class="flex flex-col gap-stack-lg relative z-10">
+<!-- Context/Question -->
+<div class="flex items-start gap-stack-md">
+<div class="bg-surface-variant p-stack-sm rounded-lg flex-shrink-0 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">help_center</span>
+</div>
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
+                            The <span class="inline-block border-b-2 border-outline-variant w-24 text-center px-2 text-outline">______</span> is essential for remote work.
+                        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-stack-sm italic border-l-4 border-secondary-container pl-stack-sm ml-unit">
+                            (meaning: a device used for connecting to the internet wirelessly)
+                        </p>
+</div>
+</div>
+<!-- Input Area -->
+<div class="mt-stack-md flex flex-col gap-stack-sm">
+<label class="font-label-md text-label-md text-on-surface-variant sr-only" for="answerInput">Your Answer</label>
+<input autocomplete="off" autofocus="" class="w-full bg-surface-container-lowest border-2 border-outline-variant rounded-lg p-stack-md font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-4 focus:ring-primary-fixed outline-none transition-all placeholder:text-outline-variant" id="answerInput" placeholder="Type your answer here..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="w-full max-w-3xl mt-stack-lg flex items-center justify-between">
+<button class="font-label-md text-label-md text-primary px-stack-md py-stack-sm rounded-lg hover:bg-surface-container-low transition-colors hover-lift">
+                Skip Question
+            </button>
+<button class="bg-primary text-on-primary font-label-md text-label-md px-margin-desktop py-stack-md rounded-lg btn-pressable hover-lift flex items-center gap-unit">
+                Submit Answer
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">arrow_forward</span>
+</button>
+</div>
+</main>
+<!-- Visual Feedback Toast (Hidden by default, standard placement top-center) -->
+<div class="fixed top-margin-desktop left-1/2 transform -translate-x-1/2 bg-[#10B981] text-white px-stack-md py-stack-sm rounded-full font-label-md text-label-md flex items-center gap-unit shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50" id="feedbackToast">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        Correct! +10 XP
+    </div>
+<script>
+        // Simple micro-interaction for input focusing and mock submission
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('answerInput');
+            const toast = document.getElementById('feedbackToast');
+            const submitBtn = document.querySelector('button.bg-primary');
+            
+            // Add subtle glow on focus
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('shadow-[0_0_8px_rgba(33,112,228,0.2)]');
+            });
+            input.addEventListener('blur', () => {
+                input.parentElement.classList.remove('shadow-[0_0_8px_rgba(33,112,228,0.2)]');
+            });
+
+            // Mock submission feedback
+            submitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if(input.value.trim().length > 0) {
+                    toast.classList.remove('opacity-0');
+                    toast.classList.add('opacity-100');
+                    
+                    setTimeout(() => {
+                        toast.classList.remove('opacity-100');
+                        toast.classList.add('opacity-0');
+                        input.value = '';
+                    }, 2000);
+                }
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Teacher Settings - Organization</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed": "#ffdbca",
+                        "surface": "#f8f9ff",
+                        "outline-variant": "#c2c6d6",
+                        "primary": "#0058be",
+                        "on-primary-fixed": "#001a42",
+                        "on-tertiary-fixed": "#341100",
+                        "outline": "#727785",
+                        "surface-variant": "#d3e4fe",
+                        "secondary-fixed": "#ffddb8",
+                        "on-tertiary-fixed-variant": "#783200",
+                        "error-container": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary-fixed-variant": "#004395",
+                        "on-background": "#0b1c30",
+                        "primary-container": "#2170e4",
+                        "on-surface-variant": "#424754",
+                        "on-error-container": "#93000a",
+                        "secondary": "#855300",
+                        "surface-bright": "#f8f9ff",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#e5eeff",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "inverse-surface": "#213145",
+                        "primary-fixed-dim": "#adc6ff",
+                        "tertiary-container": "#c05400",
+                        "tertiary-fixed-dim": "#ffb690",
+                        "on-tertiary-container": "#fffbff",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "on-primary-container": "#fefcff",
+                        "surface-container-low": "#eff4ff",
+                        "surface-tint": "#005ac2",
+                        "on-secondary-fixed": "#2a1700",
+                        "on-secondary-container": "#684000",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-surface": "#0b1c30",
+                        "inverse-primary": "#adc6ff",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-dim": "#cbdbf5",
+                        "on-tertiary": "#ffffff",
+                        "tertiary": "#994100",
+                        "background": "#f8f9ff",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#fea619",
+                        "on-secondary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px",
+                        "container-max": "1280px",
+                        "stack-sm": "8px",
+                        "unit": "8px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Lexend"],
+                        "body-lg": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "headline-lg-mobile": ["Lexend"],
+                        "headline-lg": ["Lexend"],
+                        "label-md": ["Lexend"],
+                        "body-md": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Lexend', sans-serif; background-color: #F0F9FF; }
+        .shadow-soft { box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04); }
+        .shadow-hover { box-shadow: 0 8px 24px rgba(0, 88, 190, 0.1), 0 4px 8px rgba(11, 28, 48, 0.06); }
+        .btn-primary-shadow { border-bottom: 2px solid #004395; }
+    </style>
+</head>
+<body class="bg-[#F0F9FF] text-on-background min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen p-4 gap-stack-md fixed left-0 top-0 z-50 bg-surface-container-lowest shadow-md docked left-0 h-full w-64">
+<div class="mb-8">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">school</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-black">Lumina Academy</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Teacher Portal</p>
+</div>
+</div>
+</div>
+<button class="bg-primary text-on-primary font-label-md text-label-md font-bold py-3 px-6 rounded-lg btn-primary-shadow hover:translate-y-[-2px] transition-transform active:scale-95 duration-150 flex items-center justify-center gap-2 mb-4">
+<span class="material-symbols-outlined">add</span>
+            New Lesson
+        </button>
+<div class="flex flex-col gap-2 flex-grow">
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg font-label-md text-label-md hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg font-label-md text-label-md hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">groups</span>
+                Classes
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg font-label-md text-label-md hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+                Vocabulary
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg font-label-md text-label-md hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+                Assignments
+            </a>
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-lg px-4 py-3 font-bold font-label-md text-label-md hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+</div>
+<div class="flex flex-col gap-2 mt-auto">
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg font-label-md text-label-md hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+                Help Center
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg font-label-md text-label-md hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+                Logout
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-64 flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-surface shadow-sm docked full-width top-0 flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-4 sticky top-0 z-40 transition-colors">
+<div class="flex items-center gap-4">
+<!-- Mobile Menu Button (hidden on md) -->
+<button class="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h2 class="font-headline-md text-headline-md-mobile md:text-headline-md text-primary font-bold">Lumina Learning</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-surface-container-high cursor-pointer hover:border-primary transition-colors">
+<img alt="Teacher Profile Avatar" class="w-full h-full object-cover" data-alt="A close up, highly detailed portrait photo of a smiling teacher in a bright, modern classroom environment. Soft, welcoming lighting with a high-key light mode aesthetic. The background is slightly blurred featuring books and a whiteboard. Warm and approachable tone." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNBHiG9KL4l3ylrSLk6e0_PE6Uyw0z1-ta4ryClpScE9xoS7G75iyeaE38YWJlX5-Q5kkHsStdw5I9lV4QEK0Zl-NJjhFHsDEvl7UiUs-8TfvV5j8ihZk8WN2jR8ApOHgqT0qI1ogj_W_4Krq_sREfSnIMSKsJE8UUUz9tMr3gQfHUp8QlnSozasnfbbcy7NNiM2plm1IS3qcOD41cHCpkB9YumYZJhbyZ9ufzQ57R5OT3g9Jf9u7GGA"/>
+</div>
+</div>
+</header>
+<!-- Settings Content -->
+<div class="p-margin-mobile md:p-margin-desktop flex-1">
+<div class="max-w-5xl mx-auto">
+<!-- Settings Header & Inner Nav -->
+<div class="mb-stack-lg">
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background mb-6">Settings</h1>
+<div class="flex gap-6 border-b border-outline-variant overflow-x-auto pb-1">
+<a class="font-label-md text-label-md text-on-surface-variant font-medium pb-2 whitespace-nowrap hover:text-primary transition-colors" href="#">Profile</a>
+<a class="font-label-md text-label-md text-primary font-bold border-b-2 border-primary pb-2 whitespace-nowrap" href="#">Organization</a>
+<a class="font-label-md text-label-md text-on-surface-variant font-medium pb-2 whitespace-nowrap hover:text-primary transition-colors" href="#">Notifications</a>
+<a class="font-label-md text-label-md text-on-surface-variant font-medium pb-2 whitespace-nowrap hover:text-primary transition-colors" href="#">Security</a>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Main Column -->
+<div class="lg:col-span-2 space-y-stack-lg">
+<!-- Institutional Identity Card -->
+<div class="bg-surface-container-lowest rounded-xl p-8 shadow-soft border border-outline-variant/30 hover:shadow-hover transition-shadow duration-300">
+<h3 class="font-headline-md text-headline-md text-on-background mb-6">Institutional Identity</h3>
+<div class="flex flex-col sm:flex-row gap-8 items-start mb-8">
+<div class="flex flex-col items-center gap-3">
+<div class="w-24 h-24 rounded-full bg-surface-container-highest flex items-center justify-center border border-outline-variant/50 overflow-hidden group cursor-pointer relative">
+<img alt="Institutional Logo" class="w-full h-full object-cover" data-alt="A clean, modern geometric logo design representing an educational institution. High-contrast white and bright blue colors, flat design style, vector aesthetic. Simple, elegant, and professional look, set against a pristine white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAOGCQeap_goTZPPshfDXB2fB_4mLHzSH0x_CfSx1_Oh4C07V-rtKJipxkYhZEIQtKOCLnPJdl6w_r4Zi9FcuZ30kSy5jl-p7mMEvb8mRCUkiHRV1fDCyC6bbBWWtPRR7KmS8hpzsFGzrBmK_nqEzxu7MftMOgiwwzEjyBdBOLgNFEHThETAxX8tuX9vLyPbrYL91lfbLYYv4mYi72MOefS_4T3nSw-ekg4IDvwnPpso-Ixx9ZC0poFQ"/>
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white">upload</span>
+</div>
+</div>
+<button class="font-label-sm text-label-sm text-primary hover:underline">Change Logo</button>
+</div>
+<div class="flex-1 w-full space-y-4">
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">Organization Name</label>
+<input class="w-full bg-surface border border-outline-variant rounded-[16px] px-4 py-3 font-body-md text-body-md text-on-background focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all" type="text" value="Lumina Academy"/>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">Primary Language</label>
+<select class="w-full bg-surface border border-outline-variant rounded-[16px] px-4 py-3 font-body-md text-body-md text-on-background focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all appearance-none">
+<option>English (US)</option>
+<option>Spanish (ES)</option>
+<option>French (FR)</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">Timezone</label>
+<select class="w-full bg-surface border border-outline-variant rounded-[16px] px-4 py-3 font-body-md text-body-md text-on-background focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all appearance-none">
+<option>(UTC-05:00) Eastern Time</option>
+<option>(UTC-08:00) Pacific Time</option>
+<option>(UTC+00:00) London</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+<div class="flex justify-end">
+<button class="bg-primary text-on-primary font-label-md text-label-md font-bold py-2 px-6 rounded-lg btn-primary-shadow hover:translate-y-[-1px] transition-transform active:scale-95 duration-150">Save Changes</button>
+</div>
+</div>
+<!-- Member Roles & Permissions -->
+<div class="bg-surface-container-lowest rounded-xl p-8 shadow-soft border border-outline-variant/30 hover:shadow-hover transition-shadow duration-300">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-background">Member Roles</h3>
+<button class="flex items-center gap-2 text-primary font-label-md text-label-md hover:bg-surface-container-low px-4 py-2 rounded-lg transition-colors">
+<span class="material-symbols-outlined" style="font-size: 20px;">person_add</span>
+                                    Invite Member
+                                </button>
+</div>
+<div class="space-y-4">
+<!-- Member Row 1 -->
+<div class="flex items-center justify-between p-4 bg-surface rounded-[16px] border border-outline-variant/30 hover:border-primary/30 transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center font-bold text-on-secondary-fixed">SJ</div>
+<div>
+<p class="font-label-md text-label-md text-on-background font-bold">Sarah Jenkins</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">sarah.j@lumina.academy</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="bg-primary-container/20 text-primary-container px-3 py-1 rounded-full font-label-sm text-label-sm">Admin</span>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+<!-- Member Row 2 -->
+<div class="flex items-center justify-between p-4 bg-surface rounded-[16px] border border-outline-variant/30 hover:border-primary/30 transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center font-bold text-on-tertiary-fixed">MR</div>
+<div>
+<p class="font-label-md text-label-md text-on-background font-bold">Marcus Reed</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">marcus.r@lumina.academy</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="bg-surface-variant text-on-surface-variant px-3 py-1 rounded-full font-label-sm text-label-sm">Teacher</span>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+<button class="w-full py-3 text-center text-primary font-label-md text-label-md hover:bg-surface-container-low rounded-lg transition-colors mt-2">View All 24 Members</button>
+</div>
+</div>
+</div>
+<!-- Sidebar Column -->
+<div class="space-y-stack-lg">
+<!-- Subscription Card -->
+<div class="bg-primary rounded-xl p-6 shadow-soft text-on-primary relative overflow-hidden">
+<!-- Decorative element -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16 blur-2xl"></div>
+<h3 class="font-headline-md text-headline-md mb-2 relative z-10">Pro Institutional</h3>
+<p class="font-body-md text-body-md text-primary-fixed-dim mb-6 relative z-10">Renews on Oct 12, 2024</p>
+<div class="space-y-4 mb-6 relative z-10">
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span>Teacher Seats</span>
+<span class="font-bold">24 / 50</span>
+</div>
+<div class="w-full bg-primary-fixed-dim/30 rounded-full h-2">
+<div class="bg-white h-2 rounded-full" style="width: 48%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span>Active Students</span>
+<span class="font-bold">1,240 / 5,000</span>
+</div>
+<div class="w-full bg-primary-fixed-dim/30 rounded-full h-2">
+<div class="bg-white h-2 rounded-full" style="width: 25%"></div>
+</div>
+</div>
+</div>
+<div class="flex gap-3 relative z-10">
+<button class="flex-1 bg-white text-primary font-label-md text-label-md font-bold py-2 rounded-lg shadow-sm hover:bg-surface transition-colors active:scale-95 duration-150">Manage</button>
+<button class="flex-1 bg-transparent border border-white text-white font-label-md text-label-md font-bold py-2 rounded-lg hover:bg-white/10 transition-colors active:scale-95 duration-150">Upgrade</button>
+</div>
+</div>
+<!-- Branding Settings -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-soft border border-outline-variant/30 hover:shadow-hover transition-shadow duration-300">
+<h3 class="font-headline-md text-headline-md text-on-background mb-4">Branding</h3>
+<div class="space-y-6">
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-3">Brand Color</label>
+<div class="flex gap-3">
+<button class="w-8 h-8 rounded-full bg-primary ring-2 ring-primary ring-offset-2 flex items-center justify-center"><span class="material-symbols-outlined text-white text-[16px]">check</span></button>
+<button class="w-8 h-8 rounded-full bg-secondary-container hover:scale-110 transition-transform"></button>
+<button class="w-8 h-8 rounded-full bg-[#10B981] hover:scale-110 transition-transform"></button>
+<button class="w-8 h-8 rounded-full bg-[#8B5CF6] hover:scale-110 transition-transform"></button>
+<div class="w-8 h-8 rounded-full bg-surface border-2 border-dashed border-outline-variant flex items-center justify-center cursor-pointer hover:border-primary text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</div>
+</div>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">Custom Subdomain</label>
+<div class="flex items-center">
+<span class="bg-surface border border-r-0 border-outline-variant rounded-l-[16px] px-3 py-3 font-body-md text-body-md text-on-surface-variant h-[48px] flex items-center">lumina.academy/</span>
+<input class="flex-1 bg-surface border border-outline-variant rounded-r-[16px] px-3 py-3 font-body-md text-body-md text-on-background focus:outline-none focus:border-primary focus:ring-0 h-[48px]" type="text" value="oxford"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

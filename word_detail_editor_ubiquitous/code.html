@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Word Detail Editor - Lumina Learning</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#0b1c30",
+                        "tertiary-fixed": "#ffdbca",
+                        "outline": "#727785",
+                        "on-primary-fixed": "#001a42",
+                        "inverse-surface": "#213145",
+                        "on-tertiary-fixed": "#341100",
+                        "error-container": "#ffdad6",
+                        "background": "#f8f9ff",
+                        "surface-container-low": "#eff4ff",
+                        "secondary-container": "#fea619",
+                        "surface-dim": "#cbdbf5",
+                        "on-background": "#0b1c30",
+                        "inverse-primary": "#adc6ff",
+                        "on-secondary-container": "#684000",
+                        "tertiary-fixed-dim": "#ffb690",
+                        "on-tertiary-container": "#fffbff",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "on-surface-variant": "#424754",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container-high": "#dce9ff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#994100",
+                        "surface-tint": "#005ac2",
+                        "inverse-on-surface": "#eaf1ff",
+                        "primary-fixed": "#d8e2ff",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "surface": "#f8f9ff",
+                        "surface-bright": "#f8f9ff",
+                        "primary-container": "#2170e4",
+                        "primary": "#0058be",
+                        "outline-variant": "#c2c6d6",
+                        "secondary-fixed": "#ffddb8",
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface-container": "#e5eeff",
+                        "on-primary-container": "#fefcff",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-container": "#c05400",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#d3e4fe",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#783200",
+                        "on-secondary-fixed": "#2a1700",
+                        "on-primary": "#ffffff",
+                        "secondary": "#855300",
+                        "on-secondary-fixed-variant": "#653e00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-md": "16px",
+                        "margin-mobile": "16px",
+                        "stack-lg": "32px",
+                        "margin-desktop": "40px",
+                        "gutter": "24px",
+                        "stack-sm": "8px",
+                        "container-max": "1280px",
+                        "unit": "8px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "headline-lg": ["Lexend"],
+                        "display-lg": ["Lexend"],
+                        "label-md": ["Lexend"],
+                        "headline-lg-mobile": ["Lexend"],
+                        "body-md": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Ambient Shadows */
+        .card-shadow {
+            box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+        
+        .interactive-shadow:hover {
+            box-shadow: 0 8px 24px rgba(0, 88, 190, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Button Press Effect */
+        .btn-press:active {
+            transform: translateY(2px);
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-full flex overflow-hidden">
+<!-- SideNavBar (Web) -->
+<nav class="hidden md:flex bg-surface-container-lowest dark:bg-inverse-surface border-r border-outline-variant shadow-md docked left-0 h-full w-64 rounded-r-xl flex-col gap-stack-md p-stack-md z-20 shrink-0">
+<!-- Header -->
+<div class="flex flex-col items-center py-stack-md mb-stack-lg border-b border-surface-container-high">
+<div class="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mb-stack-sm card-shadow">
+<img alt="Lumina Logo" class="w-10 h-10 object-contain rounded-full" data-alt="A stylized, modern vector logo of an open book with glowing pages, rendered in a crisp, vibrant primary blue (#0058be) and secondary orange (#fea619) color palette on a pure white background. The design is playful, energetic, and highly legible, reflecting a modern educational app style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZAl_H9oj_nEGUw9N7VjiFImWzSjI7FdSTjIgIvYZayttunLce7Z4RUMLGjP9hmINpwZsYKgs6p8lQ6BuCGsiTwenLp862STIXMw4ewc2U__SH8TUSadX3XMyXaZsgNUmcZDVn9EcCEJfEve1D_A-CbJGiLNFwvSP2hG7FU4Pjg_cd-2E81pjcM8wtG4rvDxAPmEqmxybpnG_QXb068Cq8g5uevQkFUZqZscdWx4RMGcj4SPYD6vtktg"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Lumina Learning</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Teacher Portal</p>
+</div>
+<!-- Tabs -->
+<div class="flex flex-col gap-stack-sm flex-grow">
+<a class="flex items-center gap-stack-md px-stack-md py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-stack-md px-stack-md py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-label-md text-label-md">Classes</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-stack-md px-stack-md py-3 rounded-lg bg-primary-container text-on-primary-container font-bold shadow-inner scale-[0.98]" href="#">
+<span class="material-symbols-outlined fill">menu_book</span>
+<span class="font-label-md text-label-md">Vocabulary</span>
+</a>
+<a class="flex items-center gap-stack-md px-stack-md py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-label-md text-label-md">Assignments</span>
+</a>
+<a class="flex items-center gap-stack-md px-stack-md py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<!-- CTA -->
+<button class="mt-auto w-full py-3 bg-secondary-container text-on-secondary-container font-label-md text-label-md font-bold rounded-lg border-b-2 border-secondary shadow-sm hover:brightness-105 active:border-b-0 active:translate-y-[2px] transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span>
+            Start New Lesson
+        </button>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col h-full overflow-hidden relative">
+<!-- TopAppBar (Mobile & Global Header Elements) -->
+<header class="bg-surface shadow-sm docked full-width top-0 z-10 flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16 shrink-0">
+<!-- Mobile Menu Toggle (hidden on md) -->
+<button class="md:hidden text-on-surface-variant p-2 rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<!-- Contextual Breadcrumb/Title -->
+<div class="flex items-center gap-2">
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors hidden md:block">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="hidden md:flex items-center gap-2 font-label-md text-label-md text-on-surface-variant">
+<span>Vocabulary</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="font-bold text-on-surface">Edit Word</span>
+</div>
+<h1 class="md:hidden font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">Lumina Learning</h1>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-stack-md">
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border-2 border-surface-container-high cursor-pointer ml-2">
+<img alt="Teacher Profile" class="w-full h-full object-cover" data-alt="A small, circular profile picture of a cheerful young adult teacher wearing modern casual attire, smiling warmly against a bright, solid pastel blue background. The lighting is soft and studio-quality, conveying approachability and professionalism." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYFZVIk-pejdfZGMLoGquokKDSxu8-LggxtZYS-44Hf3Yp-MDkEu-dyYGvYuNEGR2bQVVmqWZrNOuT9QlE3BrgrLg1PX_X7_f0EkOjAbiYCSGF1MHuuJ4AToYmY1PPgW_q9aWuP23pwDq1sSeWnkLRDiShXEBncWXSQZr2g-Bfim4goyOSGMSFI2DiVnI9ilyMTDWpCwnpEpsOF-i84Fg8-o86r1eHwjHsI612Z3Uac-jESR1184N7AA"/>
+</div>
+</div>
+</header>
+<!-- Main Scrollable Canvas -->
+<main class="flex-1 overflow-y-auto p-margin-mobile md:p-margin-desktop">
+<!-- Header Section -->
+<div class="max-w-container-max mx-auto mb-stack-lg flex flex-col md:flex-row md:items-end justify-between gap-stack-md">
+<div>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-2">Edit Word</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Customize the definition, examples, and metadata for your students.</p>
+</div>
+<div class="flex gap-stack-md">
+<button class="px-6 py-3 bg-surface text-primary font-label-md text-label-md font-bold rounded-lg border border-outline-variant shadow-sm hover:bg-surface-container-low transition-colors">
+                        Cancel
+                    </button>
+<button class="px-6 py-3 bg-primary text-on-primary font-label-md text-label-md font-bold rounded-lg border-b-2 border-on-primary-fixed-variant shadow-sm hover:brightness-110 active:border-b-0 active:translate-y-[2px] transition-all">
+                        Save Changes
+                    </button>
+</div>
+</div>
+<!-- Layout Grid -->
+<div class="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-12 gap-gutter pb-margin-desktop">
+<!-- LEFT COLUMN: Primary Content -->
+<div class="lg:col-span-8 flex flex-col gap-stack-lg">
+<!-- Basic Info Card -->
+<div class="bg-surface-container-lowest rounded-xl p-stack-lg card-shadow border border-surface-variant">
+<div class="flex flex-col gap-stack-md">
+<!-- Word Input -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-2" for="word-input">Target Word</label>
+<input class="w-full font-headline-lg text-headline-lg font-bold text-on-surface bg-surface-bright border border-outline-variant rounded-[16px] px-4 py-3 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all" id="word-input" type="text" value="Ubiquitous"/>
+</div>
+<!-- IPA Input -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-2" for="ipa-input">IPA (Pronunciation)</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant font-mono">/</span>
+<input class="w-full font-body-md text-body-md font-mono text-on-surface bg-surface-bright border border-outline-variant rounded-[16px] pl-8 pr-8 py-3 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all" id="ipa-input" type="text" value="juːˈbɪkwɪtəs"/>
+<span class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant font-mono">/</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Definition Card (Rich Text) -->
+<div class="bg-surface-container-lowest rounded-xl p-stack-lg card-shadow border border-surface-variant">
+<div class="flex justify-between items-center mb-stack-md">
+<h3 class="font-headline-md text-headline-md text-on-surface">Definition &amp; Meaning</h3>
+<button aria-label="Format options" class="text-primary hover:bg-surface-container-low p-2 rounded-full transition-colors">
+<span class="material-symbols-outlined">text_format</span>
+</button>
+</div>
+<!-- Pseudo Rich Text Editor -->
+<div class="border border-outline-variant rounded-[16px] overflow-hidden focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/20 transition-all">
+<!-- Toolbar -->
+<div class="bg-surface-container-low border-b border-outline-variant p-2 flex gap-1">
+<button class="p-1.5 rounded hover:bg-surface-variant text-on-surface-variant transition-colors"><span class="material-symbols-outlined text-[20px]">format_bold</span></button>
+<button class="p-1.5 rounded hover:bg-surface-variant text-on-surface-variant transition-colors"><span class="material-symbols-outlined text-[20px]">format_italic</span></button>
+<button class="p-1.5 rounded hover:bg-surface-variant text-on-surface-variant transition-colors"><span class="material-symbols-outlined text-[20px]">format_underlined</span></button>
+<div class="w-[1px] bg-outline-variant mx-1 my-1"></div>
+<button class="p-1.5 rounded hover:bg-surface-variant text-on-surface-variant transition-colors"><span class="material-symbols-outlined text-[20px]">format_list_bulleted</span></button>
+</div>
+<!-- Editable Area -->
+<div class="p-4 min-h-[120px] font-body-md text-body-md text-on-surface outline-none" contenteditable="true">
+                                Present, appearing, or found everywhere. Very common.
+                            </div>
+</div>
+</div>
+<!-- Example Sentences -->
+<div class="bg-surface-container-lowest rounded-xl p-stack-lg card-shadow border border-surface-variant">
+<div class="flex justify-between items-center mb-stack-md">
+<h3 class="font-headline-md text-headline-md text-on-surface">Example Sentences</h3>
+<span class="bg-surface-variant text-on-surface px-3 py-1 rounded-full font-label-sm text-label-sm">2 Items</span>
+</div>
+<div class="flex flex-col gap-stack-md" id="examples-container">
+<!-- Example 1 -->
+<div class="flex gap-stack-sm items-start group">
+<div class="bg-surface-container-high w-8 h-8 rounded-full flex items-center justify-center font-label-sm text-label-sm text-on-surface-variant shrink-0 mt-1">1</div>
+<div class="flex-grow">
+<textarea class="w-full font-body-md text-body-md text-on-surface bg-surface-bright border border-outline-variant rounded-[16px] px-4 py-3 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all resize-none" rows="2">Smartphones have become ubiquitous in modern society.</textarea>
+</div>
+<button aria-label="Delete example" class="p-2 text-outline hover:text-error hover:bg-error-container rounded-full transition-colors shrink-0 mt-1 opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+<!-- Example 2 -->
+<div class="flex gap-stack-sm items-start group">
+<div class="bg-surface-container-high w-8 h-8 rounded-full flex items-center justify-center font-label-sm text-label-sm text-on-surface-variant shrink-0 mt-1">2</div>
+<div class="flex-grow">
+<textarea class="w-full font-body-md text-body-md text-on-surface bg-surface-bright border border-outline-variant rounded-[16px] px-4 py-3 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all resize-none" rows="2">His ubiquitous influence was felt in every department of the company.</textarea>
+</div>
+<button aria-label="Delete example" class="p-2 text-outline hover:text-error hover:bg-error-container rounded-full transition-colors shrink-0 mt-1 opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</div>
+<button class="mt-stack-md flex items-center gap-2 text-primary font-label-md text-label-md hover:bg-surface-container-low px-4 py-2 rounded-lg transition-colors">
+<span class="material-symbols-outlined">add_circle</span>
+                            Add another example
+                        </button>
+</div>
+<!-- Synonyms & Antonyms -->
+<div class="bg-surface-container-lowest rounded-xl p-stack-lg card-shadow border border-surface-variant grid md:grid-cols-2 gap-stack-lg">
+<!-- Synonyms -->
+<div>
+<label class="block font-headline-md text-headline-md text-on-surface mb-stack-sm">Synonyms</label>
+<div class="border border-outline-variant rounded-[16px] p-3 bg-surface-bright min-h-[100px] flex flex-wrap gap-2 items-start focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/20 transition-all">
+<!-- Tags -->
+<span class="bg-surface-container-high text-on-surface px-3 py-1.5 rounded-lg font-label-md text-label-md flex items-center gap-1 group">
+                                    omnipresent
+                                    <button class="text-on-surface-variant hover:text-error transition-colors"><span class="material-symbols-outlined text-[16px]">close</span></button>
+</span>
+<span class="bg-surface-container-high text-on-surface px-3 py-1.5 rounded-lg font-label-md text-label-md flex items-center gap-1 group">
+                                    pervasive
+                                    <button class="text-on-surface-variant hover:text-error transition-colors"><span class="material-symbols-outlined text-[16px]">close</span></button>
+</span>
+<!-- Input -->
+<input class="flex-grow bg-transparent border-none outline-none font-body-md text-body-md text-on-surface min-w-[120px] py-1.5" placeholder="Add synonym..." type="text"/>
+</div>
+</div>
+<!-- Antonyms -->
+<div>
+<label class="block font-headline-md text-headline-md text-on-surface mb-stack-sm">Antonyms</label>
+<div class="border border-outline-variant rounded-[16px] p-3 bg-surface-bright min-h-[100px] flex flex-wrap gap-2 items-start focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/20 transition-all">
+<!-- Tags -->
+<span class="bg-surface-container-high text-on-surface px-3 py-1.5 rounded-lg font-label-md text-label-md flex items-center gap-1 group">
+                                    rare
+                                    <button class="text-on-surface-variant hover:text-error transition-colors"><span class="material-symbols-outlined text-[16px]">close</span></button>
+</span>
+<span class="bg-surface-container-high text-on-surface px-3 py-1.5 rounded-lg font-label-md text-label-md flex items-center gap-1 group">
+                                    scarce
+                                    <button class="text-on-surface-variant hover:text-error transition-colors"><span class="material-symbols-outlined text-[16px]">close</span></button>
+</span>
+<!-- Input -->
+<input class="flex-grow bg-transparent border-none outline-none font-body-md text-body-md text-on-surface min-w-[120px] py-1.5" placeholder="Add antonym..." type="text"/>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: Metadata & Media -->
+<div class="lg:col-span-4 flex flex-col gap-stack-lg">
+<!-- Media Preview (Image) -->
+<div class="bg-surface-container-lowest rounded-xl overflow-hidden card-shadow border border-surface-variant flex flex-col group cursor-pointer relative">
+<div class="h-48 w-full bg-surface-container-high relative overflow-hidden">
+<img alt="Visual representation of ubiquitous" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A vivid, high-quality photograph of a diverse crowd of people walking in a busy, modern city intersection, all simultaneously looking at their glowing smartphones. The scene is slightly stylized with soft, bright light-mode colors (blues, whites) to illustrate the concept of something being 'ubiquitous' or everywhere. The composition is balanced and engaging." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEtWLpIuKRKGyu4gA3lJ_B8s6ccHll0AkCQ7rNUGzRTsoFhZrh30UeaEPuK61a-KRSeJ-ppfUrooL1C4KE_HavQDlNkqankg73cH-4LzXr472WsmGXp5X_wItwQXrjsIJwrSEfvy3zeQiJXtAqFBIEaEcMhMaquoj0vgsjRf5IDEkEFss4FLDjj_JiQAn5vQCpNt1a-7SFh6irPUZnIUtZQ3kwCVCFuIAStm7mzuLCjxffEsvyJt6osA"/>
+<!-- Overlay -->
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+<span class="bg-surface text-primary px-4 py-2 rounded-lg font-label-md text-label-md font-bold flex items-center gap-2">
+<span class="material-symbols-outlined">image</span>
+                                    Change Image
+                                </span>
+</div>
+</div>
+</div>
+<!-- Audio Management -->
+<div class="bg-surface-container-lowest rounded-xl p-stack-md card-shadow border border-surface-variant">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-md">Pronunciation Audio</h3>
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded-lg border border-outline-variant mb-stack-md">
+<div class="flex items-center gap-3">
+<button class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm">
+<span class="material-symbols-outlined fill">play_arrow</span>
+</button>
+<div>
+<p class="font-label-md text-label-md text-on-surface">ubiquitous_en-US.mp3</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">0:02 • Auto-generated</p>
+</div>
+</div>
+<button aria-label="Delete audio" class="p-2 text-outline hover:text-error hover:bg-error-container rounded-full transition-colors">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 border border-outline-variant rounded-lg font-label-sm text-label-sm text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[18px]">mic</span> Record
+                            </button>
+<button class="py-2 border border-outline-variant rounded-lg font-label-sm text-label-sm text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[18px]">upload</span> Upload
+                            </button>
+</div>
+</div>
+<!-- Classification (CEFR & Tags) -->
+<div class="bg-surface-container-lowest rounded-xl p-stack-lg card-shadow border border-surface-variant">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-stack-md">Classification</h3>
+<!-- CEFR Level -->
+<div class="mb-stack-lg">
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-2">CEFR Difficulty Level</label>
+<div class="grid grid-cols-3 gap-2">
+<label class="cursor-pointer">
+<input class="peer sr-only" name="cefr" type="radio" value="A1"/>
+<div class="text-center py-2 rounded-lg border border-outline-variant peer-checked:bg-primary peer-checked:text-on-primary peer-checked:border-primary peer-checked:font-bold transition-all font-body-md text-body-md">A1</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="cefr" type="radio" value="A2"/>
+<div class="text-center py-2 rounded-lg border border-outline-variant peer-checked:bg-primary peer-checked:text-on-primary peer-checked:border-primary peer-checked:font-bold transition-all font-body-md text-body-md">A2</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="cefr" type="radio" value="B1"/>
+<div class="text-center py-2 rounded-lg border border-outline-variant peer-checked:bg-primary peer-checked:text-on-primary peer-checked:border-primary peer-checked:font-bold transition-all font-body-md text-body-md">B1</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="cefr" type="radio" value="B2"/>
+<div class="text-center py-2 rounded-lg border border-outline-variant peer-checked:bg-primary peer-checked:text-on-primary peer-checked:border-primary peer-checked:font-bold transition-all font-body-md text-body-md">B2</div>
+</label>
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" name="cefr" type="radio" value="C1"/>
+<div class="text-center py-2 rounded-lg border border-outline-variant peer-checked:bg-primary peer-checked:text-on-primary peer-checked:border-primary peer-checked:font-bold transition-all font-body-md text-body-md">C1</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="cefr" type="radio" value="C2"/>
+<div class="text-center py-2 rounded-lg border border-outline-variant peer-checked:bg-primary peer-checked:text-on-primary peer-checked:border-primary peer-checked:font-bold transition-all font-body-md text-body-md">C2</div>
+</label>
+</div>
+</div>
+<!-- Categories -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-2">Categories / Tags</label>
+<div class="flex flex-wrap gap-2 mb-2">
+<span class="bg-surface-variant text-on-surface px-3 py-1.5 rounded-full font-label-sm text-label-sm flex items-center gap-1 group cursor-pointer hover:bg-error-container hover:text-error transition-colors">
+                                    Academic
+                                    <span class="material-symbols-outlined text-[14px]">close</span>
+</span>
+<span class="bg-surface-variant text-on-surface px-3 py-1.5 rounded-full font-label-sm text-label-sm flex items-center gap-1 group cursor-pointer hover:bg-error-container hover:text-error transition-colors">
+                                    Technology
+                                    <span class="material-symbols-outlined text-[14px]">close</span>
+</span>
+<button class="border border-dashed border-outline text-on-surface-variant px-3 py-1.5 rounded-full font-label-sm text-label-sm flex items-center gap-1 hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[14px]">add</span> Add Tag
+                                </button>
+</div>
+</div>
+</div>
+<!-- Lesson Assignments -->
+<div class="bg-surface-container-lowest rounded-xl p-stack-lg card-shadow border border-surface-variant">
+<div class="flex justify-between items-center mb-stack-md">
+<h3 class="font-headline-md text-headline-md text-on-surface">Appears In</h3>
+<button class="text-primary font-label-sm text-label-sm hover:underline">Manage</button>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="w-8 h-8 rounded bg-surface-variant flex items-center justify-center text-primary group-hover:bg-primary-container">
+<span class="material-symbols-outlined text-[18px]">menu_book</span>
+</div>
+<div class="flex-grow">
+<p class="font-label-md text-label-md text-on-surface">Unit 4: Technology &amp; Society</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Advanced English Course</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary">chevron_right</span>
+</div>
+<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="w-8 h-8 rounded bg-surface-variant flex items-center justify-center text-primary group-hover:bg-primary-container">
+<span class="material-symbols-outlined text-[18px]">list_alt</span>
+</div>
+<div class="flex-grow">
+<p class="font-label-md text-label-md text-on-surface">Weekly Quiz 12</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Assessments</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

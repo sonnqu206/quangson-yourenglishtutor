@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina Learning - Lesson Sequence Builder</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-container": "#fefcff",
+                    "inverse-primary": "#adc6ff",
+                    "on-secondary-container": "#684000",
+                    "on-secondary": "#ffffff",
+                    "surface-variant": "#d3e4fe",
+                    "secondary-fixed": "#ffddb8",
+                    "secondary-container": "#fea619",
+                    "background": "#f8f9ff",
+                    "on-tertiary-fixed": "#341100",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-error": "#ffffff",
+                    "on-surface": "#0b1c30",
+                    "on-tertiary": "#ffffff",
+                    "surface-bright": "#f8f9ff",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed": "#2a1700",
+                    "tertiary-container": "#c05400",
+                    "on-tertiary-container": "#fffbff",
+                    "secondary-fixed-dim": "#ffb95f",
+                    "surface-container-high": "#dce9ff",
+                    "on-background": "#0b1c30",
+                    "surface-dim": "#cbdbf5",
+                    "secondary": "#855300",
+                    "tertiary-fixed-dim": "#ffb690",
+                    "outline": "#727785",
+                    "on-surface-variant": "#424754",
+                    "on-secondary-fixed-variant": "#653e00",
+                    "primary-container": "#2170e4",
+                    "primary": "#0058be",
+                    "tertiary-fixed": "#ffdbca",
+                    "on-primary-fixed-variant": "#004395",
+                    "primary-fixed": "#d8e2ff",
+                    "on-primary": "#ffffff",
+                    "outline-variant": "#c2c6d6",
+                    "surface-container": "#e5eeff",
+                    "surface-container-highest": "#d3e4fe",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#783200",
+                    "surface": "#f8f9ff",
+                    "on-primary-fixed": "#001a42",
+                    "on-error-container": "#93000a",
+                    "surface-container-low": "#eff4ff",
+                    "inverse-on-surface": "#eaf1ff",
+                    "inverse-surface": "#213145",
+                    "surface-tint": "#005ac2",
+                    "tertiary": "#994100"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px",
+                    "unit": "8px",
+                    "stack-lg": "32px",
+                    "container-max": "1280px",
+                    "stack-md": "16px",
+                    "stack-sm": "8px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["Lexend"],
+                    "label-md": ["Lexend"],
+                    "headline-lg": ["Lexend"],
+                    "display-lg": ["Lexend"],
+                    "headline-md": ["Lexend"],
+                    "body-lg": ["Lexend"],
+                    "label-sm": ["Lexend"],
+                    "body-md": ["Lexend"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            },
+            "boxShadow": {
+                'ambient': '0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04)',
+                'ambient-hover': '0 8px 24px rgba(0, 88, 190, 0.1), 0 4px 8px rgba(11, 28, 48, 0.06)',
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #F0F9FF; }
+        .ambient-shadow { box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04); }
+        .ambient-shadow-hover:hover { box-shadow: 0 8px 24px rgba(0, 88, 190, 0.1), 0 4px 8px rgba(11, 28, 48, 0.06); transform: translateY(-2px); }
+        .border-shade { border-bottom-width: 3px; border-bottom-color: rgba(0, 0, 0, 0.15); }
+        .border-shade:active { border-bottom-width: 1px; transform: translateY(2px); }
+        
+        /* Custom Scrollbar for inner panes */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #dce9ff; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #adc6ff; }
+    </style>
+</head>
+<body class="font-body-md text-on-surface antialiased h-screen flex overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<nav class="hidden md:flex flex-col h-screen p-4 gap-stack-md fixed left-0 top-0 z-50 bg-surface-container-lowest dark:bg-inverse-surface shadow-md docked h-full w-64 border-r border-[#E2E8F0]">
+<div class="flex items-center gap-3 mb-6 px-2">
+<img class="w-10 h-10 rounded-full object-cover shadow-sm" data-alt="A stylized, modern geometric logo for Lumina Academy, featuring interlocking bright blue and amber shapes on a pure white background, conveying a sense of dynamic learning and energetic education. 8k resolution, crisp vector style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuASf_lkgOW7r0OLuziSOZsV88Az2OVY6zmxHa06ij3vfsbnSK_7a26GmzPNq9x3mIT5zoPmgT7KeuX_6vbb2zsfow-BCHFFzy9SNzk66bzU5PiH2ARea42mA-nRRBSKJa-LWcBxoby5YF-dtN7h9tKc3pEZVXQFTtiflA1iOmjLFIQa0-CDbjTRU1mtBFvI1NkniLLDFuu4DgbF2lNTa4Z0T0-rhTin18u_jtf2wxf4z-X40-aIApSr6w"/>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-black leading-tight">Lumina Academy</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Teacher Portal</p>
+</div>
+</div>
+<button class="bg-secondary-container text-on-secondary-container font-label-md text-label-md font-bold rounded-lg py-3 px-4 mb-4 flex items-center justify-center gap-2 border-shade transition-transform active:scale-95 duration-150 ambient-shadow-hover">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+            New Lesson
+        </button>
+<ul class="flex-1 space-y-2 flex flex-col font-label-md text-label-md">
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-lg px-4 py-3 font-bold shadow-sm" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">groups</span>
+                    Classes
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+                    Vocabulary
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+                    Assignments
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</li>
+</ul>
+<div class="mt-auto border-t border-surface-variant pt-4 space-y-2 font-label-md text-label-md">
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined">help</span>
+                Help Center
+            </a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined">logout</span>
+                Logout
+            </a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 flex flex-col h-screen overflow-hidden bg-[#F0F9FF]">
+<!-- TopAppBar (Modified for context) -->
+<header class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-4 sticky top-0 z-40 bg-surface dark:bg-surface-dim shadow-sm docked full-width top-0">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface font-bold">Lesson Sequence Builder</h2>
+<div class="relative ml-4 hidden md:block">
+<select class="appearance-none bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-label-md rounded-lg py-2 pl-4 pr-10 focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none ambient-shadow transition-shadow">
+<option>Spanish 101 - Beginners</option>
+<option>French 202 - Intermediate</option>
+<option>Japanese 301 - Kanji Focus</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-surface-container-lowest text-primary font-label-md text-label-md font-bold rounded-lg py-2 px-4 border border-primary ambient-shadow-hover transition-all active:scale-95">
+                    Preview Learning Path
+                </button>
+<button class="bg-primary text-on-primary font-label-md text-label-md font-bold rounded-lg py-2 px-6 border-shade ambient-shadow-hover transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">save</span>
+                    Save Sequence
+                </button>
+<div class="hidden md:flex items-center gap-3 ml-4 border-l border-outline-variant pl-4">
+<button class="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-full transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<img class="w-10 h-10 rounded-full object-cover border-2 border-surface-container" data-alt="A professional headshot of a friendly teacher in a bright modern classroom setting, wearing glasses and a blue sweater, smiling warmly at the camera. High quality, soft natural lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOX-b5lLYf_EjkK38mgoHUskuCBXf7sibsb4tEIxtEVwCn4peBDgCPrWRKGCal29mFIkRdNhV1FHI5cM7hdHgJVFmasKUZ-e2ApP9fI18cbYSpOijfH4h71mGtrWN_vJKWSb4b4IkqQhtKuTNF28nksyRKK0bB5xvrsGleDCwHsEB_oy3yww8-kr0Fs7NLeqm_rUsxTluJzIwouv92YJiaMedkn_OTb-YXX4J8jNis4679NGOrDclNZQ"/>
+</div>
+</div>
+</header>
+<!-- Builder Workspace Grid -->
+<div class="flex-1 p-margin-mobile md:p-margin-desktop overflow-hidden grid grid-cols-1 md:grid-cols-12 gap-gutter h-full">
+<!-- Left Panel: Lesson Library -->
+<aside class="col-span-12 md:col-span-3 bg-surface-container-lowest rounded-xl ambient-shadow flex flex-col h-full overflow-hidden border border-[#E2E8F0]">
+<div class="p-4 border-b border-surface-variant bg-surface-bright">
+<h3 class="font-headline-md text-headline-md font-semibold text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">library_books</span>
+                        Lesson Library
+                    </h3>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface border border-outline-variant rounded-[16px] py-2 pl-10 pr-4 font-body-md text-body-md focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-[0_0_0_4px_rgba(33,112,228,0.2)] transition-all outline-none" placeholder="Search lessons..." type="text"/>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-3 space-y-3 bg-[#F8F9FF]">
+<!-- Library Item 1 -->
+<div class="bg-surface-container-lowest p-3 rounded-lg border border-outline-variant hover:border-primary hover:shadow-sm transition-all cursor-grab flex flex-col gap-2 group">
+<div class="flex justify-between items-start">
+<h4 class="font-label-md text-label-md font-semibold text-on-surface group-hover:text-primary transition-colors">Greetings &amp; Introductions</h4>
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 hover:text-primary transition-all p-1">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+</button>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-surface-container text-on-surface-variant text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Beginner</span>
+<span class="flex items-center text-on-surface-variant text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px] mr-1">sort_by_alpha</span> 24 words
+                            </span>
+</div>
+</div>
+<!-- Library Item 2 -->
+<div class="bg-surface-container-lowest p-3 rounded-lg border border-outline-variant hover:border-primary hover:shadow-sm transition-all cursor-grab flex flex-col gap-2 group">
+<div class="flex justify-between items-start">
+<h4 class="font-label-md text-label-md font-semibold text-on-surface group-hover:text-primary transition-colors">Numbers 1-100</h4>
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 hover:text-primary transition-all p-1">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+</button>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-surface-container text-on-surface-variant text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Beginner</span>
+<span class="flex items-center text-on-surface-variant text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px] mr-1">sort_by_alpha</span> 30 words
+                            </span>
+</div>
+</div>
+<!-- Library Item 3 -->
+<div class="bg-surface-container-lowest p-3 rounded-lg border border-outline-variant hover:border-primary hover:shadow-sm transition-all cursor-grab flex flex-col gap-2 group">
+<div class="flex justify-between items-start">
+<h4 class="font-label-md text-label-md font-semibold text-on-surface group-hover:text-primary transition-colors">Food &amp; Dining Out</h4>
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 hover:text-primary transition-all p-1">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+</button>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-surface-container-high text-on-surface-variant text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">A1</span>
+<span class="flex items-center text-on-surface-variant text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px] mr-1">sort_by_alpha</span> 45 words
+                            </span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Workspace: Sequence Area -->
+<section class="col-span-12 md:col-span-6 bg-surface-container-lowest rounded-xl ambient-shadow flex flex-col h-full overflow-hidden border border-[#E2E8F0]">
+<div class="p-4 border-b border-surface-variant bg-surface-bright flex justify-between items-center">
+<div>
+<h3 class="font-headline-md text-headline-md font-semibold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-container">route</span>
+                            Curriculum Sequence
+                        </h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1">Drag and drop lessons to build the learning path.</p>
+</div>
+<div class="bg-[#DBEAFE] h-12 w-32 rounded-full flex items-center px-3 gap-2 overflow-hidden relative">
+<div class="absolute inset-0 bg-[#10B981] w-[60%] rounded-full opacity-20"></div>
+<div class="z-10 flex flex-col">
+<span class="text-[10px] font-bold text-primary uppercase tracking-wider">Total Path</span>
+<span class="font-label-md text-label-md font-bold text-primary">3 Lessons</span>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-6 bg-[#F0F9FF] relative">
+<!-- Vertical Line Connector -->
+<div class="absolute left-10 top-10 bottom-10 w-0.5 bg-surface-variant z-0"></div>
+<div class="space-y-6 relative z-10">
+<!-- Sequence Item 1 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-sm shadow-sm ring-4 ring-[#F0F9FF] z-10">
+                                1
+                            </div>
+<div class="flex-1 bg-surface-container-lowest rounded-xl p-4 ambient-shadow border border-outline-variant flex items-center gap-4 hover:border-primary transition-all cursor-move">
+<span class="material-symbols-outlined text-outline-variant cursor-grab active:cursor-grabbing">drag_indicator</span>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md font-bold text-on-surface text-lg">Alphabet Basics</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Core Sounds &amp; Vowels</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="bg-surface-container text-on-surface-variant text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Beginner</span>
+<button class="text-outline hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Sequence Item 2 (Active/Selected) -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-sm shadow-sm ring-4 ring-[#F0F9FF] z-10">
+                                2
+                            </div>
+<div class="flex-1 bg-surface-container-low rounded-xl p-4 ambient-shadow border-2 border-primary flex items-center gap-4 cursor-move relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<span class="material-symbols-outlined text-primary cursor-grab active:cursor-grabbing">drag_indicator</span>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md font-bold text-primary text-lg">Everyday Objects</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Classroom &amp; Home</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="bg-primary-fixed text-on-primary-fixed text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Beginner</span>
+<button class="text-outline hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Sequence Item 3 -->
+<div class="flex items-center gap-4 group">
+<div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-bold text-sm shadow-sm ring-4 ring-[#F0F9FF] z-10 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                                3
+                            </div>
+<div class="flex-1 bg-surface-container-lowest rounded-xl p-4 ambient-shadow border border-outline-variant flex items-center gap-4 hover:border-primary transition-all cursor-move">
+<span class="material-symbols-outlined text-outline-variant cursor-grab active:cursor-grabbing">drag_indicator</span>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md font-bold text-on-surface text-lg">Basic Verbs</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">To Be, To Have, To Go</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="bg-surface-container-high text-on-surface-variant text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">A1</span>
+<button class="text-outline hover:text-error transition-colors p-1 rounded-full hover:bg-error-container">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Drop Target Placeholder -->
+<div class="flex items-center gap-4 opacity-50 border-2 border-dashed border-outline-variant rounded-xl p-4 bg-surface-container-lowest justify-center ml-12">
+<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                                Drag lesson here
+                            </span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Panel: Lesson Details Preview -->
+<aside class="col-span-12 md:col-span-3 bg-surface-container-lowest rounded-xl ambient-shadow flex flex-col h-full overflow-hidden border border-[#E2E8F0]">
+<div class="p-4 border-b border-surface-variant bg-surface-bright flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md font-semibold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">visibility</span>
+                        Preview
+                    </h3>
+</div>
+<div class="flex-1 overflow-y-auto p-5">
+<div class="mb-6 pb-6 border-b border-surface-variant">
+<h4 class="font-headline-md text-headline-md text-primary font-bold mb-2">Everyday Objects</h4>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="bg-primary-container text-on-primary-container text-xs font-semibold px-2 py-1 rounded-md">Vocabulary</span>
+<span class="bg-secondary-container text-on-secondary-container text-xs font-semibold px-2 py-1 rounded-md">20 Minutes</span>
+</div>
+<p class="font-body-sm text-sm text-on-surface-variant leading-relaxed">
+                            Students will learn essential vocabulary for items commonly found in a classroom and around the house. Focus is on noun gender and definite articles.
+                        </p>
+</div>
+<div>
+<h5 class="font-label-md text-label-md font-semibold text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">format_list_bulleted</span>
+                            Word List (15)
+                        </h5>
+<ul class="space-y-2">
+<li class="bg-surface-container-low rounded-lg p-2 flex justify-between items-center border border-transparent hover:border-outline-variant transition-colors">
+<span class="font-body-md text-body-md font-medium text-on-surface">el libro</span>
+<span class="text-xs text-on-surface-variant">book</span>
+</li>
+<li class="bg-surface-container-low rounded-lg p-2 flex justify-between items-center border border-transparent hover:border-outline-variant transition-colors">
+<span class="font-body-md text-body-md font-medium text-on-surface">la mesa</span>
+<span class="text-xs text-on-surface-variant">table</span>
+</li>
+<li class="bg-surface-container-low rounded-lg p-2 flex justify-between items-center border border-transparent hover:border-outline-variant transition-colors">
+<span class="font-body-md text-body-md font-medium text-on-surface">la silla</span>
+<span class="text-xs text-on-surface-variant">chair</span>
+</li>
+<li class="bg-surface-container-low rounded-lg p-2 flex justify-between items-center border border-transparent hover:border-outline-variant transition-colors">
+<span class="font-body-md text-body-md font-medium text-on-surface">el lápiz</span>
+<span class="text-xs text-on-surface-variant">pencil</span>
+</li>
+<li class="bg-surface-container-low rounded-lg p-2 flex justify-between items-center border border-transparent hover:border-outline-variant transition-colors">
+<span class="font-body-md text-body-md font-medium text-on-surface">la puerta</span>
+<span class="text-xs text-on-surface-variant">door</span>
+</li>
+</ul>
+<button class="mt-4 w-full text-center text-primary font-label-md text-label-md hover:underline py-2">
+                            View Full Lesson Details
+                        </button>
+</div>
+</div>
+</aside>
+</div>
+</main>
+</body></html>

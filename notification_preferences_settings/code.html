@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Notification Preferences - Lumina Learning</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed-variant": "#004395",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "secondary": "#855300",
+                        "surface-container-high": "#dce9ff",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed": "#001a42",
+                        "tertiary": "#994100",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface-variant": "#d3e4fe",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed-dim": "#adc6ff",
+                        "tertiary-container": "#c05400",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed": "#2a1700",
+                        "surface": "#f8f9ff",
+                        "secondary-container": "#fea619",
+                        "surface-dim": "#cbdbf5",
+                        "on-primary-container": "#fefcff",
+                        "outline-variant": "#c2c6d6",
+                        "secondary-fixed": "#ffddb8",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-tint": "#005ac2",
+                        "tertiary-fixed": "#ffdbca",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container-low": "#eff4ff",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "outline": "#727785",
+                        "inverse-primary": "#adc6ff",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#341100",
+                        "on-tertiary-fixed-variant": "#783200",
+                        "inverse-surface": "#213145",
+                        "surface-container": "#e5eeff",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-surface-variant": "#424754",
+                        "primary": "#0058be",
+                        "on-secondary-container": "#684000",
+                        "primary-container": "#2170e4",
+                        "on-background": "#0b1c30",
+                        "on-surface": "#0b1c30",
+                        "tertiary-fixed-dim": "#ffb690",
+                        "surface-bright": "#f8f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-desktop": "40px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "stack-sm": "8px",
+                        "stack-md": "16px",
+                        "margin-mobile": "16px",
+                        "stack-lg": "32px",
+                        "unit": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "headline-lg-mobile": ["Lexend"],
+                        "label-md": ["Lexend"],
+                        "body-lg": ["Lexend"],
+                        "display-lg": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "headline-lg": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #0058be;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #0058be;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen p-4 gap-stack-md fixed left-0 top-0 z-50 bg-surface-container-lowest dark:bg-inverse-surface shadow-md docked left-0 h-full w-64">
+<div class="flex items-center gap-3 mb-8 px-4 mt-2">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-headline-md">
+                L
+            </div>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-black">Lumina Academy</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Teacher Portal</p>
+</div>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-on-primary rounded-lg py-3 px-4 font-label-md text-label-md font-bold mb-4 flex items-center justify-center gap-2 transition-all active:scale-95 duration-150 border-b-2 border-on-primary-fixed-variant">
+<span class="material-symbols-outlined text-lg">add</span>
+            New Lesson
+        </button>
+<ul class="flex flex-col gap-2 flex-grow font-label-md text-label-md">
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+                    Classes
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+                    Vocabulary
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+                    Assignments
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-lg px-4 py-3 font-bold hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                    Settings
+                </a>
+</li>
+</ul>
+<ul class="flex flex-col gap-2 mt-auto font-label-md text-label-md border-t border-outline-variant pt-4">
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                    Help Center
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                    Logout
+                </a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-64 flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface-dim shadow-sm flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-4 sticky top-0 z-40 docked full-width top-0">
+<div class="md:hidden flex items-center gap-3">
+<span class="font-headline-md text-headline-md-mobile text-primary font-bold">Lumina Learning</span>
+</div>
+<div class="hidden md:flex items-center">
+<!-- Breadcrumbs -->
+<nav aria-label="Breadcrumb" class="flex text-on-surface-variant font-label-md text-label-md">
+<ol class="inline-flex items-center space-x-1 md:space-x-2">
+<li class="inline-flex items-center">
+<a class="hover:text-primary transition-colors" href="#">Dashboard</a>
+</li>
+<li>
+<div class="flex items-center">
+<span class="material-symbols-outlined mx-1 text-sm">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">Settings</a>
+</div>
+</li>
+</ol>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-high transition-colors p-2 rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-high transition-colors p-2 rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<img alt="Teacher Profile Avatar" class="w-10 h-10 rounded-full border-2 border-primary-container object-cover" data-alt="A smiling female teacher with glasses in a modern classroom setting, well-lit, professional portrait, soft focus background, vibrant colors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0Qrr1tKXvlRDUBDTO-MA1_u6VdsCirSD27Pyktd84XGV9mpNHyJy58RVaS2tRR0Vw7afrHV9_hPbnhoUGn0YKuin6zSnqqR5ctKGqpNSQkkUCqXmR-VbPPkSF1sqlgbJeorrDPF5zBYyTxRNk9iAqFDEmXkq0B7AX-dyjqaySrkbCBxsVb5X1AYWatQ_tuDTqgJhjH2auP7r1tcdfM-nXqoq_STXYBOR0XiIcQaK2imZIOGJfujJjpQ"/>
+</div>
+</header>
+<!-- Canvas -->
+<div class="flex-1 p-margin-mobile md:p-margin-desktop bg-surface-container-low">
+<div class="max-w-[1024px] mx-auto">
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg mb-6 text-on-surface">Settings</h1>
+<!-- Secondary Nav Tabs -->
+<nav class="flex space-x-8 border-b border-outline-variant mb-stack-lg overflow-x-auto pb-1 scrollbar-hide">
+<a class="font-label-md text-label-md text-on-surface-variant font-medium pb-2 hover:text-primary transition-colors whitespace-nowrap" href="#">Profile</a>
+<a class="font-label-md text-label-md text-on-surface-variant font-medium pb-2 hover:text-primary transition-colors whitespace-nowrap" href="#">Organization</a>
+<a class="font-label-md text-label-md text-primary font-bold border-b-2 border-primary pb-2 whitespace-nowrap" href="#">Notifications</a>
+<a class="font-label-md text-label-md text-on-surface-variant font-medium pb-2 hover:text-primary transition-colors whitespace-nowrap" href="#">Security</a>
+</nav>
+<div class="flex flex-col gap-stack-lg">
+<!-- General Alerts Card -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 p-6 md:p-8">
+<div class="mb-6 border-b border-outline-variant/20 pb-4">
+<h2 class="font-headline-md text-headline-md mb-2 flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-primary">campaign</span>
+                                General Alerts
+                            </h2>
+<p class="text-body-md font-body-md text-on-surface-variant">Manage high-level notifications for platform updates and announcements.</p>
+</div>
+<div class="space-y-6">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface font-semibold">System Announcements</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant font-normal mt-1">Important updates regarding platform maintenance and downtime.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out border-outline checked:translate-x-full checked:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2" id="toggle_sys_ann" name="toggle_sys_ann" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-outline-variant cursor-pointer transition-colors duration-200 ease-in-out" for="toggle_sys_ann"></label>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface font-semibold">New Feature Updates</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant font-normal mt-1">Be the first to know about new tools and capabilities.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out border-outline checked:translate-x-full checked:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2" id="toggle_feat" name="toggle_feat" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-outline-variant cursor-pointer transition-colors duration-200 ease-in-out" for="toggle_feat"></label>
+</div>
+</div>
+</div>
+</section>
+<!-- Class Activity Card -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 p-6 md:p-8">
+<div class="mb-6 border-b border-outline-variant/20 pb-4">
+<h2 class="font-headline-md text-headline-md mb-2 flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-secondary-container">local_library</span>
+                                Class Activity
+                            </h2>
+<p class="text-body-md font-body-md text-on-surface-variant">Control notifications for specific student actions and classroom events.</p>
+</div>
+<div class="space-y-6">
+<!-- Item 1 -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3 border-b border-outline-variant/10 last:border-0">
+<div class="flex-1">
+<h3 class="font-label-md text-label-md text-on-surface font-semibold">New Student Joined</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant font-normal mt-1">Alerts when a new student enrolls in your active classes.</p>
+</div>
+<div class="flex items-center gap-6">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 text-primary rounded border-outline-variant focus:ring-primary focus:ring-offset-1" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface">Email</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 text-primary rounded border-outline-variant focus:ring-primary focus:ring-offset-1" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface">Push</span>
+</label>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3 border-b border-outline-variant/10 last:border-0">
+<div class="flex-1">
+<h3 class="font-label-md text-label-md text-on-surface font-semibold">Assignment Submitted</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant font-normal mt-1">Notifications for newly submitted homework or tests.</p>
+</div>
+<div class="flex items-center gap-6">
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="form-checkbox h-5 w-5 text-primary rounded border-outline-variant focus:ring-primary focus:ring-offset-1" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface">Email</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 text-primary rounded border-outline-variant focus:ring-primary focus:ring-offset-1" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface">Push</span>
+</label>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-3 border-b border-outline-variant/10 last:border-0">
+<div class="flex-1">
+<h3 class="font-label-md text-label-md text-on-surface font-semibold">Student Help Request</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant font-normal mt-1">Immediate alerts when a student requests assistance in a module.</p>
+</div>
+<div class="flex items-center gap-6">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 text-primary rounded border-outline-variant focus:ring-primary focus:ring-offset-1" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface">Email</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 text-primary rounded border-outline-variant focus:ring-primary focus:ring-offset-1" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface">Push</span>
+</label>
+</div>
+</div>
+</div>
+</section>
+<!-- Reporting & Analytics Card -->
+<section class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 p-6 md:p-8">
+<div class="mb-6 border-b border-outline-variant/20 pb-4">
+<h2 class="font-headline-md text-headline-md mb-2 flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-primary">insights</span>
+                                Reporting &amp; Analytics
+                            </h2>
+<p class="text-body-md font-body-md text-on-surface-variant">Schedule automated reports delivered to your inbox.</p>
+</div>
+<div class="space-y-6">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface font-semibold">Weekly Class Performance Summary</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant font-normal mt-1">Receive an overview of class engagement every Friday.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out border-outline checked:translate-x-full checked:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2" id="toggle_weekly" name="toggle_weekly" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-outline-variant cursor-pointer transition-colors duration-200 ease-in-out" for="toggle_weekly"></label>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface font-semibold">Monthly Student Progress Digest</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant font-normal mt-1">Detailed breakdown of individual student advancements.</p>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out border-outline checked:translate-x-full checked:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2" id="toggle_monthly" name="toggle_monthly" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-outline-variant cursor-pointer transition-colors duration-200 ease-in-out" for="toggle_monthly"></label>
+</div>
+</div>
+</div>
+</section>
+<!-- Action Bar -->
+<div class="flex justify-end mt-4 mb-12">
+<button class="bg-primary hover:bg-primary/90 text-on-primary rounded-lg py-3 px-8 font-label-md text-label-md font-bold transition-all active:scale-95 duration-150 border-b-2 border-on-primary-fixed-variant shadow-sm hover:shadow-md">
+                            Save Changes
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

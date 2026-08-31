@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Import Summary &amp; Audit Log - Lumina Learning</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#f8f9ff",
+                      "on-primary-fixed-variant": "#004395",
+                      "error": "#ba1a1a",
+                      "on-secondary-fixed-variant": "#653e00",
+                      "on-primary-container": "#fefcff",
+                      "outline-variant": "#c2c6d6",
+                      "surface-container-low": "#eff4ff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "tertiary-container": "#c05400",
+                      "primary-fixed-dim": "#adc6ff",
+                      "surface-container": "#e5eeff",
+                      "inverse-primary": "#adc6ff",
+                      "on-error": "#ffffff",
+                      "primary-fixed": "#d8e2ff",
+                      "on-secondary-fixed": "#2a1700",
+                      "secondary-fixed": "#ffddb8",
+                      "surface-tint": "#005ac2",
+                      "error-container": "#ffdad6",
+                      "tertiary-fixed": "#ffdbca",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "on-surface-variant": "#424754",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-container": "#2170e4",
+                      "on-primary-fixed": "#001a42",
+                      "secondary-container": "#fea619",
+                      "on-secondary-container": "#684000",
+                      "primary": "#0058be",
+                      "on-primary": "#ffffff",
+                      "on-tertiary-fixed-variant": "#783200",
+                      "secondary": "#855300",
+                      "inverse-surface": "#213145",
+                      "surface-container-highest": "#d3e4fe",
+                      "background": "#f8f9ff",
+                      "on-background": "#0b1c30",
+                      "surface-container-high": "#dce9ff",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed-dim": "#ffb95f",
+                      "on-tertiary-container": "#fffbff",
+                      "tertiary-fixed-dim": "#ffb690",
+                      "on-surface": "#0b1c30",
+                      "surface-dim": "#cbdbf5",
+                      "on-tertiary-fixed": "#341100",
+                      "surface": "#f8f9ff",
+                      "surface-variant": "#d3e4fe",
+                      "outline": "#727785",
+                      "tertiary": "#994100"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "margin-mobile": "16px",
+                      "margin-desktop": "40px",
+                      "stack-sm": "8px",
+                      "unit": "8px",
+                      "stack-md": "16px",
+                      "container-max": "1280px",
+                      "stack-lg": "32px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Lexend"
+                      ],
+                      "headline-lg": [
+                              "Lexend"
+                      ],
+                      "headline-md": [
+                              "Lexend"
+                      ],
+                      "label-sm": [
+                              "Lexend"
+                      ],
+                      "body-md": [
+                              "Lexend"
+                      ],
+                      "headline-lg-mobile": [
+                              "Lexend"
+                      ],
+                      "body-lg": [
+                              "Lexend"
+                      ],
+                      "label-md": [
+                              "Lexend"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Lexend', sans-serif;
+            background-color: #F0F9FF; /* Sky Blue Background */
+        }
+        
+        .shadow-ambient {
+            box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04);
+        }
+
+        .shadow-hover {
+            box-shadow: 0 8px 24px rgba(0, 88, 190, 0.08), 0 4px 8px rgba(11, 28, 48, 0.06);
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background-color: #0058be;
+            color: #ffffff;
+            border-bottom: 2px solid #004395;
+            transition: all 0.15s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(1px);
+            border-bottom-width: 1px;
+            margin-top: 1px;
+        }
+        
+        .btn-primary:active {
+            transform: translateY(2px);
+            border-bottom-width: 0px;
+            margin-top: 2px;
+        }
+
+        .btn-secondary {
+            background-color: #fea619;
+            color: #ffffff;
+            border-bottom: 2px solid #c05400;
+            transition: all 0.15s ease;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(1px);
+            border-bottom-width: 1px;
+            margin-top: 1px;
+        }
+        
+        .btn-secondary:active {
+            transform: translateY(2px);
+            border-bottom-width: 0px;
+            margin-top: 2px;
+        }
+        
+        .card-border {
+            border: 1px solid #E2E8F0;
+        }
+        
+        /* Custom Scrollbar for table */
+        .table-scroll::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .table-scroll::-webkit-scrollbar-track {
+            background: #eff4ff;
+            border-radius: 4px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #c2c6d6;
+            border-radius: 4px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb:hover {
+            background: #727785;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex font-body-md">
+<!-- Side Navigation -->
+<aside class="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-surface-bright shadow-sm bg-surface-container-low p-4 gap-2 z-20">
+<div class="mb-8 px-4 flex flex-col gap-1 mt-2">
+<span class="font-headline-md text-headline-md font-bold text-primary">Lumina Learning</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">Admin Portal</span>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest rounded-full transition-colors scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined text-[24px] group-hover:text-primary transition-colors">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest rounded-full transition-colors scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined text-[24px] group-hover:text-primary transition-colors">school</span>
+<span class="font-label-md text-label-md">Classrooms</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary-container rounded-full font-bold scale-95 duration-150" href="#">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">menu_book</span>
+<span class="font-label-md text-label-md">Vocabulary Sets</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest rounded-full transition-colors scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined text-[24px] group-hover:text-primary transition-colors">assignment</span>
+<span class="font-label-md text-label-md">Assignments</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest rounded-full transition-colors scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined text-[24px] group-hover:text-primary transition-colors">analytics</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest rounded-full transition-colors scale-95 duration-150 group mt-auto" href="#">
+<span class="material-symbols-outlined text-[24px] group-hover:text-primary transition-colors">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest rounded-full transition-colors scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined text-[24px] group-hover:text-primary transition-colors">help</span>
+<span class="font-label-md text-label-md">Support</span>
+</a>
+</nav>
+</aside>
+<!-- Top App Bar -->
+<header class="fixed top-0 right-0 left-0 md:left-64 h-16 bg-surface-bright shadow-sm flex justify-between items-center px-gutter w-full z-10 transition-all">
+<!-- Mobile Menu Toggle (Visible only on small screens) -->
+<button class="md:hidden text-on-surface p-2 hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<!-- Navigation Links (Hidden on Mobile) -->
+<div class="hidden md:flex gap-6 h-full items-center">
+<a class="text-on-surface-variant hover:text-primary font-label-md text-label-md transition-colors h-full flex items-center px-2" href="#">Resource Hub</a>
+<a class="text-on-surface-variant hover:text-primary font-label-md text-label-md transition-colors h-full flex items-center px-2" href="#">Quick Guide</a>
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-2 ml-auto md:ml-0">
+<button class="text-on-surface-variant hover:bg-surface-container-high rounded-full p-2 transition-all scale-98 hover:text-primary">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-high rounded-full p-2 transition-all scale-98 hover:text-primary">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 ml-0 md:ml-64 pt-16 pb-8 px-margin-mobile md:px-margin-desktop min-h-screen flex flex-col items-center">
+<div class="w-full max-w-container-max flex flex-col gap-stack-lg mt-8">
+<!-- Breadcrumbs & Header -->
+<div class="flex flex-col gap-4">
+<nav aria-label="Breadcrumb" class="flex text-on-surface-variant font-label-sm text-label-sm items-center space-x-2">
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-[16px]">arrow_back</span>
+                        Back to Vocabulary Sets
+                    </a>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">Bulk Import</a>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface font-semibold">Import History</span>
+</nav>
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="font-display-lg text-headline-lg-mobile md:text-display-lg text-on-surface">Import Summary &amp; Audit Log</h1>
+<p class="font-body-lg text-body-md md:text-body-lg text-on-surface-variant mt-2 max-w-2xl">
+                            Track the status of your vocabulary set bulk imports, review success rates, and resolve any errors encountered during processing.
+                        </p>
+</div>
+<div class="flex gap-3">
+<button class="bg-surface-container hover:bg-surface-container-high text-primary font-label-md text-label-md px-6 py-3 rounded-full flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined">download</span>
+                            Download Full Report
+                        </button>
+</div>
+</div>
+</div>
+<!-- Metric Cards (Bento style) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Total Words -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient card-border flex flex-col gap-4 hover:shadow-hover transition-all duration-300">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dataset</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Total Words Imported</h3>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">45,200</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center text-[#10B981]">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+                            +12% this month
+                        </span>
+</div>
+</div>
+<!-- Success Rate -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient card-border flex flex-col gap-4 hover:shadow-hover transition-all duration-300">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#10B981]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Success Rate</h3>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">98.4%</span>
+</div>
+<!-- Progress Bar -->
+<div class="w-full bg-[#DBEAFE] rounded-full h-3 mt-1">
+<div class="bg-[#10B981] h-3 rounded-full" style="width: 98.4%"></div>
+</div>
+</div>
+<!-- Recent Errors -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient card-border flex flex-col gap-4 hover:shadow-hover transition-all duration-300 relative overflow-hidden">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-error-container rounded-full opacity-20 blur-xl"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-error-container flex items-center justify-center text-error">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">error</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Recent Errors</h3>
+</div>
+<span class="bg-error-container text-on-error-container font-label-sm text-label-sm px-3 py-1 rounded-full">Requires Attention</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-display-lg text-headline-lg md:text-display-lg text-error">12</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">active issues</span>
+</div>
+</div>
+</div>
+<!-- Main Audit Log Table Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-ambient card-border flex flex-col overflow-hidden">
+<div class="p-6 border-b border-outline-variant flex flex-col sm:flex-row justify-between items-center gap-4 bg-surface-bright">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">list_alt</span>
+                        Recent Imports
+                    </h2>
+<div class="flex items-center gap-3 w-full sm:w-auto">
+<!-- Search Input -->
+<div class="relative w-full sm:w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border-2 border-outline-variant rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all font-body-md text-body-md placeholder:text-outline outline-none" placeholder="Search filenames..." type="text"/>
+</div>
+<!-- Filter Button -->
+<button class="bg-surface-container hover:bg-surface-container-high text-on-surface p-2 rounded-xl transition-colors border border-outline-variant flex-shrink-0">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</div>
+<!-- Table Container with Custom Scrollbar -->
+<div class="overflow-x-auto table-scroll w-full">
+<table class="w-full text-left border-collapse min-w-[900px]">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
+<th class="p-4 pl-6 font-semibold whitespace-nowrap">Date &amp; Time</th>
+<th class="p-4 font-semibold whitespace-nowrap">Filename</th>
+<th class="p-4 font-semibold whitespace-nowrap">Imported By</th>
+<th class="p-4 font-semibold whitespace-nowrap text-right">Total Records</th>
+<th class="p-4 font-semibold whitespace-nowrap text-center">Success / Failed</th>
+<th class="p-4 font-semibold whitespace-nowrap">Status</th>
+<th class="p-4 pr-6 font-semibold text-right whitespace-nowrap">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md text-on-surface divide-y divide-outline-variant">
+<!-- Row 1: Processing -->
+<tr class="hover:bg-surface-container-lowest transition-colors group relative">
+<td class="p-4 pl-6 whitespace-nowrap">
+<div class="flex flex-col">
+<span>Oct 24, 2023</span>
+<span class="text-on-surface-variant text-label-sm">14:32 PM</span>
+</div>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline">description</span>
+<span class="font-medium">spanish_verbs_intermediate_v2.csv</span>
+</div>
+</td>
+<td class="p-4 whitespace-nowrap flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-[10px]">EW</div>
+                                    Elena W.
+                                </td>
+<td class="p-4 text-right">450</td>
+<td class="p-4 text-center">
+<span class="text-outline-variant italic">Calculating...</span>
+</td>
+<td class="p-4">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                                        Processing
+                                    </div>
+</td>
+<td class="p-4 pr-6 text-right">
+<button class="text-outline hover:text-primary transition-colors p-2" disabled="" title="More options">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2: Completed with Errors -->
+<tr class="hover:bg-surface-container-lowest transition-colors group relative bg-error-container/10">
+<td class="p-4 pl-6 whitespace-nowrap">
+<div class="flex flex-col">
+<span>Oct 23, 2023</span>
+<span class="text-on-surface-variant text-label-sm">09:15 AM</span>
+</div>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline">description</span>
+<span class="font-medium">french_vocabulary_a1.xlsx</span>
+</div>
+</td>
+<td class="p-4 whitespace-nowrap flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-[10px]">SA</div>
+                                    Sarah A.
+                                </td>
+<td class="p-4 text-right font-medium">1,200</td>
+<td class="p-4 text-center">
+<div class="flex items-center justify-center gap-2">
+<span class="text-[#10B981] font-semibold">1,188</span>
+<span class="text-outline-variant">/</span>
+<span class="text-error font-semibold flex items-center gap-1">
+                                            12
+                                            <span class="material-symbols-outlined text-[14px]">warning</span>
+</span>
+</div>
+</td>
+<td class="p-4">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm border border-error/20">
+<span class="material-symbols-outlined text-[16px]">error</span>
+                                        Completed with Errors
+                                    </div>
+</td>
+<td class="p-4 pr-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="btn-secondary font-label-sm text-label-sm px-3 py-1.5 rounded-lg whitespace-nowrap">
+                                            View Errors
+                                        </button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2" title="More options">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: Completed Successfully -->
+<tr class="hover:bg-surface-container-lowest transition-colors group relative">
+<td class="p-4 pl-6 whitespace-nowrap">
+<div class="flex flex-col">
+<span>Oct 22, 2023</span>
+<span class="text-on-surface-variant text-label-sm">16:45 PM</span>
+</div>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline">description</span>
+<span class="font-medium">german_cases_advanced.csv</span>
+</div>
+</td>
+<td class="p-4 whitespace-nowrap flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-bold text-[10px]">MJ</div>
+                                    Marcus J.
+                                </td>
+<td class="p-4 text-right font-medium">850</td>
+<td class="p-4 text-center">
+<div class="flex items-center justify-center gap-2">
+<span class="text-[#10B981] font-semibold">850</span>
+<span class="text-outline-variant">/</span>
+<span class="text-outline-variant">0</span>
+</div>
+</td>
+<td class="p-4">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DBEAFE] text-[#047857] font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+                                        Completed
+                                    </div>
+</td>
+<td class="p-4 pr-6 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2" title="More options">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 4: Completed Successfully -->
+<tr class="hover:bg-surface-container-lowest transition-colors group relative">
+<td class="p-4 pl-6 whitespace-nowrap">
+<div class="flex flex-col">
+<span>Oct 20, 2023</span>
+<span class="text-on-surface-variant text-label-sm">11:20 AM</span>
+</div>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline">description</span>
+<span class="font-medium">japanese_n5_kanji.csv</span>
+</div>
+</td>
+<td class="p-4 whitespace-nowrap flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-[10px]">SA</div>
+                                    Sarah A.
+                                </td>
+<td class="p-4 text-right font-medium">103</td>
+<td class="p-4 text-center">
+<div class="flex items-center justify-center gap-2">
+<span class="text-[#10B981] font-semibold">103</span>
+<span class="text-outline-variant">/</span>
+<span class="text-outline-variant">0</span>
+</div>
+</td>
+<td class="p-4">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DBEAFE] text-[#047857] font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+                                        Completed
+                                    </div>
+</td>
+<td class="p-4 pr-6 text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2" title="More options">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 5: Failed Entirely -->
+<tr class="hover:bg-surface-container-lowest transition-colors group relative bg-error-container/5">
+<td class="p-4 pl-6 whitespace-nowrap">
+<div class="flex flex-col">
+<span>Oct 19, 2023</span>
+<span class="text-on-surface-variant text-label-sm">15:05 PM</span>
+</div>
+</td>
+<td class="p-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline">description</span>
+<span class="font-medium text-error">corrupted_data_export.csv</span>
+</div>
+</td>
+<td class="p-4 whitespace-nowrap flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-bold text-[10px]">MJ</div>
+                                    Marcus J.
+                                </td>
+<td class="p-4 text-right font-medium">--</td>
+<td class="p-4 text-center">
+<span class="text-error font-semibold">Failed to read</span>
+</td>
+<td class="p-4">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">cancel</span>
+                                        Failed
+                                    </div>
+</td>
+<td class="p-4 pr-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="text-primary hover:text-surface-tint font-label-sm text-label-sm px-3 py-1.5 rounded-lg flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">refresh</span>
+                                            Retry
+                                        </button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2" title="More options">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="p-4 border-t border-outline-variant bg-surface-bright flex flex-col sm:flex-row justify-between items-center gap-4">
+<span class="font-body-md text-label-md text-on-surface-variant">
+                        Showing <span class="font-semibold text-on-surface">1</span> to <span class="font-semibold text-on-surface">5</span> of <span class="font-semibold text-on-surface">128</span> entries
+                    </span>
+<div class="flex items-center gap-1">
+<button class="p-2 text-outline hover:bg-surface-container hover:text-on-surface rounded-lg transition-colors flex items-center" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm flex items-center justify-center">1</button>
+<button class="w-8 h-8 rounded-lg text-on-surface hover:bg-surface-container font-label-sm text-label-sm flex items-center justify-center transition-colors">2</button>
+<button class="w-8 h-8 rounded-lg text-on-surface hover:bg-surface-container font-label-sm text-label-sm flex items-center justify-center transition-colors">3</button>
+<span class="px-2 text-outline-variant">...</span>
+<button class="w-8 h-8 rounded-lg text-on-surface hover:bg-surface-container font-label-sm text-label-sm flex items-center justify-center transition-colors">26</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container hover:text-on-surface rounded-lg transition-colors flex items-center">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Announcement Analytics - Lumina Learning</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#d3e4fe",
+                        "on-surface": "#0b1c30",
+                        "inverse-primary": "#adc6ff",
+                        "on-background": "#0b1c30",
+                        "surface-variant": "#d3e4fe",
+                        "surface-bright": "#f8f9ff",
+                        "primary-container": "#2170e4",
+                        "primary-fixed-dim": "#adc6ff",
+                        "inverse-surface": "#213145",
+                        "secondary-container": "#fea619",
+                        "surface-container-low": "#eff4ff",
+                        "surface-dim": "#cbdbf5",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "background": "#f8f9ff",
+                        "tertiary-fixed-dim": "#ffb690",
+                        "on-surface-variant": "#424754",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#341100",
+                        "primary-fixed": "#d8e2ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "error": "#ba1a1a",
+                        "surface-tint": "#005ac2",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container": "#e5eeff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#994100",
+                        "on-error": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-container": "#fffbff",
+                        "secondary-fixed": "#ffddb8",
+                        "on-primary-container": "#fefcff",
+                        "secondary": "#855300",
+                        "on-secondary-fixed": "#2a1700",
+                        "on-secondary-container": "#684000",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-container-high": "#dce9ff",
+                        "outline-variant": "#c2c6d6",
+                        "tertiary-container": "#c05400",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#001a42",
+                        "primary": "#0058be",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "on-error-container": "#93000a",
+                        "outline": "#727785",
+                        "on-tertiary-fixed-variant": "#783200",
+                        "surface": "#f8f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "unit": "8px",
+                        "stack-md": "16px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px",
+                        "stack-lg": "32px",
+                        "gutter": "24px",
+                        "container-max": "1280px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Lexend"],
+                        "headline-lg-mobile": ["Lexend"],
+                        "display-lg": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "label-md": ["Lexend"],
+                        "headline-lg": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "body-lg": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #F0F9FF; }
+        .shadow-ambient {
+            box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(66, 71, 84, 0.04);
+        }
+        .shadow-hover:hover {
+            box-shadow: 0 8px 24px rgba(0, 88, 190, 0.08), 0 4px 8px rgba(66, 71, 84, 0.04);
+            transform: translateY(-2px);
+        }
+        .btn-pressable {
+            border-bottom: 3px solid #004395;
+            transition: all 0.1s ease;
+        }
+        .btn-pressable:active {
+            border-bottom-width: 0px;
+            transform: translateY(3px);
+            margin-bottom: 3px;
+        }
+        
+        /* Bar chart styles */
+        .bar-container { width: 100%; height: 12px; background-color: #dce9ff; border-radius: 9999px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 9999px; transition: width 1s ease-out; }
+    </style>
+</head>
+<body class="font-body-md text-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar Navigation -->
+<nav class="hidden md:flex flex-col h-screen p-4 gap-stack-md fixed left-0 top-0 z-50 bg-surface-container-lowest dark:bg-inverse-surface w-64 shadow-md transition-all duration-300">
+<div class="flex items-center gap-3 px-4 py-2">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined font-bold text-2xl">school</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-black leading-tight tracking-tight">Lumina Academy</h1>
+<p class="text-label-sm text-on-surface-variant font-label-sm">Teacher Portal</p>
+</div>
+</div>
+<button class="w-full mt-2 bg-primary text-on-primary font-label-md text-label-md rounded-lg py-3 btn-pressable flex items-center justify-center gap-2 hover:bg-primary-fixed-variant transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                New Lesson
+            </button>
+<div class="flex flex-col gap-1 mt-4 flex-1">
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-lg px-4 py-3 font-bold active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-md text-label-md">Classes</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="font-label-md text-label-md">Vocabulary</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-label-md text-label-md">Assignments</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<div class="mt-auto flex flex-col gap-1 pt-4 border-t border-outline-variant/30">
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Help Center</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 hover:bg-surface-container-high rounded-lg hover:translate-x-1 transition-transform active:scale-98 duration-200 text-error" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-0 md:ml-64 h-full overflow-y-auto bg-[#F0F9FF] px-margin-mobile md:px-margin-desktop py-8">
+<div class="max-w-container-max mx-auto space-y-stack-lg pb-12">
+<!-- Header -->
+<header class="flex flex-col gap-2">
+<button class="flex items-center gap-2 text-primary font-label-md text-label-md hover:text-primary-fixed-variant transition-colors w-fit group">
+<span class="material-symbols-outlined group-hover:-translate-x-1 transition-transform text-lg">arrow_back</span>
+                        Back to Dashboard
+                    </button>
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mt-2">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Announcement Analytics</h2>
+<p class="text-on-surface-variant font-body-lg text-body-lg mt-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-container" style="font-variation-settings: 'FILL' 1;">campaign</span>
+                                Campus Closure due to Extreme Weather
+                            </p>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-lowest text-primary px-4 py-2 rounded-lg font-label-md text-label-md border border-primary/20 hover:bg-surface-container-low transition-colors shadow-ambient flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">download</span> Export
+                            </button>
+</div>
+</div>
+</header>
+<!-- KPIs -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Total Reach -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient shadow-hover transition-all duration-300 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-primary-container/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="p-3 bg-surface-container-high rounded-xl text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">visibility</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[#10B981] bg-[#10B981]/10 px-2 py-1 rounded-full text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +15%
+                            </span>
+</div>
+<div class="relative z-10">
+<p class="text-on-surface-variant font-label-md text-label-md">Total Reach</p>
+<h3 class="font-display-lg text-display-lg text-on-surface mt-1">12,450</h3>
+</div>
+</div>
+<!-- Open Rate -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient shadow-hover transition-all duration-300 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-secondary-container/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="p-3 bg-surface-container-high rounded-xl text-secondary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">drafts</span>
+</div>
+<span class="inline-flex items-center gap-1 text-primary bg-primary/10 px-2 py-1 rounded-full text-label-sm font-label-sm">
+                                High
+                            </span>
+</div>
+<div class="relative z-10">
+<p class="text-on-surface-variant font-label-md text-label-md">Open Rate</p>
+<h3 class="font-display-lg text-display-lg text-on-surface mt-1">82%</h3>
+</div>
+</div>
+<!-- Click-Through Rate -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient shadow-hover transition-all duration-300 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-[#10B981]/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="p-3 bg-surface-container-high rounded-xl text-[#10B981]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">ads_click</span>
+</div>
+</div>
+<div class="relative z-10">
+<p class="text-on-surface-variant font-label-md text-label-md">Click-Through Rate</p>
+<h3 class="font-display-lg text-display-lg text-on-surface mt-1">45%</h3>
+</div>
+</div>
+<!-- Avg Time Spent -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient shadow-hover transition-all duration-300 relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-tertiary-container/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="p-3 bg-surface-container-high rounded-xl text-tertiary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">timer</span>
+</div>
+</div>
+<div class="relative z-10">
+<p class="text-on-surface-variant font-label-md text-label-md">Avg. Time Spent</p>
+<h3 class="font-headline-lg text-headline-lg text-on-surface mt-1 pt-2">1m 24s</h3>
+</div>
+</div>
+</section>
+<!-- Chart & Audience Section -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Reach Over Time Chart (Mockup) -->
+<div class="lg:col-span-2 bg-surface-container-lowest rounded-xl p-6 shadow-ambient border border-surface-container-high">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Reach Over Time</h3>
+<select class="bg-surface-container-high text-on-surface rounded-lg border-none text-label-md font-label-md py-2 pl-3 pr-8 focus:ring-2 focus:ring-primary">
+<option>Last 7 Days</option>
+<option>Last 30 Days</option>
+</select>
+</div>
+<div class="h-[300px] w-full bg-surface-bright rounded-lg relative overflow-hidden border border-outline-variant/20 p-4 flex flex-col justify-end gap-2">
+<!-- Faux Chart Lines -->
+<div class="absolute left-0 bottom-0 w-full h-[60%] opacity-20" style="background: linear-gradient(to top, #2170e4 0%, transparent 100%); clip-path: polygon(0 80%, 10% 70%, 20% 90%, 30% 50%, 40% 60%, 50% 20%, 60% 40%, 70% 10%, 80% 30%, 90% 5%, 100% 15%, 100% 100%, 0 100%);"></div>
+<!-- Faux Grid -->
+<div class="w-full h-px bg-outline-variant/30 absolute bottom-[20%]"></div>
+<div class="w-full h-px bg-outline-variant/30 absolute bottom-[40%]"></div>
+<div class="w-full h-px bg-outline-variant/30 absolute bottom-[60%]"></div>
+<div class="w-full h-px bg-outline-variant/30 absolute bottom-[80%]"></div>
+<!-- Data Points Overlay -->
+<div class="relative w-full h-full flex items-end justify-between px-2 pb-2">
+<div class="w-2 h-2 rounded-full bg-primary mb-[20%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary mb-[30%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary mb-[10%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary mb-[50%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary mb-[40%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary mb-[80%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary mb-[60%] relative group">
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-label-sm px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Peak: 4,200</div>
+</div>
+</div>
+</div>
+<div class="flex justify-between mt-3 text-label-sm text-on-surface-variant px-2">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+</div>
+<!-- Audience Breakdown -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient border border-surface-container-high flex flex-col gap-6">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-4">Engagement by Role</h3>
+<div class="space-y-4">
+<!-- Teachers -->
+<div>
+<div class="flex justify-between text-label-md font-label-md mb-1">
+<span class="text-on-surface">Teachers</span>
+<span class="text-primary font-bold">95%</span>
+</div>
+<div class="bar-container">
+<div class="bar-fill bg-primary" style="width: 95%"></div>
+</div>
+</div>
+<!-- Students -->
+<div>
+<div class="flex justify-between text-label-md font-label-md mb-1">
+<span class="text-on-surface">Students</span>
+<span class="text-primary font-bold">78%</span>
+</div>
+<div class="bar-container">
+<div class="bar-fill bg-primary" style="width: 78%"></div>
+</div>
+</div>
+<!-- Parents -->
+<div>
+<div class="flex justify-between text-label-md font-label-md mb-1">
+<span class="text-on-surface">Parents</span>
+<span class="text-primary font-bold">65%</span>
+</div>
+<div class="bar-container">
+<div class="bar-fill bg-primary-fixed-dim" style="width: 65%"></div>
+</div>
+</div>
+</div>
+</div>
+<hr class="border-outline-variant/30 border-t-2 border-dotted"/>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-4">Top Classes</h3>
+<ul class="space-y-3">
+<li class="flex items-center justify-between p-3 bg-surface-bright rounded-lg border border-outline-variant/20 hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container/20 text-secondary-container flex items-center justify-center font-bold text-label-sm">1</div>
+<span class="font-label-md text-label-md text-on-surface">Class 9A</span>
+</div>
+<span class="text-[#10B981] font-bold text-label-md bg-[#10B981]/10 px-2 py-1 rounded-full">100%</span>
+</li>
+<li class="flex items-center justify-between p-3 bg-surface-bright rounded-lg border border-outline-variant/20 hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-bold text-label-sm">2</div>
+<span class="font-label-md text-label-md text-on-surface">Class 10C</span>
+</div>
+<span class="text-[#10B981] font-bold text-label-md bg-[#10B981]/10 px-2 py-1 rounded-full">98%</span>
+</li>
+<li class="flex items-center justify-between p-3 bg-surface-bright rounded-lg border border-outline-variant/20 hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-bold text-label-sm">3</div>
+<span class="font-label-md text-label-md text-on-surface">Class 11B</span>
+</div>
+<span class="text-primary font-bold text-label-md">94%</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Bottom Row: Interactions & Attachments -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter">
+<!-- Interactions & Sentiment -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient border border-surface-container-high">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6">Reactions &amp; Comments</h3>
+<div class="flex gap-4 mb-6">
+<div class="flex-1 bg-surface-bright p-4 rounded-xl border border-outline-variant/20 text-center shadow-sm">
+<span class="text-2xl block mb-1">👍</span>
+<span class="font-headline-md text-headline-md text-on-surface block">842</span>
+<span class="text-label-sm text-on-surface-variant">Got it</span>
+</div>
+<div class="flex-1 bg-surface-bright p-4 rounded-xl border border-outline-variant/20 text-center shadow-sm">
+<span class="text-2xl block mb-1">❤️</span>
+<span class="font-headline-md text-headline-md text-on-surface block">315</span>
+<span class="text-label-sm text-on-surface-variant">Thanks</span>
+</div>
+<div class="flex-1 bg-surface-bright p-4 rounded-xl border border-outline-variant/20 text-center shadow-sm">
+<span class="text-2xl block mb-1">❓</span>
+<span class="font-headline-md text-headline-md text-on-surface block">42</span>
+<span class="text-label-sm text-on-surface-variant">Questions</span>
+</div>
+</div>
+<h4 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">Top Comments Snippets</h4>
+<div class="space-y-3">
+<div class="p-3 bg-surface-container-low rounded-lg border-l-4 border-primary">
+<p class="text-body-md text-on-surface italic">"Will the makeup classes be scheduled for next weekend?"</p>
+<p class="text-label-sm text-on-surface-variant mt-1">— Student, Class 10A</p>
+</div>
+<div class="p-3 bg-surface-container-low rounded-lg border-l-4 border-secondary-container">
+<p class="text-body-md text-on-surface italic">"Thank you for the early notice. Stay safe everyone."</p>
+<p class="text-label-sm text-on-surface-variant mt-1">— Parent</p>
+</div>
+</div>
+</div>
+<!-- Attachments Performance -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-ambient border border-surface-container-high">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Attachments</h3>
+<span class="material-symbols-outlined text-primary bg-primary-container/20 p-2 rounded-lg">attachment</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b-2 border-outline-variant/20">
+<th class="py-3 px-2 font-label-md text-label-md text-on-surface-variant">File Name</th>
+<th class="py-3 px-2 font-label-md text-label-md text-on-surface-variant text-right">Downloads</th>
+<th class="py-3 px-2 font-label-md text-label-md text-on-surface-variant text-right">Rate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="border-b border-outline-variant/10 hover:bg-surface-bright transition-colors">
+<td class="py-3 px-2">
+<div class="flex items-center gap-3">
+<div class="p-2 bg-error/10 text-error rounded-lg">
+<span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Winter_Safety_Guide.pdf</p>
+<p class="text-label-sm text-on-surface-variant">2.4 MB</p>
+</div>
+</div>
+</td>
+<td class="py-3 px-2 text-right font-headline-md text-headline-md-mobile text-on-surface">5,204</td>
+<td class="py-3 px-2 text-right">
+<span class="inline-flex items-center gap-1 text-[#10B981] bg-[#10B981]/10 px-2 py-1 rounded-full text-label-sm font-label-sm">
+                                                41.8%
+                                            </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="py-3 px-2">
+<div class="flex items-center gap-3">
+<div class="p-2 bg-primary/10 text-primary rounded-lg">
+<span class="material-symbols-outlined text-sm">image</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Campus_Map_Closure_Zones.png</p>
+<p class="text-label-sm text-on-surface-variant">1.1 MB</p>
+</div>
+</div>
+</td>
+<td class="py-3 px-2 text-right font-headline-md text-headline-md-mobile text-on-surface">3,892</td>
+<td class="py-3 px-2 text-right">
+<span class="inline-flex items-center gap-1 text-primary bg-primary/10 px-2 py-1 rounded-full text-label-sm font-label-sm">
+                                                31.2%
+                                            </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

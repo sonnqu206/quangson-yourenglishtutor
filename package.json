@@ -1,0 +1,31 @@
+{
+  "name": "quang-son-english-tutor",
+  "version": "1.0.0",
+  "description": "LMS & Vocabulary Learning Platform - Quang Son - Your English Tutor",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "ruby -EUTF-8:UTF-8 server.rb 3000",
+    "start": "ruby -EUTF-8:UTF-8 server.rb 3000",
+    "serve": "ruby -EUTF-8:UTF-8 server.rb 3000"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.49.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "vite": "^5.4.14"
+  },
+  "keywords": [
+    "english",
+    "lms",
+    "vocabulary",
+    "flashcards",
+    "quiz",
+    "supabase",
+    "gemini-ai"
+  ],
+  "author": "Quang Son - Your English Tutor",
+  "license": "MIT"
+}

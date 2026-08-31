@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quang Son - Your English Tutor | Nền tảng Luyện thi Tiếng Anh vào 10</title>
+  
+  <!-- Google Fonts: Lexend -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  
+  <!-- Supabase JS Client & SheetJS (XLSX) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#0058be",
+            "on-primary": "#ffffff",
+            "primary-container": "#2170e4",
+            "on-primary-container": "#fefcff",
+            "primary-fixed": "#d8e2ff",
+            "secondary": "#855300",
+            "on-secondary": "#ffffff",
+            "secondary-container": "#fea619",
+            "on-secondary-container": "#684000",
+            "tertiary": "#994100",
+            "surface": "#f8f9ff",
+            "on-surface": "#0b1c30",
+            "on-surface-variant": "#424754",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "surface-container-high": "#dce9ff",
+            "surface-container-highest": "#d3e4fe",
+            "outline": "#727785",
+            "outline-variant": "#c2c6d6",
+            "error": "#ba1a1a",
+            "on-error": "#ffffff",
+            "error-container": "#ffdad6"
+          },
+          fontFamily: {
+            sans: ['Lexend', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
+          },
+          borderRadius: {
+            'DEFAULT': '1rem',
+            'lg': '1.5rem',
+            'xl': '2rem',
+            '2xl': '2.5rem',
+            '3xl': '3rem',
+            'full': '9999px'
+          },
+          spacing: {
+            'stack-sm': '8px',
+            'stack-md': '16px',
+            'stack-lg': '32px',
+            'container-max': '1280px',
+            'gutter': '24px',
+            'margin-desktop': '32px',
+            'margin-mobile': '16px'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Lexend', sans-serif;
+      background-color: #F0F9FF;
+      color: #0b1c30;
+    }
+    
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      user-select: none;
+    }
+    
+    .material-symbols-outlined.filled {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    /* Ambient Soft Shadows */
+    .ambient-shadow {
+      box-shadow: 0 4px 14px rgba(0, 88, 190, 0.07), 0 2px 4px rgba(11, 28, 48, 0.04);
+    }
+    
+    .hover-lift {
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .hover-lift:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 88, 190, 0.12), 0 4px 8px rgba(11, 28, 48, 0.06);
+    }
+
+    /* 3D Button Press */
+    .btn-press {
+      border-bottom: 2px solid rgba(0, 0, 0, 0.15);
+      transition: all 0.1s ease;
+    }
+    .btn-press:active {
+      transform: translateY(2px);
+      border-bottom-width: 0px;
+    }
+
+    /* 3D Flashcard Styles */
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    .transform-style-3d {
+      transform-style: preserve-3d;
+    }
+    .backface-hidden {
+      backface-visibility: hidden;
+    }
+    .rotate-y-180 {
+      transform: rotateY(180deg);
+    }
+    .flashcard.is-flipped {
+      transform: rotateY(180deg);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c2c6d6;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #727785;
+    }
+  </style>
+</head>
+
+<body class="h-full flex flex-col md:flex-row antialiased overflow-x-hidden">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Sidebar Navigation (Desktop) -->
+  <aside class="hidden md:flex flex-col h-screen w-72 bg-surface-container-lowest border-r border-outline-variant/30 ambient-shadow fixed left-0 top-0 bottom-0 p-5 z-40">
+    
+    <!-- Logo & Brand Header -->
+    <div class="flex items-center gap-3 mb-6 px-2">
+      <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary flex items-center justify-center font-bold text-xl shadow-md">
+        <span class="material-symbols-outlined text-2xl">school</span>
+      </div>
+      <div>
+        <h1 class="font-headline-md text-base font-bold text-primary leading-tight">Quang Son</h1>
+        <p class="font-label-sm text-xs font-semibold text-secondary">Your English Tutor</p>
+      </div>
+    </div>
+
+    <!-- Quick Action: Open Batch Table Input (Admin/Teacher Only) -->
+    <button id="sidebar-batch-btn" onclick="App.openBatchTableModal()" class="w-full bg-primary text-on-primary rounded-xl py-3 px-4 font-bold text-sm btn-press flex items-center justify-center gap-2 mb-5 hover-lift shadow-sm">
+      <span class="material-symbols-outlined text-lg">table_rows</span>
+      + Thêm Từ Dạng Bảng
+    </button>
+
+    <!-- Main Navigation Menu -->
+    <nav class="flex-1 space-y-1.5 overflow-y-auto pr-1">
+      <p class="px-3 text-[11px] font-bold uppercase tracking-wider text-outline mb-1">Học Tập & Lớp Học</p>
+      
+      <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" data-nav-tab="dashboard" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">dashboard</span>
+        <span class="font-medium">Trang Chủ & Lớp Học</span>
+      </a>
+
+      <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" data-nav-tab="vocabulary" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">menu_book</span>
+        <span class="font-medium">Kho Từ Vựng (Lớp Em)</span>
+      </a>
+
+      <!-- Admin-Only Management Links -->
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('classes')" data-nav-tab="classes" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">groups</span>
+        <span class="font-medium">Lớp Học & Học Viên</span>
+      </a>
+
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('accounts')" data-nav-tab="accounts" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">manage_accounts</span>
+        <span class="font-medium">Quản Lý & Cấp Tài Khoản</span>
+      </a>
+
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('lessons')" data-nav-tab="lessons" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">auto_stories</span>
+        <span class="font-medium">Quản Lý Bài Học</span>
+      </a>
+
+      <a href="javascript:void(0)" data-admin-only onclick="App.switchTab('table_input')" data-nav-tab="table_input" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">table_rows</span>
+        <span class="font-medium">Bảng Nhập Từ Hàng Loạt</span>
+      </a>
+
+      <p class="px-3 text-[11px] font-bold uppercase tracking-wider text-outline mt-5 mb-1">Góc Luyện Thi Vào 10</p>
+
+      <a href="javascript:void(0)" onclick="App.switchTab('flashcards')" data-nav-tab="flashcards" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">style</span>
+        <span class="font-medium">Luyện Flashcard 3D</span>
+      </a>
+
+      <a href="javascript:void(0)" onclick="App.switchTab('quiz', { startNew: true, isRandom: true })" data-nav-tab="quiz" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">quiz</span>
+        <span class="font-medium">Bài Kiểm Tra (3 Dạng)</span>
+      </a>
+
+      <a href="javascript:void(0)" onclick="App.switchTab('reports')" data-nav-tab="reports" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">analytics</span>
+        <span class="font-medium">Báo Cáo & Tiến Độ</span>
+      </a>
+
+      <a href="javascript:void(0)" onclick="App.switchTab('tutor')" data-nav-tab="tutor" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-sm">
+        <span class="material-symbols-outlined text-xl">psychology</span>
+        <span class="font-medium">Gia Sư AI Quang Son</span>
+      </a>
+    </nav>
+
+    <!-- Logged in User Profile & Logout in Sidebar -->
+    <div class="mt-auto pt-4 border-t border-outline-variant/30 space-y-2">
+      <div id="sidebar-user-profile"></div>
+
+      <div class="flex items-center justify-between px-2 text-xs">
+        <a href="javascript:void(0)" onclick="App.switchTab('settings')" class="flex items-center gap-1.5 text-outline hover:text-primary">
+          <span class="material-symbols-outlined text-sm">settings</span> Cài đặt
+        </a>
+        <button onclick="App.handleLogout()" class="text-error font-bold hover:underline flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">logout</span> Đăng xuất
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Wrapper -->
+  <div class="flex-1 flex flex-col md:ml-72 min-h-screen relative">
+    
+    <!-- Top Bar -->
+    <header class="bg-surface-container-lowest/90 backdrop-blur-md sticky top-0 z-30 border-b border-outline-variant/30 px-margin-mobile md:px-margin-desktop py-3.5 flex items-center justify-between">
+      
+      <!-- Mobile Brand Header -->
+      <div class="flex items-center gap-3 md:hidden">
+        <div class="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold">
+          <span class="material-symbols-outlined text-xl">school</span>
+        </div>
+        <div>
+          <span class="font-bold text-sm text-primary block leading-none">Quang Son</span>
+          <span class="text-[10px] text-secondary font-semibold">Your English Tutor</span>
+        </div>
+      </div>
+
+      <!-- Desktop Breadcrumbs -->
+      <div class="hidden md:flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+        <span class="text-primary font-bold">Quang Son - Your English Tutor</span>
+        <span class="text-outline">/</span>
+        <span class="text-on-surface">Luyện Thi Tiếng Anh Vào 10 Chuyên Sâu</span>
+      </div>
+
+      <!-- Right Header Actions -->
+      <div class="flex items-center gap-3">
+        <button id="header-batch-btn" onclick="App.openBatchTableModal()" class="hidden sm:flex bg-primary/10 text-primary hover:bg-primary hover:text-on-primary px-3.5 py-1.5 rounded-full text-xs font-bold items-center gap-1.5 transition-all">
+          <span class="material-symbols-outlined text-sm">table_rows</span>
+          <span>Bảng Nhập Từ</span>
+        </button>
+
+        <button onclick="App.switchTab('tutor')" class="bg-secondary-container/20 text-secondary hover:bg-secondary-container hover:text-on-secondary-container px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all">
+          <span class="material-symbols-outlined text-sm">psychology</span>
+          <span>Gia sư AI</span>
+        </button>
+
+        <!-- User Badge -->
+        <div id="header-user-badge" class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-full border border-outline-variant/30"></div>
+        
+        <button onclick="App.handleLogout()" class="p-1.5 rounded-full bg-surface-container hover:bg-error-container/20 hover:text-error text-outline transition-colors" title="Đăng xuất">
+          <span class="material-symbols-outlined text-base">logout</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Container (Dynamic Rendering) -->
+    <main id="app-root" class="flex-1 p-margin-mobile md:p-margin-desktop bg-[#F0F9FF] flex flex-col">
+      <!-- Injected by src/app.js -->
+    </main>
+
+    <!-- Footer Copyright -->
+    <footer class="bg-surface-container-lowest border-t border-outline-variant/30 py-4 px-margin-mobile md:px-margin-desktop text-center text-xs text-on-surface-variant">
+      <div class="max-w-container-max mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <p class="font-medium">© 2026 Quang Son - Your English Tutor. All rights reserved.</p>
+        <p class="text-outline text-[11px]">Nền tảng Ôn thi Tiếng Anh vào 10 • Host Account & Cookies Authentication</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-lowest border-t border-outline-variant/30 z-50 px-2 py-2 flex justify-around shadow-lg">
+    <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" class="flex flex-col items-center p-1 text-on-surface-variant">
+      <span class="material-symbols-outlined text-xl">dashboard</span>
+      <span class="text-[10px] font-medium">Trang chủ</span>
+    </a>
+    <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" class="flex flex-col items-center p-1 text-on-surface-variant">
+      <span class="material-symbols-outlined text-xl">menu_book</span>
+      <span class="text-[10px] font-medium">Kho từ</span>
+    </a>
+    <a href="javascript:void(0)" onclick="App.switchTab('flashcards')" class="flex flex-col items-center p-1 text-on-surface-variant">
+      <span class="material-symbols-outlined text-xl">style</span>
+      <span class="text-[10px]">Flashcard</span>
+    </a>
+    <a href="javascript:void(0)" onclick="App.switchTab('tutor')" class="flex flex-col items-center p-1 text-on-surface-variant">
+      <span class="material-symbols-outlined text-xl">psychology</span>
+      <span class="text-[10px] font-medium">Gia sư AI</span>
+    </a>
+  </nav>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Modal: Học Sinh / Người Dùng Tự Đổi Mật Khẩu (Change My Password) -->
+  <div id="change-my-password-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-md w-full p-6 relative border border-outline-variant/30">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-headline-md text-base font-bold text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">key</span>
+          <span>Đổi Mật Khẩu Cá Nhân</span>
+        </h3>
+        <button onclick="App.closeModal('change-my-password-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="App.handleChangeMyPassword(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Mật Khẩu Hiện Tại (*)</label>
+          <input 
+            type="password" 
+            id="input-my-current-password" 
+            placeholder="Nhập mật khẩu đang dùng..." 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Mật Khẩu Mới (*)</label>
+          <input 
+            type="password" 
+            id="input-my-new-password" 
+            placeholder="Nhập mật khẩu mới (ít nhất 4 ký tự)..." 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Xác Nhận Mật Khẩu Mới (*)</label>
+          <input 
+            type="password" 
+            id="input-my-confirm-password" 
+            placeholder="Gõ lại mật khẩu mới..." 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+
+        <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30">
+          <button type="button" onclick="App.closeModal('change-my-password-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
+          <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Lưu Mật Khẩu Mới</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Cấp Tài Khoản Mới (Create User Modal - Host/Teacher) -->
+  <div id="create-user-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-md w-full p-6 relative border border-outline-variant/30">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-headline-md text-base font-bold text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">person_add</span>
+          <span>Cấp Tài Khoản Mới</span>
+        </h3>
+        <button onclick="App.closeModal('create-user-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="App.handleCreateUser(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Họ và Tên (*)</label>
+          <input 
+            type="text" 
+            id="input-user-fullname" 
+            placeholder="Ví dụ: Nguyễn Hoàng Minh" 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Tên Đăng Nhập / Username (*)</label>
+          <input 
+            type="text" 
+            id="input-user-username" 
+            placeholder="Ví dụ: minh_nguyen, trogiang_hoa..." 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-mono focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Mật Khẩu Ban Đầu (*)</label>
+          <input 
+            type="text" 
+            id="input-user-password" 
+            value="123456" 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-mono focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Vai Trò Người Dùng (*)</label>
+          <select id="input-user-role" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-bold">
+            <option value="student">🎓 Học sinh (Student)</option>
+            <option value="assistant_teacher">👩‍🏫 Giáo viên phụ / Trợ giảng (Assistant Teacher)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Lớp Học Phân Công (*)</label>
+          <select id="modal-user-class" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-bold"></select>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30">
+          <button type="button" onclick="App.closeModal('create-user-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
+          <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Cấp Tài Khoản</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Xem Lại Chi Tiết Bài Thi (Session Details Modal) -->
+  <div id="session-details-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-2xl w-full p-6 relative border border-outline-variant/30 flex flex-col max-h-[90vh]">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-headline-md text-base font-bold text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary">analytics</span>
+          <span>Chi Tiết Kết Quả Bài Làm</span>
+        </h3>
+        <button onclick="App.closeModal('session-details-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div id="session-details-content" class="flex-1 overflow-y-auto">
+        <!-- Injected dynamically by App.openSessionDetailsModal -->
+      </div>
+
+      <div class="pt-3 border-t border-outline-variant/30 flex justify-end">
+        <button onclick="App.closeModal('session-details-modal')" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Xác nhận rời khỏi bài kiểm tra (Exit Quiz Confirmation) -->
+  <div id="exit-quiz-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-md w-full p-6 relative border border-outline-variant/30">
+      <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-2xl mx-auto mb-3">
+        <span class="material-symbols-outlined text-2xl">warning</span>
+      </div>
+      <h3 class="font-headline-md text-base font-bold text-on-surface text-center mb-2">Xác nhận thoát bài kiểm tra</h3>
+      <p class="text-xs text-on-surface-variant text-center mb-6 leading-relaxed">
+        Bạn có chắc muốn thoát? Tiến trình làm bài hiện tại sẽ không được lưu.
+      </p>
+      <div class="flex items-center gap-3">
+        <button type="button" onclick="App.closeModal('exit-quiz-modal')" class="flex-1 py-2.5 rounded-xl border border-outline-variant text-on-surface font-bold text-xs hover:bg-surface-container transition-colors text-center">
+          Tiếp tục làm bài
+        </button>
+        <button type="button" onclick="App.confirmExitQuiz()" class="flex-1 bg-error text-on-error py-2.5 rounded-xl font-bold text-xs btn-press hover:bg-red-700 transition-colors text-center">
+          Đồng ý thoát
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Tạo Lớp Học Mới -->
+  <div id="create-class-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-md w-full p-6 relative border border-outline-variant/30">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-headline-md text-base font-bold text-on-surface">Tạo Lớp Học Mới</h3>
+        <button onclick="App.closeModal('create-class-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="App.handleCreateClass(event)" class="space-y-4 text-sm">
+        <div>
+          <label class="block font-bold text-xs text-on-surface mb-1">Tên Lớp Học (*)</label>
+          <input 
+            type="text" 
+            id="input-class-name" 
+            placeholder="Ví dụ: Lớp 9A1 - Luyện đề Chuyên Anh 2026" 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+        <div>
+          <label class="block font-bold text-xs text-on-surface mb-1">Mã Lớp Tự Chọn (Tùy chọn)</label>
+          <input 
+            type="text" 
+            id="input-class-code" 
+            placeholder="Để trống hệ thống sẽ tự sinh mã" 
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-mono uppercase focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+        <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30">
+          <button type="button" onclick="App.closeModal('create-class-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
+          <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Tạo Lớp Học</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Tạo Bài Học Mới -->
+  <div id="create-lesson-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-md w-full p-6 relative border border-outline-variant/30">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-headline-md text-base font-bold text-on-surface">Thêm Bài Học Mới</h3>
+        <button onclick="App.closeModal('create-lesson-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="App.handleCreateLesson(event)" class="space-y-4 text-sm">
+        <div>
+          <label class="block font-bold text-xs text-on-surface mb-1">Chọn Lớp Học (*)</label>
+          <select id="modal-lesson-class" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-bold"></select>
+        </div>
+        <div>
+          <label class="block font-bold text-xs text-on-surface mb-1">Tiêu Đề Bài Học (*)</label>
+          <input 
+            type="text" 
+            id="input-lesson-title" 
+            placeholder="Ví dụ: Unit 6: Viet Nam Then and Now" 
+            required
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs"
+          />
+        </div>
+        <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30">
+          <button type="button" onclick="App.closeModal('create-lesson-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
+          <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Thêm Bài Học</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main ES Module Script -->
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

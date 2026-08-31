@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bulk Import Vocabulary - Lumina Learning</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-error": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "on-secondary-fixed": "#2a1700",
+                      "error": "#ba1a1a",
+                      "inverse-surface": "#213145",
+                      "surface-tint": "#005ac2",
+                      "tertiary-fixed-dim": "#ffb690",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-primary-container": "#fefcff",
+                      "on-tertiary-fixed-variant": "#783200",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#fea619",
+                      "on-surface": "#0b1c30",
+                      "primary-fixed": "#d8e2ff",
+                      "primary-container": "#2170e4",
+                      "tertiary-container": "#c05400",
+                      "surface-variant": "#d3e4fe",
+                      "on-primary": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "surface-container-high": "#dce9ff",
+                      "outline": "#727785",
+                      "tertiary": "#994100",
+                      "on-tertiary-container": "#fffbff",
+                      "on-primary-fixed-variant": "#004395",
+                      "surface-container-highest": "#d3e4fe",
+                      "primary": "#0058be",
+                      "on-primary-fixed": "#001a42",
+                      "on-surface-variant": "#424754",
+                      "inverse-primary": "#adc6ff",
+                      "secondary-fixed": "#ffddb8",
+                      "on-background": "#0b1c30",
+                      "on-secondary-fixed-variant": "#653e00",
+                      "surface-bright": "#f8f9ff",
+                      "surface-container-low": "#eff4ff",
+                      "primary-fixed-dim": "#adc6ff",
+                      "on-error-container": "#93000a",
+                      "surface": "#f8f9ff",
+                      "surface-container": "#e5eeff",
+                      "on-tertiary-fixed": "#341100",
+                      "on-secondary-container": "#684000",
+                      "tertiary-fixed": "#ffdbca",
+                      "on-secondary": "#ffffff",
+                      "secondary": "#855300",
+                      "secondary-fixed-dim": "#ffb95f",
+                      "outline-variant": "#c2c6d6",
+                      "surface-dim": "#cbdbf5",
+                      "background": "#f8f9ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "1rem",
+                      "lg": "2rem",
+                      "xl": "3rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "8px",
+                      "container-max": "1280px",
+                      "stack-md": "16px",
+                      "margin-mobile": "16px",
+                      "stack-sm": "8px",
+                      "gutter": "24px",
+                      "margin-desktop": "40px",
+                      "stack-lg": "32px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Lexend"
+                      ],
+                      "display-lg": [
+                              "Lexend"
+                      ],
+                      "body-lg": [
+                              "Lexend"
+                      ],
+                      "label-md": [
+                              "Lexend"
+                      ],
+                      "headline-lg-mobile": [
+                              "Lexend"
+                      ],
+                      "label-sm": [
+                              "Lexend"
+                      ],
+                      "headline-lg": [
+                              "Lexend"
+                      ],
+                      "headline-md": [
+                              "Lexend"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom Shadows for that "squishy" feel */
+        .shadow-soft {
+            box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04);
+        }
+        .shadow-soft-hover {
+            box-shadow: 0 8px 24px rgba(0, 88, 190, 0.12), 0 4px 8px rgba(11, 28, 48, 0.06);
+        }
+        
+        /* Button Press Effect */
+        .btn-press {
+            box-shadow: 0 4px 0 #004395; /* shadow using on-primary-fixed-variant */
+            transition: all 0.1s ease;
+        }
+        .btn-press:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #004395;
+        }
+        
+        .upload-zone-dashed {
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='48' ry='48' stroke='%23C2C6D6' stroke-width='2' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+            border-radius: 48px;
+        }
+        .upload-zone-dashed:hover {
+             background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='48' ry='48' stroke='%230058BE' stroke-width='2' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+        }
+    </style>
+</head>
+<body class="bg-background min-h-screen flex flex-col md:flex-row font-body-md text-on-surface">
+<!-- SideNavBar (Hidden on Mobile, Visible on Desktop) -->
+<nav class="hidden md:flex flex-col h-screen w-72 bg-surface-container-low shadow-sm z-50 p-stack-md fixed left-0 top-0">
+<div class="flex items-center gap-3 mb-8 px-4">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold">
+                L
+            </div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Lumina Admin</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Institutional Portal</p>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary rounded-lg py-3 px-4 font-bold btn-press flex items-center justify-center gap-2 mb-8 hover:scale-[1.02] transition-transform duration-200">
+<span class="material-symbols-outlined">add</span>
+            Create New Class
+        </button>
+<ul class="flex-1 space-y-2">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors hover:scale-[1.02] duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors hover:scale-[1.02] duration-200" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-body-md text-body-md">Classrooms</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary-container text-on-secondary-container font-bold shadow-sm hover:scale-[1.02] transition-transform duration-200" href="#">
+<span class="material-symbols-outlined filled">import_contacts</span>
+<span class="font-body-md text-body-md">Vocabulary Sets</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors hover:scale-[1.02] duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-body-md text-body-md">Assignments</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors hover:scale-[1.02] duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md text-body-md">Reports</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto border-t border-outline-variant pt-4 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors hover:scale-[1.02] duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors hover:scale-[1.02] duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-body-md text-body-md">Support</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-72 flex flex-col min-h-screen relative">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-stack-md sticky top-0 z-40 bg-surface border-b border-outline-variant">
+<div class="flex items-center gap-4">
+<button class="md:hidden p-2 rounded-full hover:bg-surface-container-high transition-all">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="hidden md:flex items-center bg-surface-container rounded-full px-4 py-2 w-64 shadow-inner">
+<span class="material-symbols-outlined text-outline mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 w-full font-body-md text-body-md text-on-surface placeholder-outline" placeholder="Search..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4 md:gap-6">
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Resource Hub</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Quick Guide</a>
+</nav>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-full hover:bg-surface-container-high transition-all hover:scale-[1.02] duration-200 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-2.5 h-2.5 bg-error rounded-full"></span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-container-high transition-all hover:scale-[1.02] duration-200">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="flex-1 p-margin-mobile md:p-margin-desktop max-w-container-max mx-auto w-full flex flex-col gap-stack-lg">
+<!-- Header Section -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-xl">arrow_back</span>
+<a class="font-label-md text-label-md font-medium hover:underline" href="#">Back to Vocabulary Sets</a>
+</div>
+<h2 class="font-display-lg text-display-lg text-on-surface mt-2">Bulk Import Vocabulary</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Upload your CSV or Excel file to add multiple words to your library at once.</p>
+</div>
+<!-- Stepper -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-soft flex items-center justify-between relative overflow-hidden border border-outline-variant/30">
+<div class="absolute top-1/2 left-0 w-full h-1 bg-surface-container-highest -z-10 -translate-y-1/2"></div>
+<!-- Step 1: Active -->
+<div class="flex flex-col items-center gap-2 bg-surface-container-lowest px-4 z-10">
+<div class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-label-md shadow-soft">1</div>
+<span class="font-label-md text-label-md font-bold text-primary">Upload File</span>
+</div>
+<!-- Step 2: Inactive -->
+<div class="flex flex-col items-center gap-2 bg-surface-container-lowest px-4 z-10">
+<div class="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-bold text-label-md">2</div>
+<span class="font-label-md text-label-md font-medium text-on-surface-variant">Map Fields</span>
+</div>
+<!-- Step 3: Inactive -->
+<div class="flex flex-col items-center gap-2 bg-surface-container-lowest px-4 z-10">
+<div class="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-bold text-label-md">3</div>
+<span class="font-label-md text-label-md font-medium text-on-surface-variant">Preview &amp; Validate</span>
+</div>
+</div>
+<!-- Content Area: Upload Step -->
+<div class="bg-surface-container-lowest rounded-xl p-8 shadow-soft border border-outline-variant/30 flex flex-col gap-6">
+<div class="flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface">Step 1: Upload Data</h3>
+<a class="flex items-center gap-2 font-label-md text-label-md text-primary hover:underline bg-surface-container px-4 py-2 rounded-full" href="#">
+<span class="material-symbols-outlined text-sm">download</span>
+                        Download Sample Template
+                    </a>
+</div>
+<!-- Drag & Drop Zone -->
+<div class="upload-zone-dashed h-80 flex flex-col items-center justify-center gap-4 bg-surface-bright hover:bg-surface-container-low transition-colors cursor-pointer relative overflow-hidden group">
+<div class="w-20 h-20 rounded-full bg-surface-container flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm">
+<span class="material-symbols-outlined text-5xl text-primary">cloud_upload</span>
+</div>
+<div class="text-center space-y-2">
+<p class="font-headline-md text-headline-md text-on-surface">Drag &amp; drop your file here</p>
+<p class="font-body-md text-body-md text-on-surface-variant">or <span class="text-primary font-bold hover:underline">browse files</span></p>
+</div>
+<div class="flex gap-2 mt-4">
+<span class="px-3 py-1 bg-surface-container-highest rounded-full font-label-sm text-label-sm text-on-surface-variant">.CSV</span>
+<span class="px-3 py-1 bg-surface-container-highest rounded-full font-label-sm text-label-sm text-on-surface-variant">.XLS</span>
+<span class="px-3 py-1 bg-surface-container-highest rounded-full font-label-sm text-label-sm text-on-surface-variant">.XLSX</span>
+</div>
+<input accept=".csv, .xls, .xlsx" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" type="file"/>
+</div>
+<!-- Bottom Action -->
+<div class="flex justify-end pt-4 border-t border-outline-variant/30">
+<button class="bg-surface-container-high text-on-surface-variant rounded-lg py-3 px-8 font-bold flex items-center justify-center gap-2 cursor-not-allowed opacity-70">
+                        Continue to Mapping
+                        <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<!-- Note: In a real app, this button becomes primary once a file is selected -->
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Visible on Mobile, Hidden on Desktop) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant z-50 px-2 py-2 flex justify-around shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+<a class="flex flex-col items-center p-2 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="font-label-sm text-[10px]">Dashboard</span>
+</a>
+<a class="flex flex-col items-center p-2 text-primary" href="#">
+<div class="bg-secondary-container/20 px-4 py-1 rounded-full mb-1">
+<span class="material-symbols-outlined filled">import_contacts</span>
+</div>
+<span class="font-label-sm text-[10px] font-bold">Vocab</span>
+</a>
+<a class="flex flex-col items-center p-2 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined mb-1">assignment</span>
+<span class="font-label-sm text-[10px]">Assignments</span>
+</a>
+<a class="flex flex-col items-center p-2 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined mb-1">account_circle</span>
+<span class="font-label-sm text-[10px]">Profile</span>
+</a>
+</nav>
+</body></html>

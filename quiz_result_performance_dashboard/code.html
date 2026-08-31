@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quiz Results - LingoFlow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+<script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed-variant": "#783200",
+                        "surface-bright": "#f8f9ff",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-container": "#fffbff",
+                        "primary-fixed-dim": "#adc6ff",
+                        "tertiary": "#994100",
+                        "on-surface": "#0b1c30",
+                        "tertiary-fixed-dim": "#ffb690",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#004395",
+                        "on-tertiary-fixed": "#341100",
+                        "on-background": "#0b1c30",
+                        "outline": "#727785",
+                        "surface-variant": "#d3e4fe",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "primary-container": "#2170e4",
+                        "surface-dim": "#cbdbf5",
+                        "primary-fixed": "#d8e2ff",
+                        "background": "#f8f9ff",
+                        "secondary-container": "#fea619",
+                        "outline-variant": "#c2c6d6",
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#fefcff",
+                        "on-primary-fixed": "#001a42",
+                        "secondary-fixed": "#ffddb8",
+                        "primary": "#0058be",
+                        "on-secondary-fixed": "#2a1700",
+                        "surface": "#f8f9ff",
+                        "tertiary-fixed": "#ffdbca",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#c05400",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-container": "#e5eeff",
+                        "inverse-primary": "#adc6ff",
+                        "on-error-container": "#93000a",
+                        "on-secondary-container": "#684000",
+                        "surface-container-low": "#eff4ff",
+                        "inverse-surface": "#213145",
+                        "on-secondary": "#ffffff",
+                        "on-surface-variant": "#424754",
+                        "surface-container-high": "#dce9ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface-tint": "#005ac2",
+                        "error-container": "#ffdad6",
+                        "secondary": "#855300"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "container-max": "1280px",
+                        "gutter": "24px",
+                        "margin-mobile": "16px",
+                        "stack-sm": "8px",
+                        "stack-md": "16px",
+                        "margin-desktop": "40px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Lexend"],
+                        "headline-md": ["Lexend"],
+                        "headline-lg-mobile": ["Lexend"],
+                        "headline-lg": ["Lexend"],
+                        "label-sm": ["Lexend"],
+                        "display-lg": ["Lexend"],
+                        "body-md": ["Lexend"],
+                        "body-lg": ["Lexend"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Lexend', sans-serif; }
+        .ambient-shadow { box-shadow: 0 4px 12px rgba(0, 88, 190, 0.06), 0 2px 4px rgba(11, 28, 48, 0.04); }
+        .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0, 88, 190, 0.08), 0 4px 8px rgba(11, 28, 48, 0.06); transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex font-body-md">
+<!-- SideNavBar (Suppressed due to context - Quiz Result is a transactional/focused end-point) -->
+<!-- However, prompt explicitly requests it, so we include it despite design system rules suggesting suppression. Rule 1 says use Exact match logic for active. -->
+<nav class="fixed left-0 top-0 bottom-0 flex flex-col p-stack-md z-40 bg-surface-container-lowest border-r border-outline-variant shadow-[2px_0_4px_rgba(0,0,0,0.04)] h-screen w-64 rounded-r-lg hidden md:flex">
+<div class="flex items-center gap-stack-md mb-stack-lg">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">L</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">LingoFlow Academy</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Language Learning</p>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-stack-sm">
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">school</span>
+<span class="font-label-md text-label-md">Classes</span>
+</a>
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md text-label-md">Students</span>
+</a>
+<a class="flex items-center gap-stack-md bg-primary-container text-on-primary-container rounded-lg px-stack-md py-stack-sm font-bold translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_stories</span>
+<span class="font-label-md text-label-md">Lessons</span>
+</a>
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">local_library</span>
+<span class="font-label-md text-label-md">My Classes</span>
+</a>
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">exercise</span>
+<span class="font-label-md text-label-md">Practice</span>
+</a>
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-label-md text-label-md">Stats</span>
+</a>
+</div>
+<div class="mt-auto flex flex-col gap-stack-sm">
+<button class="bg-secondary-container text-on-secondary-container font-label-md text-label-md py-2 px-4 rounded-lg font-bold mb-4 hover-lift">
+                Upgrade Plan
+            </button>
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Help</span>
+</a>
+<a class="flex items-center gap-stack-md text-on-surface-variant px-stack-md py-stack-sm hover:bg-surface-container-high transition-all duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-1 md:ml-64 p-margin-mobile md:p-margin-desktop bg-surface-bright flex flex-col items-center max-w-container-max mx-auto w-full">
+<!-- Header Section -->
+<div class="w-full max-w-4xl text-center mb-stack-lg">
+<h1 class="font-display-lg text-display-lg text-primary mb-stack-sm flex items-center justify-center gap-2">
+                Well Done! 🎉
+            </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                Unit 5: Technology &amp; Innovation completed
+            </p>
+</div>
+<!-- Statistics Grid -->
+<div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-gutter mb-stack-lg">
+<!-- Score Card -->
+<div class="bg-surface-container-lowest rounded-xl p-6 ambient-shadow hover-lift flex flex-col items-center justify-center border border-[#E2E8F0]">
+<div class="w-16 h-16 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-3xl">military_tech</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-1">Score</h3>
+<p class="font-headline-lg text-headline-lg text-primary">85%</p>
+</div>
+<!-- Time Card -->
+<div class="bg-surface-container-lowest rounded-xl p-6 ambient-shadow hover-lift flex flex-col items-center justify-center border border-[#E2E8F0]">
+<div class="w-16 h-16 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-3xl">timer</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-1">Time</h3>
+<p class="font-headline-lg text-headline-lg text-secondary">04:20</p>
+</div>
+<!-- Accuracy Card -->
+<div class="bg-surface-container-lowest rounded-xl p-6 ambient-shadow hover-lift flex flex-col items-center justify-center border border-[#E2E8F0]">
+<div class="w-16 h-16 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-3xl">fact_check</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-1">Accuracy</h3>
+<p class="font-headline-lg text-headline-lg text-tertiary">17/20</p>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-4 mb-stack-lg">
+<button class="bg-secondary-container text-on-secondary-container font-label-md text-label-md py-3 px-8 rounded-lg font-bold hover-lift">
+                Retake Quiz
+            </button>
+<button class="bg-primary text-on-primary font-label-md text-label-md py-3 px-8 rounded-lg font-bold border-b-2 border-primary-container hover-lift shadow-sm">
+                Back to Lessons
+            </button>
+</div>
+</main>
+</body></html>
