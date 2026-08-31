@@ -349,10 +349,11 @@ window.App = {
   },
 
   async handleDeleteUser(userId, name) {
-    if (!confirm(`Bạn có chắc muốn xóa tài khoản "${name}"?`)) return;
+    if (!confirm(`Bạn có chắc muốn xóa vĩnh viễn tài khoản "${name}"?`)) return;
     try {
       await AuthService.deleteUser(userId);
-      showToast(`Đã xóa tài khoản "${name}" thành công!`, "success");
+      state.usersList = (state.usersList || []).filter(u => u.id !== userId && u.username !== userId);
+      showToast(`Đã xóa vĩnh viễn tài khoản "${name}" thành công!`, "success");
       await this.loadAllData();
       this.render();
     } catch (e) {

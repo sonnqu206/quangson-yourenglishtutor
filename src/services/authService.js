@@ -7,6 +7,7 @@ import { getSupabase } from './supabaseService.js';
 
 const COOKIE_NAME = "QUANG_SON_AUTH_SESSION_V1";
 const STORAGE_USERS_KEY = "QUANG_SON_LMS_USERS_V4";
+const DELETED_USERS_KEY = "QUANG_SON_DELETED_USER_KEYS_V1";
 
 // Initial Default Accounts
 const INITIAL_USERS = [
@@ -89,6 +90,108 @@ const INITIAL_USERS = [
   }
 ];
 
+function getDeletedUserKeys() {
+  try {
+    const raw = localStorage.getItem(DELETED_USERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(k => String(k).toLowerCase().trim());
+    }
+  } catch (e) {}
+  return [];
+}
+
+function markUserAsDeleted(id, username) {
+  try {
+    const list = getDeletedUserKeys();
+    if (id && !list.includes(String(id).toLowerCase().trim())) {
+      list.push(String(id).toLowerCase().trim());
+    }
+    if (username && !list.includes(String(username).toLowerCase().trim())) {
+      list.push(String(username).toLowerCase().trim());
+    }
+    localStorage.setItem(DELETED_USERS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+function unmarkUserAsDeleted(id, username) {
+  try {
+    let list = getDeletedUserKeys();
+    const idClean = String(id || "").toLowerCase().trim();
+    const userClean = String(username || "").toLowerCase().trim();
+    list = list.filter(k => k !== idClean && k !== userClean);
+    localStorage.setItem(DELETED_USERS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+// Read and write users storage (Persistent, never resurrects deleted accounts)
+function getStoredUsers() {
+  const deletedKeys = getDeletedUserKeys();
+
+  try {
+    const raw = localStorage.getItem(STORAGE_USERS_KEY);
+    if (raw) {
+      let parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        let hasChanges = false;
+
+        // 0. Filter out any previously deleted users if they were stored
+        const filtered = parsed.filter(u => 
+          u.role === 'host' || 
+          (!deletedKeys.includes(String(u.id).toLowerCase()) && !deletedKeys.includes(String(u.username).toLowerCase()))
+        );
+        if (filtered.length !== parsed.length) {
+          parsed = filtered;
+          hasChanges = true;
+        }
+
+        // 1. Ensure Host account always exists with valid credentials
+        const hostIndex = parsed.findIndex(u => u.username === "sonnqu206" || u.role === "host");
+        if (hostIndex === -1) {
+          parsed.unshift(INITIAL_USERS[0]);
+          hasChanges = true;
+        } else {
+          // Always ensure Host credentials match
+          if (parsed[hostIndex].password !== "Son@04102006") {
+            parsed[hostIndex].password = "Son@04102006";
+            hasChanges = true;
+          }
+        }
+
+        // 2. Ensure initial users exist ONLY IF they were NEVER deleted by the user
+        for (const defUser of INITIAL_USERS) {
+          const isDeleted = deletedKeys.includes(defUser.id.toLowerCase()) || deletedKeys.includes(defUser.username.toLowerCase());
+          if (isDeleted) continue; // DO NOT RESURRECT DELETED USERS
+
+          const exists = parsed.some(u => 
+            u.username.toLowerCase() === defUser.username.toLowerCase() || 
+            u.id === defUser.id
+          );
+          if (!exists) {
+            parsed.push(defUser);
+            hasChanges = true;
+          }
+        }
+
+        if (hasChanges) {
+          localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(parsed));
+        }
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Error reading users:", e);
+  }
+
+  // Initialize first time only (excluding deleted)
+  const initial = INITIAL_USERS.filter(u => 
+    u.role === 'host' || 
+    (!deletedKeys.includes(u.id.toLowerCase()) && !deletedKeys.includes(u.username.toLowerCase()))
+  );
+  localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(initial));
+  return JSON.parse(JSON.stringify(initial));
+}
+
 // Helper to remove accents for flexible search
 function removeVietnameseTones(str) {
   if (!str) return "";
@@ -138,55 +241,6 @@ function deleteCookie(name) {
   }
 }
 
-// Read and write users storage (Persistent, with auto-healing for core accounts)
-function getStoredUsers() {
-  try {
-    const raw = localStorage.getItem(STORAGE_USERS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        let hasChanges = false;
-
-        // 1. Ensure Host account always exists with valid credentials
-        const hostIndex = parsed.findIndex(u => u.username === "sonnqu206" || u.role === "host");
-        if (hostIndex === -1) {
-          parsed.unshift(INITIAL_USERS[0]);
-          hasChanges = true;
-        } else {
-          // Always ensure Host credentials match
-          if (parsed[hostIndex].password !== "Son@04102006") {
-            parsed[hostIndex].password = "Son@04102006";
-            hasChanges = true;
-          }
-        }
-
-        // 2. Ensure essential default accounts (Assistant teacher & Students) exist if not present
-        for (const defUser of INITIAL_USERS) {
-          const exists = parsed.some(u => 
-            u.username.toLowerCase() === defUser.username.toLowerCase() || 
-            u.id === defUser.id
-          );
-          if (!exists) {
-            parsed.push(defUser);
-            hasChanges = true;
-          }
-        }
-
-        if (hasChanges) {
-          localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(parsed));
-        }
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn("Error reading users:", e);
-  }
-
-  // Initialize first time only
-  localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(INITIAL_USERS));
-  return JSON.parse(JSON.stringify(INITIAL_USERS));
-}
-
 function saveStoredUsers(users) {
   try {
     localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
@@ -194,6 +248,8 @@ function saveStoredUsers(users) {
     console.warn("Error saving users:", e);
   }
 }
+
+
 
 export const AuthService = {
   /**
@@ -234,6 +290,7 @@ export const AuthService = {
    * Đồng bộ danh sách tài khoản từ Supabase Cloud về máy cục bộ
    */
   async syncUsersFromSupabase() {
+    const deletedKeys = getDeletedUserKeys();
     try {
       const client = getSupabase();
       if (!client) return getStoredUsers();
@@ -243,11 +300,20 @@ export const AuthService = {
         const local = getStoredUsers();
         const mergedMap = new Map();
 
-        // 1. Put local users in map
-        local.forEach(u => mergedMap.set(u.username.toLowerCase(), u));
+        // 1. Put local users in map (excluding deleted)
+        local.forEach(u => {
+          const isDel = u.role !== 'host' && (deletedKeys.includes(String(u.id).toLowerCase()) || deletedKeys.includes(String(u.username).toLowerCase()));
+          if (!isDel) mergedMap.set(u.username.toLowerCase(), u);
+        });
 
-        // 2. Merge cloud users
+        // 2. Merge cloud users (filtering out any that were deleted by Host)
         data.forEach(cloudUser => {
+          const isDel = cloudUser.role !== 'host' && (deletedKeys.includes(String(cloudUser.id).toLowerCase()) || deletedKeys.includes(String(cloudUser.username).toLowerCase()));
+          if (isDel) {
+            // Clean up deleted user from Supabase Cloud as well
+            try { client.from('app_users').delete().eq('id', cloudUser.id).then(() => {}); } catch(e) {}
+            return;
+          }
           const key = cloudUser.username.toLowerCase();
           const existing = mergedMap.get(key);
           mergedMap.set(key, { ...existing, ...cloudUser });
@@ -410,6 +476,8 @@ export const AuthService = {
       created_at: new Date().toISOString()
     };
 
+    unmarkUserAsDeleted(newUser.id, newUser.username);
+
     users.push(newUser);
     saveStoredUsers(users);
 
@@ -501,7 +569,7 @@ export const AuthService = {
   },
 
   /**
-   * Xóa tài khoản vĩnh viễn (Không thể xóa Host)
+   * Xóa tài khoản vĩnh viễn (Không thể xóa Host, xóa triệt để cả Cloud và Local)
    */
   async deleteUser(userId) {
     const users = getStoredUsers();
@@ -510,7 +578,14 @@ export const AuthService = {
       throw new Error("Không thể xóa tài khoản Quản trị viên tối cao (Host)!");
     }
 
-    // Filter out strictly by ID or username
+    // Ghi nhận vào danh sách đã xóa để không bao giờ tự nạp lại
+    if (target) {
+      markUserAsDeleted(target.id, target.username);
+    } else {
+      markUserAsDeleted(userId, userId);
+    }
+
+    // Xóa khỏi danh sách cục bộ
     const filtered = users.filter(u => u.id !== userId && u.username !== userId);
     saveStoredUsers(filtered);
 
@@ -519,6 +594,9 @@ export const AuthService = {
       const client = getSupabase();
       if (client) {
         await client.from('app_users').delete().eq('id', userId);
+        if (target?.username) {
+          await client.from('app_users').delete().eq('username', target.username);
+        }
       }
     } catch (e) {
       console.warn("Supabase delete user fallback:", e);
