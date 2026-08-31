@@ -1729,7 +1729,7 @@ window.App = {
       }
 
       let userAnsDisplay = q.user_answer;
-      if (q.type === 'multiple_choice') {
+      if (q.type.startsWith('multiple_choice') || q.type === 'multiple_choice') {
         userAnsDisplay = q.user_answer !== "" && q.options[q.user_answer] ? q.options[q.user_answer] : "Chưa chọn";
       }
 
@@ -3585,18 +3585,20 @@ window.App = {
               <span class="px-3 py-1 rounded-full text-xs font-bold ${
                 currentQ.type === 'type_en' ? 'bg-blue-100 text-blue-800' :
                 currentQ.type === 'type_vi' ? 'bg-purple-100 text-purple-800' :
+                currentQ.type === 'multiple_choice_word' ? 'bg-teal-100 text-teal-800' :
                 currentQ.is_grammar ? 'bg-amber-100 text-amber-900' : 'bg-green-100 text-green-800'
               }">
                 ${
-                  currentQ.type === 'type_en' ? '✍️ Dạng bài: Điền từ Tiếng Anh' :
-                  currentQ.type === 'type_vi' ? '🇻🇳 Dạng bài: Điền nghĩa Tiếng Việt' :
-                  currentQ.is_grammar ? '📘 Cấu trúc Ngữ pháp (Trắc nghiệm)' : '🎯 Trắc nghiệm 4 Lựa chọn'
+                  currentQ.type === 'type_en' ? '✍️ Tự luận: Điền từ Tiếng Anh' :
+                  currentQ.type === 'type_vi' ? '🇻🇳 Tự luận: Điền nghĩa Tiếng Việt' :
+                  currentQ.type === 'multiple_choice_word' ? '🔤 Trắc nghiệm: Chọn từ Tiếng Anh' :
+                  currentQ.is_grammar ? '📘 Cấu trúc Ngữ pháp (Trắc nghiệm)' : '🎯 Trắc nghiệm: Chọn nghĩa Tiếng Việt'
                 }
               </span>
             </div>
 
             <!-- Only show Audio button if it won't spoil the answer (or when answered) -->
-            ${(currentQ.type !== 'type_en' || currentQ.is_checked) ? `
+            ${((currentQ.type !== 'type_en' && currentQ.type !== 'multiple_choice_word') || currentQ.is_checked) ? `
               <button onclick="App.speakWord('${currentQ.word}')" class="w-9 h-9 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors" title="Phát âm từ vựng">
                 <span class="material-symbols-outlined text-lg">volume_up</span>
               </button>
@@ -3664,8 +3666,8 @@ window.App = {
             </div>
           ` : ''}
 
-          <!-- DẠNG 3: TRẮC NGHIỆM 4 ĐÁP ÁN (multiple_choice & Grammar Rule) -->
-          ${currentQ.type === 'multiple_choice' ? `
+          <!-- DẠNG 3: TRẮC NGHIỆM 4 ĐÁP ÁN (multiple_choice_meaning, multiple_choice_word, multiple_choice) -->
+          ${(currentQ.type.startsWith('multiple_choice') || currentQ.type === 'multiple_choice') ? `
             <div class="grid grid-cols-1 gap-2.5">
               ${currentQ.options.map((opt, idx) => {
                 const letter = String.fromCharCode(65 + idx);

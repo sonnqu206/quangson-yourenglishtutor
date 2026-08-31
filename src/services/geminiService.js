@@ -172,43 +172,97 @@ Trả về DUY NHẤT 1 mảng JSON các object theo đúng thứ tự (không k
   },
 
   /**
-   * Sinh bài kiểm tra đa dạng với 3 format ngẫu nhiên (Điền Anh, Điền Việt, Trắc nghiệm)
-   * ÁP DỤNG QUY TẮC BẮT BUỘC: Cấu trúc ngữ pháp (is_grammar: true) CHỈ xuất hiện dạng Trắc nghiệm!
+   * Sinh bài kiểm tra đa dạng và NGẪU NHIÊN 100% về cả thứ tự từ vựng lẫn dạng bài
+   * Các dạng bài hỗ trợ:
+   * 1. 'multiple_choice_meaning': Trắc nghiệm - Cho từ tiếng Anh, chọn nghĩa tiếng Việt đúng (A, B, C, D)
+   * 2. 'multiple_choice_word': Trắc nghiệm - Cho nghĩa tiếng Việt, chọn từ tiếng Anh đúng (A, B, C, D)
+   * 3. 'type_en': Tự luận - Nhập từ tiếng Anh theo nghĩa tiếng Việt
+   * 4. 'type_vi': Tự luận - Nhập nghĩa tiếng Việt theo từ tiếng Anh
+   * Cấu trúc ngữ pháp (is_grammar: true) xuất hiện linh hoạt dưới các dạng Trắc nghiệm chuẩn cấu trúc.
    */
   async generateMultiFormatQuiz(vocabList, numQuestions = 10) {
     if (!vocabList || vocabList.length === 0) return [];
     
-    // Pick random subset
-    const shuffledVocab = [...vocabList].sort(() => 0.5 - Math.random());
-    const selectedSubset = shuffledVocab.slice(0, Math.min(vocabList.length, numQuestions));
+    // 1. Trộn ngẫu nhiên danh sách từ vựng theo thuật toán Fisher-Yates
+    const shuffledVocab = [...vocabList];
+    for (let i = shuffledVocab.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledVocab[i], shuffledVocab[j]] = [shuffledVocab[j], shuffledVocab[i]];
+    }
 
-    const formats = ['type_en', 'type_vi', 'multiple_choice'];
+    const selectedSubset = shuffledVocab.slice(0, Math.min(vocabList.length, numQuestions));
+    const availableFormats = ['multiple_choice_meaning', 'multiple_choice_word', 'type_en', 'type_vi'];
 
     return selectedSubset.map((item, idx) => {
       const isGrammar = Boolean(item.is_grammar || item.word.includes('+') || item.word.toLowerCase().startsWith('used to'));
       
-      // Mandatory rule: Grammar patterns MUST strictly be multiple_choice!
-      let questionType = isGrammar ? 'multiple_choice' : formats[idx % formats.length];
-
-      // Prepare 4 options for multiple choice or fallback
-      const wrongOptions = vocabList
-        .filter(v => v.id !== item.id)
-        .map(v => v.meaning)
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 3);
-      
-      const allOptions = [item.meaning, ...wrongOptions].sort(() => 0.5 - Math.random());
-      const correctOptionIdx = allOptions.indexOf(item.meaning);
+      // Bốc ngẫu nhiên dạng bài cho từng câu hỏi
+      let questionType;
+      if (isGrammar) {
+        questionType = Math.random() < 0.5 ? 'multiple_choice_meaning' : 'multiple_choice_word';
+      } else {
+        // Trộn ngẫu nhiên hoàn toàn 1 trong 4 dạng bài
+        questionType = availableFormats[Math.floor(Math.random() * availableFormats.length)];
+      }
 
       let questionTitle = "";
-      if (questionType === 'type_en') {
-        questionTitle = `Hãy nhập từ tiếng Anh có nghĩa là: "${item.meaning}"`;
-      } else if (questionType === 'type_vi') {
-        questionTitle = `Hãy nhập nghĩa tiếng Việt của từ: "${item.word}" ${item.ipa ? `(${item.ipa})` : ''}`;
-      } else {
+      let allOptions = [];
+      let correctOptionIdx = -1;
+      let correctAnswer = "";
+
+      if (questionType === 'multiple_choice_meaning') {
         questionTitle = isGrammar 
           ? `Cấu trúc ngữ pháp "${item.word}" có ý nghĩa và cách dùng nào sau đây?`
-          : `Nghĩa chính xác của từ vựng "${item.word}" ${item.ipa ? `(${item.ipa})` : ''} là gì?`;
+          : `Từ vựng "${item.word}" ${item.ipa ? `(${item.ipa})` : ''} có nghĩa tiếng Việt chính xác là gì?`;
+
+        const otherMeanings = vocabList
+          .filter(v => v.id !== item.id && v.meaning !== item.meaning)
+          .map(v => v.meaning);
+        
+        // Trộn và lấy 3 đáp án nhiễu
+        for (let i = otherMeanings.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [otherMeanings[i], otherMeanings[j]] = [otherMeanings[j], otherMeanings[i]];
+        }
+        const distractors = otherMeanings.slice(0, 3);
+        
+        allOptions = [item.meaning, ...distractors];
+        // Trộn 4 đáp án A, B, C, D
+        for (let i = allOptions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allOptions[i], allOptions[j]] = [allOptions[j], allOptions[i]];
+        }
+        correctOptionIdx = allOptions.indexOf(item.meaning);
+        correctAnswer = item.meaning;
+
+      } else if (questionType === 'multiple_choice_word') {
+        questionTitle = `Từ tiếng Anh nào sau đây mang ý nghĩa: "${item.meaning}"?`;
+
+        const otherWords = vocabList
+          .filter(v => v.id !== item.id && v.word !== item.word)
+          .map(v => v.word);
+        
+        for (let i = otherWords.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [otherWords[i], otherWords[j]] = [otherWords[j], otherWords[i]];
+        }
+        const distractors = otherWords.slice(0, 3);
+
+        allOptions = [item.word, ...distractors];
+        for (let i = allOptions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allOptions[i], allOptions[j]] = [allOptions[j], allOptions[i]];
+        }
+        correctOptionIdx = allOptions.indexOf(item.word);
+        correctAnswer = item.word;
+
+      } else if (questionType === 'type_en') {
+        questionTitle = `Hãy viết từ tiếng Anh có nghĩa là: "${item.meaning}"`;
+        correctAnswer = item.word;
+
+      } else if (questionType === 'type_vi') {
+        questionTitle = `Hãy nhập nghĩa tiếng Việt của từ: "${item.word}" ${item.ipa ? `(${item.ipa})` : ''}`;
+        correctAnswer = item.meaning;
       }
 
       return {
@@ -217,14 +271,13 @@ Trả về DUY NHẤT 1 mảng JSON các object theo đúng thứ tự (không k
         word: item.word,
         meaning: item.meaning,
         ipa: item.ipa || "",
-        example: item.example || "",
         is_grammar: isGrammar,
-        type: questionType, // 'type_en' | 'type_vi' | 'multiple_choice'
+        type: questionType,
         question: questionTitle,
         options: allOptions,
         correct_index: correctOptionIdx,
-        correct_answer: questionType === 'type_en' ? item.word : (questionType === 'type_vi' ? item.meaning : allOptions[correctOptionIdx]),
-        explanation: `"${item.word}" ${item.ipa ? `(${item.ipa})` : ''}: ${item.meaning}.${item.example ? ` Ví dụ: "${item.example}"` : ''}`
+        correct_answer: correctAnswer,
+        explanation: `"${item.word}" ${item.ipa ? `(${item.ipa})` : ''}: ${item.meaning}.`
       };
     });
   },
