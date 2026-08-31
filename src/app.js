@@ -1962,7 +1962,14 @@ window.App = {
       dashboard: this.renderDashboardView,
       classes: this.renderClassesView,
       class_detail: this.renderClassDetailView,
-      accounts: this.renderAccountManagementView,
+      accounts: () => {
+        const isStudent = state.currentUser?.role === 'student';
+        const targetId = isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || (state.classes[0] ? state.classes[0].id : 1));
+        state.selectedClassDetailId = targetId;
+        state.selectedClassId = targetId;
+        state.classDetailTab = 'accounts';
+        return this.renderClassDetailView(targetId);
+      },
       lessons: this.renderLessonsView,
       vocabulary: this.renderVocabularyView,
       table_input: this.renderTableInputView,
@@ -2160,17 +2167,14 @@ window.App = {
     `;
   },
 
-  // 1. Dashboard View (Active Class Hub, Personal Learning Stats & AI Tutor)
+  // 1. Dashboard View (Clean & Focused Personal Learning Hub)
   renderDashboardView() {
     const user = state.currentUser;
     const isStudent = user.role === 'student';
     
     // For students, lock selectedClassId to their own class
-    const targetClassId = isStudent ? Number(user.class_id || 1) : Number(state.selectedClassId);
+    const targetClassId = isStudent ? Number(user.class_id || 1) : Number(state.selectedClassId || user.class_id || 1);
     const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học", class_code: "QS9A" };
-    const classVocab = state.vocabulary.filter(v => v.class_id === targetClassId);
-    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
-    const classStudents = state.usersList.filter(u => u.role === 'student' && u.class_id === targetClassId);
 
     // Compute personal learning time & test stats for this user
     const userStudySessions = (state.studySessions || []).filter(s => s.user_id === user.id || (user.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
@@ -2199,12 +2203,16 @@ window.App = {
             <div class="flex items-center gap-2 text-primary font-bold text-xs mb-2">
               <span class="material-symbols-outlined text-lg">verified</span>
               <span>${CONFIG.BRAND.NAME}</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary font-mono text-[11px] font-bold">Lớp: ${activeClass.name}</span>
             </div>
             <h1 class="font-display-lg text-2xl md:text-3xl font-bold text-on-surface">
               Xin chào, <span class="text-primary">${user.full_name}!</span> 👋
             </h1>
             <p class="font-body-md text-sm text-on-surface-variant mt-2 max-w-xl">
-              Chào mừng em quay trở lại không gian ôn thi Tiếng Anh vào 10. Hãy sẵn sàng bứt phá điểm số hôm nay!
+              ${isStudent 
+                ? 'Không gian ôn thi Tiếng Anh vào 10 cá nhân hóa. Bấm vào lớp học để bắt đầu luyện chuyên đề và làm bài thi.' 
+                : 'Phân hệ quản trị và giảng dạy. Bấm vào lớp học để quản lý bài học, kho từ vựng, tài khoản học sinh và báo cáo.'
+              }
             </p>
           </div>
 
@@ -2217,41 +2225,6 @@ window.App = {
             <button onclick="App.switchTab('tutor')" class="bg-secondary-container text-on-secondary-container px-4 py-3 rounded-2xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-base">psychology</span>
               <span>Gia Sư AI</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Active Class Hub Spotlight Card -->
-        <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div class="flex items-start gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/20 text-primary flex items-center justify-center font-bold text-2xl shrink-0 shadow-sm">
-              <span class="material-symbols-outlined text-3xl">school</span>
-            </div>
-            <div>
-              <div class="flex items-center gap-2.5 flex-wrap">
-                <span class="px-3 py-1 rounded-full bg-primary-container/20 text-primary font-mono font-bold text-xs">Mã lớp: ${activeClass.class_code}</span>
-                <h2 class="font-headline-md text-lg font-bold text-on-surface">${activeClass.name}</h2>
-              </div>
-              <p class="text-xs text-on-surface-variant mt-1.5">
-                ${isStudent ? `Lớp học của em gồm đầy đủ chuyên đề bài học, kho từ vựng và bài thi chuẩn format vào 10.` : `Quản trị viên & Giáo viên: Truy cập các Unit bài học, kho từ và theo dõi báo cáo học sinh của lớp.`}
-              </p>
-              <div class="flex items-center gap-4 text-xs font-semibold text-outline mt-3">
-                <span class="flex items-center gap-1 text-primary"><span class="material-symbols-outlined text-base">auto_stories</span> <strong>${classLessons.length}</strong> bài học</span>
-                <span class="flex items-center gap-1 text-secondary"><span class="material-symbols-outlined text-base">menu_book</span> <strong>${classVocab.length}</strong> từ vựng</span>
-                <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">groups</span> <strong>${classStudents.length}</strong> học sinh</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap">
-            <button onclick="App.openClassDetail(${targetClassId}, 'units')" class="flex-1 lg:flex-none bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-xs btn-press flex items-center justify-center gap-1.5 hover-lift shadow-sm">
-              <span class="material-symbols-outlined text-base">list_alt</span> Xem Bài Học (Units)
-            </button>
-            <button onclick="App.startLessonFlashcard(null)" class="flex-1 lg:flex-none bg-surface-container text-primary px-4 py-3 rounded-xl font-bold text-xs border border-primary/20 flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors">
-              <span class="material-symbols-outlined text-base">style</span> Luyện Flashcard
-            </button>
-            <button onclick="App.startNewQuiz(null, true)" class="flex-1 lg:flex-none bg-surface-container text-on-surface px-4 py-3 rounded-xl font-bold text-xs border border-outline-variant/40 flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors">
-              <span class="material-symbols-outlined text-base">quiz</span> Thi Thử
             </button>
           </div>
         </div>
