@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quang Son - Your English Tutor | Nền tảng Luyện thi Tiếng Anh vào 10</title>
   
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+  
   <!-- Google Fonts: Lexend -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -164,9 +168,7 @@
     <!-- Logo & Brand Header with Close button for Mobile -->
     <div class="flex items-center justify-between mb-5 px-1 shrink-0">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary flex items-center justify-center font-bold text-xl shadow-md">
-          <span class="material-symbols-outlined text-2xl">school</span>
-        </div>
+        <img src="assets/logo.png" alt="Quang Son Logo" class="w-10 h-10 rounded-2xl object-cover shadow-md">
         <div>
           <h1 class="font-headline-md text-base font-bold text-primary leading-tight">Quang Son</h1>
           <p class="font-label-sm text-[11px] font-semibold text-secondary">Your English Tutor</p>
@@ -184,6 +186,11 @@
       <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" data-nav-tab="dashboard" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-semibold">
         <span class="material-symbols-outlined text-xl">dashboard</span>
         <span>Trang Chủ</span>
+      </a>
+
+      <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" data-nav-tab="vocabulary" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-semibold">
+        <span class="material-symbols-outlined text-xl">menu_book</span>
+        <span>Kho Từ Vựng (Lớp Em)</span>
       </a>
 
       <a href="javascript:void(0)" onclick="App.switchTab('classes')" data-nav-tab="classes" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-on-surface-variant hover:bg-surface-container transition-all text-xs sm:text-sm font-semibold">
@@ -286,6 +293,10 @@
     <a href="javascript:void(0)" onclick="App.switchTab('dashboard')" data-mobile-tab="dashboard" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
       <span class="material-symbols-outlined text-xl sm:text-2xl">dashboard</span>
       <span class="text-[10px] font-bold mt-0.5">Trang chủ</span>
+    </a>
+    <a href="javascript:void(0)" onclick="App.switchTab('vocabulary')" data-mobile-tab="vocabulary" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
+      <span class="material-symbols-outlined text-xl sm:text-2xl">menu_book</span>
+      <span class="text-[10px] font-bold mt-0.5">Kho từ</span>
     </a>
     <a href="javascript:void(0)" onclick="App.switchTab('classes')" data-mobile-tab="classes" class="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-on-surface-variant flex-1 text-center">
       <span class="material-symbols-outlined text-xl sm:text-2xl">school</span>
@@ -469,9 +480,6 @@
           Đồng ý thoát
         </button>
       </div>
-    </div>
-  </div>
-
   <!-- Modal: Tạo Lớp Học Mới -->
   <div id="create-class-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-surface-container-lowest rounded-2xl ambient-shadow max-w-md w-full p-6 relative border border-outline-variant/30">

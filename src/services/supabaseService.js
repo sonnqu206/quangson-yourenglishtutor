@@ -756,8 +756,54 @@ export const SupabaseService = {
     const newId = local.test_sessions.length ? Math.max(...local.test_sessions.map(s => s.id)) + 1 : 1;
     const saved = { id: newId, ...record };
     local.test_sessions.unshift(saved);
+    
+    if (detailsList.length > 0) {
+      if (!local.session_details) local.session_details = [];
+      const newDetailId = local.session_details.length ? Math.max(...local.session_details.map(d => d.id)) + 1 : 1;
+      const detailsToSave = detailsList.map((d, index) => ({
+        id: newDetailId + index,
+        session_id: newId,
+        word_id: d.word_id,
+        user_answer: d.user_answer,
+        correct_answer: d.correct_answer,
+        is_correct: d.is_correct,
+        is_skipped: Boolean(d.is_skipped)
+      }));
+      local.session_details.push(...detailsToSave);
+    }
+    
     saveLocalData(local);
     return saved;
+  },
+
+  /**
+   * Lấy chi tiết câu trả lời của một bài kiểm tra
+   */
+  async getTestSessionDetails(sessionId) {
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { data, error } = await client
+          .from('session_details')
+          .select(`*, vocabulary(word, meaning)`)
+          .eq('session_id', Number(sessionId));
+        if (!error && data) return data;
+      } catch (err) {
+        console.warn("Supabase getTestSessionDetails fallback:", err);
+      }
+    }
+    const local = getLocalData();
+    if (!local.session_details) return [];
+    
+    return local.session_details
+      .filter(d => d.session_id === Number(sessionId))
+      .map(d => {
+        const vocab = local.vocabulary.find(v => v.id === d.word_id);
+        return {
+          ...d,
+          vocabulary: vocab ? { word: vocab.word, meaning: vocab.meaning } : null
+        };
+      });
   },
 
   /**
@@ -882,5 +928,49 @@ export const SupabaseService = {
         }
       }
     });
+  },
+
+  /**
+   * Xoá nhật ký học tập
+   */
+  async deleteStudySession(id) {
+    const client = getSupabase();
+    if (client) {
+      try {
+        await client.from('study_sessions').delete().eq('id', id);
+      } catch (err) {
+        console.warn("Supabase deleteStudySession fallback:", err);
+      }
+    }
+    const local = getLocalData();
+    if (local.study_sessions) {
+      local.study_sessions = local.study_sessions.filter(s => s.id !== id);
+      saveLocalData(local);
+    }
+    return true;
+  },
+
+  /**
+   * Xoá lịch sử bài kiểm tra
+   */
+  async deleteTestSession(id) {
+    const client = getSupabase();
+    if (client) {
+      try {
+        await client.from('test_sessions').delete().eq('id', id);
+        await client.from('session_details').delete().eq('session_id', id);
+      } catch (err) {
+        console.warn("Supabase deleteTestSession fallback:", err);
+      }
+    }
+    const local = getLocalData();
+    if (local.test_sessions) {
+      local.test_sessions = local.test_sessions.filter(s => s.id !== id);
+    }
+    if (local.session_details) {
+      local.session_details = local.session_details.filter(d => d.session_id !== id);
+    }
+    saveLocalData(local);
+    return true;
   }
 };

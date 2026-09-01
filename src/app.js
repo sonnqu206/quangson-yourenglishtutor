@@ -604,7 +604,7 @@ window.App = {
     this.render();
   },
 
-  openSessionDetailsModal(sessionId) {
+  async openTestDetailsModal(sessionId) {
     const session = state.testSessions.find(s => s.id === Number(sessionId));
     if (!session) {
       showToast("Không tìm thấy thông tin chi tiết bài thi!", "error");
@@ -614,7 +614,11 @@ window.App = {
     const modal = document.getElementById('session-details-modal');
     const container = document.getElementById('session-details-content');
     if (modal && container) {
-      const details = session.details || [];
+      // Show loading state
+      container.innerHTML = `<div class="p-8 text-center"><span class="material-symbols-outlined animate-spin text-primary text-3xl">refresh</span><p class="mt-2 text-sm text-outline">Đang tải chi tiết bài làm...</p></div>`;
+      modal.classList.remove('hidden');
+
+      const details = await SupabaseService.getTestSessionDetails(sessionId) || [];
       const student = state.usersList.find(u => u.id === session.user_id) || { full_name: "Học sinh" };
 
       container.innerHTML = `
@@ -640,23 +644,41 @@ window.App = {
                 </span>
                 <span class="text-[10px] text-outline font-bold bg-white px-2 py-0.5 rounded border border-outline-variant/20">Câu ${idx + 1}</span>
               </div>
-              <p class="font-bold text-sm text-on-surface mb-2">${d.question}</p>
+              <p class="font-bold text-sm text-on-surface mb-2">
+                ${d.vocabulary ? (d.vocabulary.word + ' (' + d.vocabulary.meaning + ')') : 'Từ vựng đã xóa'}
+              </p>
               <div class="space-y-1 text-xs">
                 <p><span class="font-semibold text-outline">Học sinh đã trả lời:</span> <strong class="${d.is_correct ? 'text-green-700 font-bold' : 'text-error font-bold'}">${d.user_answer || '(Bỏ trống)'}</strong></p>
                 ${!d.is_correct ? `<p><span class="font-semibold text-outline">Đáp án chuẩn:</span> <strong class="text-green-800 font-bold">${d.correct_answer}</strong></p>` : ''}
-                ${d.explanation ? `<p class="italic text-on-surface bg-white/80 p-2.5 rounded-lg border border-outline-variant/20 mt-1.5">💡 <strong>Giải thích chi tiết:</strong> ${d.explanation}</p>` : ''}
               </div>
             </div>
           `).join('') : `
             <div class="text-center py-8 text-outline text-xs">
               <span class="material-symbols-outlined text-3xl mb-1">quiz</span>
-              <p>Phiên thi này không lưu chi tiết từng câu hỏi.</p>
+              <p>Phiên thi này không có chi tiết lưu lại.</p>
             </div>
           `}
         </div>
       `;
+    }
+  },
 
-      modal.classList.remove('hidden');
+  async deleteHistory(type, id) {
+    if (!confirm("Bạn có chắc chắn muốn xóa lịch sử này? Thao tác này không thể hoàn tác.")) return;
+    
+    try {
+      if (type === 'test') {
+        await SupabaseService.deleteTestSession(id);
+        state.testSessions = state.testSessions.filter(s => s.id !== id);
+      } else if (type === 'study') {
+        await SupabaseService.deleteStudySession(id);
+        state.studySessions = state.studySessions.filter(s => s.id !== id);
+      }
+      
+      showToast("Đã xóa lịch sử thành công!", "success");
+      this.render(); // Re-render reports
+    } catch (err) {
+      showToast("Lỗi khi xóa: " + err.message, "error");
     }
   },
 
