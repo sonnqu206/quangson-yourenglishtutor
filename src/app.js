@@ -746,6 +746,7 @@ window.App = {
         SupabaseService.saveStudySession(sessionPayload).then(async saved => {
           if (saved) {
             state.studySessions.unshift(saved);
+            this.render(); // Ensure UI is updated
           }
           await this.recordRealtimeActivity();
         });
@@ -1598,7 +1599,23 @@ window.App = {
   // QUIZ ENGINE (3 FORMATS & REAL-TIME CHECK)
   // =========================================================================
 
-  async startNewQuiz(lessonId = null, isRandom = false) {
+  startRandomClassQuiz() {
+    const classVocab = state.vocabulary.filter(v => v.class_id === Number(state.selectedClassId));
+    if (classVocab.length === 0) {
+      showToast("Lớp học này chưa có từ vựng để kiểm tra!", "error");
+      return;
+    }
+    const maxWords = classVocab.length;
+    let numStr = prompt(`Nhập số lượng từ bạn muốn kiểm tra ngẫu nhiên (Tối đa ${maxWords} từ):`, Math.min(maxWords, 10));
+    if (numStr === null) return;
+    let num = parseInt(numStr, 10);
+    if (isNaN(num) || num <= 0) {
+      num = Math.min(maxWords, 10);
+    }
+    this.startNewQuiz(null, true, num);
+  },
+
+  async startNewQuiz(lessonId = null, isRandom = false, requestedNumQuestions = null) {
     const classVocab = state.vocabulary.filter(v => v.class_id === Number(state.selectedClassId));
     
     if (classVocab.length === 0) {
@@ -1612,10 +1629,14 @@ window.App = {
       if (targetVocab.length === 0) targetVocab = classVocab;
     }
 
-    const testTypeLabel = isRandom ? "Ngẫu Nhiên Toàn Lớp" : (lessonId ? `Bài học Unit #${lessonId}` : "Tổng Hợp Lớp");
+    const testTypeLabel = isRandom ? "Kiểm Tra Ngẫu Nhiên" : (lessonId ? `Bài học Unit #${lessonId}` : "Tổng Hợp Lớp");
     showToast(`Đang tạo bài kiểm tra ${testTypeLabel} (3 dạng bài)...`, "info");
     
-    const questions = await GeminiService.generateMultiFormatQuiz(targetVocab, Math.min(targetVocab.length, 10));
+    let numQuestions = isRandom ? Math.min(targetVocab.length, 10) : targetVocab.length;
+    if (requestedNumQuestions && requestedNumQuestions > 0) {
+      numQuestions = Math.min(targetVocab.length, requestedNumQuestions);
+    }
+    const questions = await GeminiService.generateMultiFormatQuiz(targetVocab, numQuestions);
     
     state.currentQuiz = questions.map(q => ({
       ...q,
@@ -2866,8 +2887,8 @@ window.App = {
             <button onclick="App.startLessonFlashcard(null)" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">style</span> Luyện Flashcard Lớp
             </button>
-            <button onclick="App.startNewQuiz(null, true)" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs btn-press flex items-center gap-1.5 hover-lift shadow-sm">
-              <span class="material-symbols-outlined text-sm">quiz</span> Thi Thử Toàn Lớp
+            <button onclick="App.startRandomClassQuiz()" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs btn-press flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">quiz</span> Kiểm Tra Ngẫu Nhiên
             </button>
           </div>
         </div>
