@@ -144,6 +144,30 @@ window.App = {
     }
 
     await this.loadAllData();
+
+    // Đăng ký nhận sự kiện realtime từ LocalStorage hoặc Supabase để cập nhật báo cáo
+    SupabaseService.subscribeToRealtimeData(async (event, payload) => {
+      let shouldRender = false;
+      if (event === 'study_sessions_local') {
+        state.studySessions = payload;
+        shouldRender = true;
+      } else if (event === 'test_sessions_local') {
+        state.testSessions = payload;
+        shouldRender = true;
+      } else if (event === 'study_sessions' || event === 'test_sessions') {
+        if (event === 'study_sessions') {
+          state.studySessions = await SupabaseService.getStudySessions();
+        } else {
+          state.testSessions = await SupabaseService.getTestSessions();
+        }
+        shouldRender = true;
+      }
+      
+      if (shouldRender && (state.currentTab === 'dashboard' || state.currentTab === 'class_hub')) {
+        this.render();
+      }
+    });
+
     this.render();
     this.bindGlobalEvents();
   },

@@ -842,5 +842,45 @@ export const SupabaseService = {
       return list.filter(s => s.class_id === Number(classId));
     }
     return list;
+  },
+
+  /**
+   * Đăng ký nhận sự kiện realtime từ Supabase và LocalStorage
+   */
+  subscribeToRealtimeData(callback) {
+    const client = getSupabase();
+    if (client) {
+      try {
+        client.channel('public:sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'study_sessions' }, payload => {
+            callback('study_sessions', payload);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'test_sessions' }, payload => {
+            callback('test_sessions', payload);
+          })
+          .subscribe();
+      } catch (err) {
+        console.warn('Realtime subscription failed:', err);
+      }
+    }
+    
+    // Cross-tab sync if using LocalStorage fallback
+    window.addEventListener('storage', (e) => {
+      if (e.key === "QUANG_SON_LMS_ISOLATED_DATA_V3" && e.newValue) {
+        try {
+          const newData = JSON.parse(e.newValue);
+          const oldData = e.oldValue ? JSON.parse(e.oldValue) : { study_sessions: [], test_sessions: [] };
+          
+          if (newData.study_sessions?.length !== oldData.study_sessions?.length) {
+            callback('study_sessions_local', newData.study_sessions);
+          }
+          if (newData.test_sessions?.length !== oldData.test_sessions?.length) {
+            callback('test_sessions_local', newData.test_sessions);
+          }
+        } catch (err) {
+          console.warn("Storage sync parse error:", err);
+        }
+      }
+    });
   }
 };
