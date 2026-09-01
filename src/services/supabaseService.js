@@ -331,17 +331,20 @@ export const SupabaseService = {
    * Lấy danh sách lớp học
    */
   async getClasses() {
+    let supabaseData = [];
     const client = getSupabase();
     if (client) {
       try {
         const { data, error } = await client.from('classes').select('*').order('id', { ascending: true });
-        if (!error && data && data.length > 0) return data;
+        if (!error && data) supabaseData = data;
       } catch (err) {
         console.warn("Supabase classes query fallback:", err);
       }
     }
     const local = getLocalData();
-    return local.classes;
+    const supabaseIds = new Set(supabaseData.map(c => c.id));
+    const mergedLocal = local.classes.filter(c => !supabaseIds.has(c.id));
+    return [...supabaseData, ...mergedLocal].sort((a,b) => a.id - b.id);
   },
 
   /**
@@ -416,6 +419,7 @@ export const SupabaseService = {
    * Lấy danh sách bài học (Đã lọc chính xác theo class_id)
    */
   async getLessons(classId = null) {
+    let supabaseData = [];
     const client = getSupabase();
     if (client) {
       try {
@@ -424,17 +428,20 @@ export const SupabaseService = {
           query = query.eq('class_id', Number(classId));
         }
         const { data, error } = await query;
-        if (!error && data && data.length > 0) return data;
+        if (!error && data) supabaseData = data;
       } catch (err) {
         console.warn("Supabase lessons query fallback:", err);
       }
     }
 
     const local = getLocalData();
+    let localLessons = local.lessons;
     if (classId) {
-      return local.lessons.filter(l => l.class_id === Number(classId));
+      localLessons = localLessons.filter(l => l.class_id === Number(classId));
     }
-    return local.lessons;
+    const supabaseIds = new Set(supabaseData.map(l => l.id));
+    const mergedLocal = localLessons.filter(l => !supabaseIds.has(l.id));
+    return [...supabaseData, ...mergedLocal].sort((a,b) => a.id - b.id);
   },
 
   /**
@@ -489,6 +496,7 @@ export const SupabaseService = {
    */
   async getVocabulary(filters = {}) {
     const { classId, lessonId, searchQuery, isGrammar } = filters;
+    let supabaseData = [];
     const client = getSupabase();
     if (client) {
       try {
@@ -506,7 +514,7 @@ export const SupabaseService = {
           query = query.or(`word.ilike.%${searchQuery}%,meaning.ilike.%${searchQuery}%`);
         }
         const { data, error } = await query;
-        if (!error && data && data.length > 0) return data;
+        if (!error && data) supabaseData = data;
       } catch (err) {
         console.warn("Supabase vocabulary query fallback:", err);
       }
@@ -531,7 +539,10 @@ export const SupabaseService = {
         (v.example && v.example.toLowerCase().includes(q))
       );
     }
-    return result;
+    
+    const supabaseIds = new Set(supabaseData.map(v => v.id));
+    const mergedLocal = result.filter(v => !supabaseIds.has(v.id));
+    return [...supabaseData, ...mergedLocal].sort((a,b) => b.id - a.id);
   },
 
   /**
@@ -691,23 +702,27 @@ export const SupabaseService = {
    * Lấy danh sách profiles
    */
   async getProfiles(classId = null) {
+    let supabaseData = [];
     const client = getSupabase();
     if (client) {
       try {
         let query = client.from('profiles').select('*');
         if (classId) query = query.eq('class_id', classId);
         const { data, error } = await query;
-        if (!error && data && data.length > 0) return data;
+        if (!error && data) supabaseData = data;
       } catch (err) {
         console.warn("Supabase profiles query fallback:", err);
       }
     }
 
     const local = getLocalData();
+    let localProfiles = local.profiles || [];
     if (classId) {
-      return local.profiles.filter(p => p.class_id === Number(classId));
+      localProfiles = localProfiles.filter(p => p.class_id === Number(classId));
     }
-    return local.profiles;
+    const supabaseIds = new Set(supabaseData.map(p => p.id));
+    const mergedLocal = localProfiles.filter(p => !supabaseIds.has(p.id));
+    return [...supabaseData, ...mergedLocal];
   },
 
   /**
@@ -810,22 +825,26 @@ export const SupabaseService = {
    * Lấy lịch sử làm bài kiểm tra theo lớp
    */
   async getTestSessions(classId = null) {
+    let supabaseData = [];
     const client = getSupabase();
     if (client) {
       try {
         let query = client.from('test_sessions').select('*').order('id', { ascending: false });
         if (classId) query = query.eq('class_id', Number(classId));
         const { data, error } = await query;
-        if (!error && data && data.length > 0) return data;
+        if (!error && data) supabaseData = data;
       } catch (err) {
         console.warn("Supabase test_sessions query fallback:", err);
       }
     }
     const local = getLocalData();
+    let localSessions = local.test_sessions || [];
     if (classId) {
-      return local.test_sessions.filter(s => s.class_id === Number(classId));
+      localSessions = localSessions.filter(s => s.class_id === Number(classId));
     }
-    return local.test_sessions;
+    const supabaseIds = new Set(supabaseData.map(s => s.id));
+    const mergedLocal = localSessions.filter(s => !supabaseIds.has(s.id));
+    return [...supabaseData, ...mergedLocal].sort((a,b) => b.id - a.id);
   },
 
   /**
@@ -870,24 +889,27 @@ export const SupabaseService = {
    * Lấy danh sách nhật ký học tập theo lớp
    */
   async getStudySessions(classId = null) {
+    let supabaseData = [];
     const client = getSupabase();
     if (client) {
       try {
         let query = client.from('study_sessions').select('*').order('id', { ascending: false });
         if (classId) query = query.eq('class_id', Number(classId));
         const { data, error } = await query;
-        if (!error && data && data.length > 0) return data;
+        if (!error && data) supabaseData = data;
       } catch (err) {
         console.warn("Supabase study_sessions query fallback:", err);
       }
     }
 
     const local = getLocalData();
-    const list = local.study_sessions || [];
+    let list = local.study_sessions || [];
     if (classId) {
-      return list.filter(s => s.class_id === Number(classId));
+      list = list.filter(s => s.class_id === Number(classId));
     }
-    return list;
+    const supabaseIds = new Set(supabaseData.map(s => s.id));
+    const mergedLocal = list.filter(s => !supabaseIds.has(s.id));
+    return [...supabaseData, ...mergedLocal].sort((a,b) => b.id - a.id);
   },
 
   /**
