@@ -237,5 +237,7 @@ INSERT INTO classes (id, name, class_code) VALUES
   (3, 'Lớp 10A1 - Luyện đề & Bứt phá Điểm số', 'QS10A2026')
 ON CONFLICT (id) DO NOTHING;
 
-
-
+-- ==============================================================================
+-- 10. ENABLE REALTIME
+-- ==============================================================================
+ALTER PUBLICATION supabase_realtime ADD TABLE study_sessions, test_sessions;
