@@ -177,7 +177,7 @@ window.App = {
    */
   getManagedClasses(user = state.currentUser) {
     if (!user) return [];
-    if (user.role === 'host') return state.classes;
+    if ((user.role === 'host' || user.role === 'teacher')) return state.classes;
     if (user.role === 'student') {
       return state.classes.filter(c => c.id === Number(user.class_id));
     }
@@ -537,7 +537,7 @@ window.App = {
     let baseStreak = Number(studentUser.streak || 0);
 
     if (activeDates.size === 0) {
-      return Math.max(1, baseStreak);
+      return baseStreak;
     }
 
     // Đếm ngược từng ngày liên tục
@@ -698,7 +698,7 @@ window.App = {
   openClassDetail(classId, tab = 'units') {
     const targetId = Number(classId);
     const allowedClasses = this.getManagedClasses(state.currentUser);
-    const isAllowed = state.currentUser?.role === 'host' || allowedClasses.some(c => c.id === targetId);
+    const isAllowed = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher') || allowedClasses.some(c => c.id === targetId);
 
     if (!isAllowed) {
       showToast("Bạn chỉ được phép truy cập lớp học thuộc quyền phụ trách của mình!", "error");
@@ -758,7 +758,7 @@ window.App = {
   selectClass(classId) {
     const targetId = Number(classId);
     const allowedClasses = this.getManagedClasses(state.currentUser);
-    const isAllowed = state.currentUser?.role === 'host' || allowedClasses.some(c => c.id === targetId);
+    const isAllowed = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher') || allowedClasses.some(c => c.id === targetId);
 
     if (!isAllowed) {
       showToast("Bạn chỉ được phép truy cập lớp học thuộc quyền phụ trách của mình!", "error");
@@ -875,9 +875,16 @@ window.App = {
     this.render();
   },
 
-  openBatchTableModal() {
+  openBatchTableModal(lessonId = null, classId = null) {
     if (state.currentUser?.role === 'student') {
       state.selectedClassId = Number(state.currentUser.class_id) || 1;
+    } else if (classId) {
+      state.selectedClassId = Number(classId);
+    } else if (state.selectedClassDetailId) {
+      state.selectedClassId = Number(state.selectedClassDetailId);
+    }
+    if (lessonId) {
+      state.selectedLessonId = Number(lessonId);
     }
     this.switchTab('table_input');
   },
@@ -1089,8 +1096,9 @@ window.App = {
     const isStudent = state.currentUser?.role === 'student';
     const classId = isStudent 
       ? Number(state.currentUser.class_id || 1)
-      : (Number(document.getElementById('table-input-class')?.value) || state.selectedClassId || 1);
-    const lessonId = Number(document.getElementById('table-input-lesson')?.value) || state.selectedLessonId || 1;
+      : (Number(document.getElementById('table-input-class')?.value) || Number(state.selectedClassDetailId) || Number(state.selectedClassId) || 1);
+    const lessonVal = document.getElementById('table-input-lesson')?.value;
+    const lessonId = lessonVal ? Number(lessonVal) : (state.selectedLessonId || null);
 
     const validRows = state.batchTableRows.filter(r => r.word && r.word.trim() !== "");
     if (validRows.length === 0) {
@@ -1123,8 +1131,16 @@ window.App = {
         { id: 5, word: "", meaning: "" }
       ];
 
+      if (inserted && inserted.length > 0 && inserted[0].lesson_id) {
+        state.selectedLessonId = inserted[0].lesson_id;
+      }
+
       await this.loadAllData();
-      this.switchTab('vocabulary');
+      if (state.selectedClassDetailId) {
+        this.switchTab('class_detail');
+      } else {
+        this.switchTab('vocabulary');
+      }
     } catch (err) {
       console.error(err);
       showToast("Lỗi khi lưu bảng từ vựng: " + err.message, "error");
@@ -1192,7 +1208,7 @@ window.App = {
   async deleteClass(id) {
     if (state.currentUser?.role === 'student') return;
     const targetClass = state.classes.find(c => c.id === Number(id));
-    const isHost = state.currentUser?.role === 'host';
+    const isHost = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher');
     const isCreator = targetClass && (targetClass.creator_id === state.currentUser?.id || targetClass.created_by === state.currentUser?.id);
 
     if (!isHost && !isCreator) {
@@ -1212,63 +1228,86 @@ window.App = {
     }
   },
 
-  openCreateLessonModal() {
-    const modal = document.getElementById('create-lesson-modal');
-    if (modal) {
+  openCreateLessonModal(targetClassId = null) {
+    try {
+      const modal = document.getElementById('create-lesson-modal');
+      if (!modal) {
+        showToast("Không tìm thấy giao diện tạo bài học!", "error");
+        return;
+      }
       const classSelect = document.getElementById('modal-lesson-class');
       const isStudent = state.currentUser?.role === 'student';
       const isAssistant = state.currentUser?.role === 'assistant_teacher';
       const allowedClasses = this.getManagedClasses(state.currentUser);
-      const targetClassId = Number(state.selectedClassId || state.currentUser?.class_id || 1);
+      
+      const effectiveClassId = Number(targetClassId || state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || (state.classes[0]?.id || 1));
 
       if (classSelect) {
         if (isStudent) {
-          const userClass = state.classes.find(c => c.id === targetClassId) || state.classes[0];
-          classSelect.innerHTML = `<option value="${targetClassId}">${userClass ? userClass.name : 'Lớp của bạn'}</option>`;
+          const studentClassId = Number(state.currentUser?.class_id || effectiveClassId);
+          const userClass = state.classes.find(c => c.id === studentClassId) || state.classes[0];
+          classSelect.innerHTML = `<option value="${userClass ? userClass.id : studentClassId}">${userClass ? userClass.name : 'Lớp của bạn'}</option>`;
           classSelect.disabled = true;
         } else if (isAssistant) {
           if (allowedClasses.length > 1) {
             classSelect.disabled = false;
             classSelect.innerHTML = allowedClasses.map(c => 
-              `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
+              `<option value="${c.id}" ${c.id === effectiveClassId ? 'selected' : ''}>${c.name}</option>`
             ).join('');
           } else {
-            const userClass = allowedClasses[0] || state.classes[0];
+            const userClass = allowedClasses[0] || state.classes.find(c => c.id === effectiveClassId) || state.classes[0];
             classSelect.innerHTML = `<option value="${userClass.id}">${userClass.name}</option>`;
             classSelect.disabled = true;
           }
         } else {
           classSelect.disabled = false;
           classSelect.innerHTML = state.classes.map(c => 
-            `<option value="${c.id}" ${state.selectedClassId === c.id ? 'selected' : ''}>${c.name}</option>`
+            `<option value="${c.id}" ${c.id === effectiveClassId ? 'selected' : ''}>${c.name}</option>`
           ).join('');
         }
       }
+
+      const titleInput = document.getElementById('input-lesson-title');
+      if (titleInput) {
+        titleInput.value = '';
+        setTimeout(() => titleInput.focus(), 50);
+      }
+
       modal.classList.remove('hidden');
+    } catch (err) {
+      console.error("Lỗi khi mở modal tạo bài học:", err);
+      showToast("Lỗi khi mở giao diện tạo bài học: " + err.message, "error");
     }
   },
 
   async handleCreateLesson(e) {
-    e.preventDefault();
-    const isStudent = state.currentUser?.role === 'student';
-    const classId = isStudent
-      ? Number(state.currentUser.class_id || 1)
-      : Number(document.getElementById('modal-lesson-class')?.value || state.selectedClassId || 1);
-    const title = document.getElementById('input-lesson-title')?.value.trim();
-    if (!title) {
-      showToast("Vui lòng nhập tên bài học!", "error");
-      return;
-    }
     try {
+      e.preventDefault();
+      const isStudent = state.currentUser?.role === 'student';
+      const classSelect = document.getElementById('modal-lesson-class');
+      const classId = isStudent
+        ? Number(state.currentUser.class_id || 1)
+        : Number(classSelect?.value || state.selectedClassDetailId || state.selectedClassId || 1);
+      const title = document.getElementById('input-lesson-title')?.value.trim();
+      if (!title) {
+        showToast("Vui lòng nhập tên bài học!", "error");
+        return;
+      }
+      
       const created = await SupabaseService.createLesson(classId, title);
-      showToast(`Đã tạo bài học "${title}" thành công!`, "success");
+      showToast(`Đã tạo bài học "${title}" thành công! 🎉`, "success");
       this.closeModal('create-lesson-modal');
       const titleInput = document.getElementById('input-lesson-title');
       if (titleInput) titleInput.value = '';
-      await this.loadAllData();
+
+      state.selectedClassDetailId = classId;
+      state.selectedClassId = classId;
       state.selectedLessonId = created.id;
+
+      await this.loadAllData();
       this.render();
     } catch (err) {
+      console.error("Lỗi khi tạo bài học:", err);
       showToast("Lỗi khi tạo bài học: " + err.message, "error");
     }
   },
@@ -1289,11 +1328,26 @@ window.App = {
   // SINGLE VOCABULARY CREATION & EDITING (STUDENTS & TEACHERS)
   // =========================================================================
 
-  openCreateVocabularyModal(preselectedLessonId = null) {
+  openCreateVocabularyModal(preselectedLessonId = null, preselectedClassId = null) {
     const isStudent = state.currentUser?.role === 'student';
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
     const allowedClasses = this.getManagedClasses(state.currentUser);
-    const targetClassId = Number(state.selectedClassId || state.currentUser?.class_id || 1);
+
+    let targetClassId = null;
+    if (preselectedLessonId) {
+      const targetLesson = state.lessons.find(l => l.id === Number(preselectedLessonId));
+      if (targetLesson) targetClassId = Number(targetLesson.class_id);
+    }
+    if (!targetClassId && preselectedClassId) {
+      targetClassId = Number(preselectedClassId);
+    }
+    if (!targetClassId) {
+      targetClassId = Number(state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || (state.classes[0]?.id || 1));
+    }
+    if (isStudent) {
+      targetClassId = Number(state.currentUser?.class_id || targetClassId);
+    }
+
     const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
 
     const classSelect = document.getElementById('input-vocab-class');
@@ -1309,7 +1363,7 @@ window.App = {
             `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
           ).join('');
         } else {
-          const userClass = allowedClasses[0] || state.classes[0];
+          const userClass = allowedClasses[0] || state.classes.find(c => c.id === targetClassId) || state.classes[0];
           classSelect.innerHTML = `<option value="${userClass.id}">${userClass.name}</option>`;
           classSelect.disabled = true;
         }
@@ -1324,17 +1378,21 @@ window.App = {
     const lessonSelect = document.getElementById('input-vocab-lesson');
     if (lessonSelect) {
       if (classLessons.length > 0) {
+        const activeLessonId = preselectedLessonId || (classLessons.some(l => l.id === state.selectedLessonId) ? state.selectedLessonId : classLessons[0].id);
         lessonSelect.innerHTML = classLessons.map(l => 
-          `<option value="${l.id}" ${(preselectedLessonId === l.id || state.selectedLessonId === l.id) ? 'selected' : ''}>${l.title}</option>`
+          `<option value="${l.id}" ${l.id === Number(activeLessonId) ? 'selected' : ''}>${l.title}</option>`
         ).join('');
       } else {
-        lessonSelect.innerHTML = `<option value="1">Unit mặc định</option>`;
+        lessonSelect.innerHTML = `<option value="">(Chưa có Unit - Hệ thống sẽ tự tạo)</option>`;
       }
     }
 
     // Reset inputs
     const wordInput = document.getElementById('input-vocab-word');
-    if (wordInput) wordInput.value = '';
+    if (wordInput) {
+      wordInput.value = '';
+      setTimeout(() => wordInput.focus(), 50);
+    }
     const meaningInput = document.getElementById('input-vocab-meaning');
     if (meaningInput) meaningInput.value = '';
     const ipaInput = document.getElementById('input-vocab-ipa');
@@ -1408,8 +1466,9 @@ window.App = {
     const isStudent = state.currentUser?.role === 'student';
     const classId = isStudent 
       ? Number(state.currentUser.class_id || 1)
-      : Number(document.getElementById('input-vocab-class')?.value || state.selectedClassId || 1);
-    const lessonId = Number(document.getElementById('input-vocab-lesson')?.value) || state.selectedLessonId || 1;
+      : Number(document.getElementById('input-vocab-class')?.value || state.selectedClassDetailId || state.selectedClassId || 1);
+    const lessonVal = document.getElementById('input-vocab-lesson')?.value;
+    const lessonId = lessonVal ? Number(lessonVal) : (state.selectedLessonId || null);
     const word = document.getElementById('input-vocab-word')?.value?.trim();
     const meaning = document.getElementById('input-vocab-meaning')?.value?.trim();
     const ipa = document.getElementById('input-vocab-ipa')?.value?.trim() || "";
@@ -1431,10 +1490,12 @@ window.App = {
         is_grammar: isGrammar
       });
 
-      showToast(`Đã thêm từ "${word}" vào lớp thành công! 🎉`, "success");
+      showToast(`Đã thêm từ "${word}" vào bài học thành công! 🎉`, "success");
       this.closeModal('create-vocabulary-modal');
       await this.loadAllData();
-      state.selectedLessonId = lessonId;
+      if (item && item.lesson_id) {
+        state.selectedLessonId = item.lesson_id;
+      }
       this.updateStudyList();
       this.render();
     } catch (err) {
@@ -1591,6 +1652,87 @@ window.App = {
   closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) modal.classList.add('hidden');
+  },
+
+  async openSessionDetailsModal(sessionId) {
+    const modal = document.getElementById('session-details-modal');
+    const content = document.getElementById('session-details-content');
+    if (!modal || !content) return;
+
+    content.innerHTML = `
+      <div class="py-12 text-center text-outline">
+        <div class="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+        <p class="text-xs">Đang tải chi tiết bài làm...</p>
+      </div>
+    `;
+    modal.classList.remove('hidden');
+
+    try {
+      const details = await SupabaseService.getTestSessionDetails(sessionId);
+      const session = state.testSessions.find(s => s.id === Number(sessionId));
+
+      if (!details || details.length === 0) {
+        content.innerHTML = `
+          <div class="p-8 text-center text-outline text-xs">
+            Không tìm thấy dữ liệu chi tiết các câu hỏi của bài thi này.
+          </div>
+        `;
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="p-2 space-y-4">
+          ${session ? `
+            <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/30 flex items-center justify-between text-xs">
+              <div>
+                <span class="font-bold text-on-surface">Điểm số: <strong class="text-primary">${session.score_percentage}%</strong></span>
+                <span class="mx-2 text-outline">•</span>
+                <span class="text-green-700 font-bold">${session.correct_count} đúng</span> / <span class="text-error font-medium">${session.wrong_count} sai</span>
+              </div>
+              <div class="text-outline">
+                Thời gian làm: <strong>${session.duration_seconds}s</strong>
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="space-y-3">
+            ${details.map((d, idx) => {
+              const wordText = d.vocabulary ? d.vocabulary.word : (d.word_id ? `Từ #${d.word_id}` : 'Câu hỏi');
+              const meaningText = d.vocabulary ? d.vocabulary.meaning : '';
+              return `
+                <div class="p-4 rounded-xl border ${d.is_correct ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'} text-xs">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-bold ${d.is_correct ? 'text-green-800' : 'text-red-800'} flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-base">${d.is_correct ? 'check_circle' : 'cancel'}</span>
+                      <span>Câu ${idx + 1}: <strong>${wordText}</strong> ${meaningText ? `(${meaningText})` : ''}</span>
+                    </span>
+                    <span class="font-mono text-[11px] px-2 py-0.5 rounded-full ${d.is_correct ? 'bg-green-100 text-green-800 font-bold' : 'bg-red-100 text-red-800 font-bold'}">
+                      ${d.is_correct ? 'ĐÚNG' : 'SAI'}
+                    </span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-outline-variant/20">
+                    <div>
+                      <span class="text-outline text-[11px] block">Học sinh trả lời:</span>
+                      <p class="font-mono font-bold ${d.is_correct ? 'text-green-700' : 'text-red-600'}">${d.user_answer || '(bỏ trống)'}</p>
+                    </div>
+                    <div>
+                      <span class="text-outline text-[11px] block">Đáp án chính xác:</span>
+                      <p class="font-mono font-bold text-green-800">${d.correct_answer || (d.vocabulary ? d.vocabulary.word : '--')}</p>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      content.innerHTML = `
+        <div class="p-6 text-center text-error text-xs">
+          Lỗi khi tải chi tiết bài làm: ${e.message}
+        </div>
+      `;
+    }
   },
 
   // =========================================================================
@@ -1815,20 +1957,38 @@ window.App = {
     const total = state.currentQuiz.length;
     const scorePct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
+    const targetClassId = Number(state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || 1);
     const sessionRecord = {
       user_id: state.currentUser?.id || "00000000-0000-0000-0000-000000000002",
-      class_id: state.selectedClassId || 1,
+      student_name: state.currentUser?.name || state.currentUser?.full_name || '',
+      class_id: targetClassId,
       session_type: 'multi_format',
       total_questions: total,
       correct_count: correct,
       wrong_count: wrong,
       skipped_count: skipped,
       score_percentage: scorePct,
-      duration_seconds: state.quizTimer
+      duration_seconds: state.quizTimer || 0
     };
 
     try {
       const savedSession = await SupabaseService.saveTestSession(sessionRecord, details);
+      try {
+        await SupabaseService.saveStudySession({
+          user_id: state.currentUser?.id || "guest",
+          user_name: state.currentUser?.name || state.currentUser?.full_name || 'Học sinh',
+          class_id: targetClassId,
+          lesson_id: state.selectedLessonId ? Number(state.selectedLessonId) : null,
+          activity_type: 'quiz',
+          duration_seconds: state.quizTimer || 0,
+          cards_viewed: total,
+          cards_mastered: correct,
+          score: scorePct
+        });
+      } catch (e) {
+        console.warn("Save study_session from quiz:", e);
+      }
+
       state.lastQuizResult = {
         ...sessionRecord,
         id: savedSession.id,
@@ -1839,6 +1999,19 @@ window.App = {
       this.switchTab('quiz_result');
     } catch (err) {
       console.error(err);
+      try {
+        await SupabaseService.saveStudySession({
+          user_id: state.currentUser?.id || "guest",
+          user_name: state.currentUser?.name || state.currentUser?.full_name || 'Học sinh',
+          class_id: targetClassId,
+          lesson_id: state.selectedLessonId ? Number(state.selectedLessonId) : null,
+          activity_type: 'quiz',
+          duration_seconds: state.quizTimer || 0,
+          cards_viewed: total,
+          cards_mastered: correct,
+          score: scorePct
+        });
+      } catch (e) {}
       state.lastQuizResult = { ...sessionRecord, details };
       await this.recordRealtimeActivity();
       this.switchTab('quiz_result');
@@ -2109,7 +2282,7 @@ window.App = {
     const user = state.currentUser;
     if (!user) return;
 
-    const roleLabel = user.role === 'host' ? '👑 Host' : user.role === 'assistant_teacher' ? '👩‍🏫 Trợ giảng' : '🎓 Học sinh';
+    const roleLabel = (user.role === 'host' || user.role === 'teacher') ? '👑 Host' : user.role === 'assistant_teacher' ? '👩‍🏫 Trợ giảng' : '🎓 Học sinh';
     const realtimeStreak = this.getStudentRealtimeStreak(user);
     
     // Header Badge
@@ -2120,7 +2293,7 @@ window.App = {
           <span class="material-symbols-outlined text-xs text-amber-500">local_fire_department</span>
           <span>${realtimeStreak}d</span>
         </div>
-        <div class="w-2 h-2 rounded-full ${user.role === 'host' ? 'bg-amber-500' : 'bg-green-500'}"></div>
+        <div class="w-2 h-2 rounded-full ${(user.role === 'host' || user.role === 'teacher') ? 'bg-amber-500' : 'bg-green-500'}"></div>
         <span class="text-xs font-bold text-on-surface">${user.full_name}</span>
         <span class="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono font-bold">${roleLabel}</span>
       `;
@@ -2132,7 +2305,7 @@ window.App = {
       sidebarProfile.innerHTML = `
         <div class="p-3 bg-surface-container-low rounded-xl flex items-center justify-between">
           <div class="flex items-center gap-2.5 cursor-pointer" onclick="App.openChangeMyPasswordModal()" title="Bấm để đổi mật khẩu của bạn">
-            <div class="w-8 h-8 rounded-full ${user.role === 'host' ? 'bg-amber-100 text-amber-900' : 'bg-primary text-on-primary'} flex items-center justify-center text-xs font-bold shadow-sm">
+            <div class="w-8 h-8 rounded-full ${(user.role === 'host' || user.role === 'teacher') ? 'bg-amber-100 text-amber-900' : 'bg-primary text-on-primary'} flex items-center justify-center text-xs font-bold shadow-sm">
               ${user.full_name.charAt(0)}
             </div>
             <div>
@@ -2504,7 +2677,7 @@ window.App = {
       return this.renderDashboardView();
     }
 
-    const isHost = state.currentUser?.role === 'host';
+    const isHost = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher');
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
     const assistantClassId = Number(state.currentUser?.class_id || 0);
     const assignedClass = state.classes.find(c => c.id === assistantClassId) || { name: `Lớp #${assistantClassId}` };
@@ -2565,7 +2738,7 @@ window.App = {
               <tbody class="divide-y divide-outline-variant/20">
                 ${users.length > 0 ? users.map((u, idx) => {
                   const itemClass = state.classes.find(c => c.id === u.class_id);
-                  const isUserHost = u.role === 'host';
+                  const isUserHost = (u.role === 'host' || u.role === 'teacher');
 
                   return `
                     <tr class="hover:bg-surface-container-low/50 transition-colors">
@@ -2797,7 +2970,7 @@ window.App = {
   renderClassesView() {
     const isStudent = state.currentUser?.role === 'student';
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
-    const isHost = state.currentUser?.role === 'host';
+    const isHost = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher');
 
     // If student, directly render their single assigned class
     if (isStudent) {
@@ -2885,7 +3058,7 @@ window.App = {
   renderClassDetailView(classId) {
     const isStudent = state.currentUser?.role === 'student';
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
-    const isHost = state.currentUser?.role === 'host';
+    const isHost = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher');
     const isTeacher = !isStudent;
 
     const targetClassId = Number(classId) || (isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1));
@@ -2971,13 +3144,13 @@ window.App = {
                 <p class="text-xs text-on-surface-variant">Luyện tập từ vựng, flashcard 3D và thi thử theo từng Unit của lớp.</p>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="App.openCreateLessonModal()" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
                   <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
                 </button>
-                <button onclick="App.openCreateVocabularyModal()" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
+                <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
                   <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
                 </button>
-                <button onclick="App.openBatchTableModal()" class="bg-surface-container text-primary px-3.5 py-2 rounded-xl font-bold text-xs border border-primary/30 flex items-center gap-1.5 hover:bg-surface-container-high">
+                <button onclick="App.openBatchTableModal(null, ${targetClassId})" class="bg-surface-container text-primary px-3.5 py-2 rounded-xl font-bold text-xs border border-primary/30 flex items-center gap-1.5 hover:bg-surface-container-high">
                   <span class="material-symbols-outlined text-sm">table_rows</span> + Bảng Nhập Từ Hàng Loạt
                 </button>
               </div>
@@ -2996,7 +3169,7 @@ window.App = {
                       <h4 class="font-headline-md text-base font-bold text-on-surface mb-3">${l.title}</h4>
                     </div>
                     <div class="flex items-center gap-1.5 pt-3 border-t border-outline-variant/30 flex-wrap">
-                      <button onclick="App.openCreateVocabularyModal(${l.id})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
+                      <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
                         <span class="material-symbols-outlined text-sm">add</span>
                       </button>
                       <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
@@ -3016,7 +3189,7 @@ window.App = {
               }).join('') : `
                 <div class="col-span-full p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                   <p class="text-outline font-semibold">Chưa có bài học nào trong lớp này.</p>
-                  <button onclick="App.openCreateLessonModal()" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold">
+                  <button onclick="App.openCreateLessonModal(${targetClassId})" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold">
                     + Tạo Bài Học Đầu Tiên
                   </button>
                 </div>
@@ -3034,10 +3207,10 @@ window.App = {
                 <p class="text-xs text-on-surface-variant">Tra cứu và quản lý toàn bộ từ vựng ôn thi vào 10 của lớp.</p>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="App.openCreateVocabularyModal()" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
                   <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
                 </button>
-                <button onclick="App.openBatchTableModal()" class="bg-primary-container text-on-primary-container px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                <button onclick="App.openBatchTableModal(null, ${targetClassId})" class="bg-primary-container text-on-primary-container px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
                   <span class="material-symbols-outlined text-sm">table_rows</span> + Thêm Dạng Bảng
                 </button>
                 <button onclick="App.ExcelService.exportVocabulary(classVocab)" class="bg-surface-container text-on-surface px-3.5 py-2 rounded-xl font-bold text-xs border border-outline-variant/40 flex items-center gap-1 hover:bg-surface-container-high">
@@ -3302,8 +3475,13 @@ window.App = {
                 </div>
                 <p class="text-xs text-outline uppercase font-bold">Thời Gian Cả Lớp Đã Học</p>
                 <p class="text-2xl font-bold text-on-surface mt-1">
-                  ${Math.max(1, Math.round((classStudySessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) + classTestSessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0)) / 60))} 
-                  <span class="text-xs font-normal text-outline">phút</span>
+                  ${(() => {
+                    const totalSecs = classStudySessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) + classTestSessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+                    const totalMins = Math.round(totalSecs / 60);
+                    if (totalSecs === 0) return `0 <span class="text-xs font-normal text-outline">phút</span>`;
+                    if (totalMins === 0) return `${totalSecs} <span class="text-xs font-normal text-outline">giây</span>`;
+                    return `${totalMins} <span class="text-xs font-normal text-outline">phút</span>`;
+                  })()}
                 </p>
               </div>
 
@@ -3315,7 +3493,7 @@ window.App = {
                   <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[11px] font-bold">Flashcard</span>
                 </div>
                 <p class="text-xs text-outline uppercase font-bold">Lượt Luyện Flashcard</p>
-                <p class="text-2xl font-bold text-on-surface mt-1">${classStudySessions.length} <span class="text-xs font-normal text-outline">phiên</span></p>
+                <p class="text-2xl font-bold text-on-surface mt-1">${classStudySessions.filter(s => s.activity_type === 'flashcard').length} <span class="text-xs font-normal text-outline">phiên</span></p>
               </div>
 
               <div class="bg-surface-container-lowest p-5 rounded-2xl ambient-shadow border border-outline-variant/30">
@@ -3327,7 +3505,7 @@ window.App = {
                 </div>
                 <p class="text-xs text-outline uppercase font-bold">Điểm Thi TB Toàn Lớp</p>
                 <p class="text-2xl font-bold text-on-surface mt-1">
-                  ${classTestSessions.length > 0 ? Math.round(classTestSessions.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / classTestSessions.length) + '%' : '88%'}
+                  ${classTestSessions.length > 0 ? Math.round(classTestSessions.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / classTestSessions.length) + '%' : '<span class="text-sm font-medium text-outline">Chưa có bài thi</span>'}
                 </p>
               </div>
             </div>
@@ -3364,8 +3542,10 @@ window.App = {
                       const stTests = classTestSessions.filter(s => s.user_id === st.id || (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
 
                       const fcSecs = stStudy.filter(s => s.activity_type === 'flashcard').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
-                      const quizSecs = stTests.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
-                      const totalMins = Math.max(1, Math.round((fcSecs + quizSecs) / 60));
+                      const quizSecs = stTests.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) + stStudy.filter(s => s.activity_type === 'quiz').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+                      const totalSecs = fcSecs + quizSecs;
+                      const totalMins = Math.round(totalSecs / 60);
+                      const displayTime = totalSecs === 0 ? '0 phút' : totalMins === 0 ? `${totalSecs}s` : `${totalMins} phút`;
 
                       const cardsMastered = stStudy.reduce((acc, s) => acc + (s.cards_mastered || 0), 0);
                       const testsCount = stTests.length;
@@ -3386,17 +3566,17 @@ window.App = {
                             </div>
                           </td>
                           <td class="p-4 text-center">
-                            <span class="px-2.5 py-1 rounded-full bg-blue-100 text-blue-900 font-bold text-xs">
-                              ⏱️ ${totalMins} phút
+                            <span class="px-2.5 py-1 rounded-full ${totalSecs > 0 ? 'bg-blue-100 text-blue-900 font-bold' : 'bg-surface-container text-outline font-medium'} text-xs">
+                              ⏱️ ${displayTime}
                             </span>
                           </td>
                           <td class="p-4 text-center text-xs">
-                            <p class="font-bold text-primary">${stStudy.length} lượt học</p>
+                            <p class="font-bold text-primary">${stStudy.filter(s => s.activity_type === 'flashcard').length} lượt học</p>
                             <p class="text-[11px] text-outline">${cardsMastered} thẻ thuộc</p>
                           </td>
                           <td class="p-4 text-center text-xs">
                             <p class="font-bold text-on-surface">${testsCount} bài thi</p>
-                            <p class="text-[11px] ${avgSc >= 80 ? 'text-green-700 font-bold' : 'text-outline'}">TB: ${avgSc > 0 ? avgSc + '%' : 'Chưa thi'}</p>
+                            <p class="text-[11px] ${avgSc >= 80 ? 'text-green-700 font-bold' : 'text-outline'}">TB: ${testsCount > 0 ? avgSc + '%' : 'Chưa thi'}</p>
                           </td>
                           <td class="p-4 text-center">
                             ${(() => {
@@ -3419,9 +3599,18 @@ window.App = {
                             })()}
                           </td>
                           <td class="p-4 text-center">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-bold ${avgSc >= 90 ? 'bg-green-100 text-green-900' : avgSc >= 80 ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-900'}">
-                              ${avgSc >= 90 ? 'Xuất sắc' : avgSc >= 80 ? 'Giỏi' : 'Chăm chỉ'}
-                            </span>
+                            ${(() => {
+                              if (testsCount > 0) {
+                                if (avgSc >= 90) return '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-900 border border-green-300">Xuất sắc</span>';
+                                if (avgSc >= 80) return '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-900 border border-blue-300">Giỏi</span>';
+                                if (avgSc >= 65) return '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">Khá</span>';
+                                return '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-900 border border-red-300">Cần cố gắng</span>';
+                              } else if (stStudy.length > 0) {
+                                return '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-900 border border-purple-300">Đang luyện từ</span>';
+                              } else {
+                                return '<span class="px-2.5 py-1 rounded-full text-xs font-medium bg-surface-container text-outline border border-outline-variant/30">Chưa bắt đầu</span>';
+                              }
+                            })()}
                           </td>
                           <td class="p-4 text-center">
                             <button onclick="App.openStudentHistoryModal('${st.id}')" class="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-primary hover:text-on-primary text-primary font-bold text-xs transition-colors">
@@ -3461,10 +3650,10 @@ window.App = {
             <p class="font-body-md text-sm text-on-surface-variant">Danh mục chuyên đề ôn thi vào 10 cho ${activeClass.name}.</p>
           </div>
           <div class="flex items-center gap-3 flex-wrap">
-            <button onclick="App.openCreateVocabularyModal()" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+            <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Từ Vựng
             </button>
-            <button onclick="App.openCreateLessonModal()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+            <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
             </button>
           </div>
@@ -3483,7 +3672,7 @@ window.App = {
                   <h3 class="font-headline-md text-base font-bold text-on-surface mb-2">${l.title}</h3>
                 </div>
                 <div class="flex items-center gap-1.5 pt-4 border-t border-outline-variant/30 flex-wrap">
-                  <button onclick="App.openCreateVocabularyModal(${l.id})" class="p-2 bg-surface-container text-primary font-bold text-xs rounded-xl hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
+                  <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary font-bold text-xs rounded-xl hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
                     <span class="material-symbols-outlined text-base">add</span>
                   </button>
                   <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
@@ -4169,14 +4358,20 @@ window.App = {
         s.user_id === st.id || 
         (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
       );
+      const studySessions = (state.studySessions || []).filter(s =>
+        s.user_id === st.id || 
+        (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
+      );
+      const flashcardSessions = studySessions.filter(s => s.activity_type === 'flashcard');
       const totalTests = sessions.length;
       const avgScore = totalTests > 0 ? Math.round(sessions.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / totalTests) : 0;
       const maxScore = totalTests > 0 ? Math.max(...sessions.map(s => s.score_percentage || 0)) : 0;
       const totalCorrect = sessions.reduce((acc, s) => acc + (s.correct_count || 0), 0);
       const totalQuestions = sessions.reduce((acc, s) => acc + (s.total_questions || 0), 0);
       const avgDuration = totalTests > 0 ? Math.round(sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) / totalTests) : 0;
+      const totalStudySecs = studySessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) + sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
 
-      let evalLabel = "Chưa làm bài";
+      let evalLabel = "Chưa bắt đầu học";
       let evalClass = "bg-surface-container text-outline border-outline-variant/30";
       if (totalTests > 0) {
         if (avgScore >= 90) {
@@ -4192,11 +4387,17 @@ window.App = {
           evalLabel = "Cần cố gắng (<6.5)";
           evalClass = "bg-red-100 text-red-900 border-red-300 font-bold";
         }
+      } else if (studySessions.length > 0) {
+        evalLabel = `Đang luyện từ (${flashcardSessions.length} lượt)`;
+        evalClass = "bg-purple-100 text-purple-900 border-purple-300 font-bold";
       }
 
       return {
         student: st,
         sessions,
+        studySessions,
+        flashcardSessions,
+        totalStudySecs,
         totalTests,
         avgScore,
         maxScore,
@@ -4223,17 +4424,22 @@ window.App = {
       if (!selectedMetric) {
         const foundUser = state.usersList.find(u => u.id === effectiveSelectedStudentId);
         if (foundUser) {
+          const userTests = state.testSessions.filter(s => s.user_id === foundUser.id || (foundUser.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+          const userStudy = (state.studySessions || []).filter(s => s.user_id === foundUser.id || (foundUser.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
           selectedMetric = {
             student: foundUser,
-            sessions: state.testSessions.filter(s => s.user_id === foundUser.id || (foundUser.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')),
-            totalTests: 0,
-            avgScore: 0,
-            maxScore: 0,
-            totalCorrect: 0,
-            totalQuestions: 0,
-            avgDuration: 0,
-            evalLabel: "Chưa có bài thi",
-            evalClass: "bg-surface-container text-outline"
+            sessions: userTests,
+            studySessions: userStudy,
+            flashcardSessions: userStudy.filter(s => s.activity_type === 'flashcard'),
+            totalStudySecs: userStudy.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) + userTests.reduce((acc, s) => acc + (s.duration_seconds || 0), 0),
+            totalTests: userTests.length,
+            avgScore: userTests.length > 0 ? Math.round(userTests.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / userTests.length) : 0,
+            maxScore: userTests.length > 0 ? Math.max(...userTests.map(s => s.score_percentage || 0)) : 0,
+            totalCorrect: userTests.reduce((acc, s) => acc + (s.correct_count || 0), 0),
+            totalQuestions: userTests.reduce((acc, s) => acc + (s.total_questions || 0), 0),
+            avgDuration: userTests.length > 0 ? Math.round(userTests.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) / userTests.length) : 0,
+            evalLabel: userTests.length > 0 ? "Đã có kết quả thi" : userStudy.length > 0 ? "Đang luyện flashcard" : "Chưa bắt đầu học",
+            evalClass: userTests.length > 0 ? "bg-blue-100 text-blue-900 border-blue-300 font-bold" : userStudy.length > 0 ? "bg-purple-100 text-purple-900 border-purple-300 font-bold" : "bg-surface-container text-outline"
           };
         }
       }
@@ -4324,17 +4530,17 @@ window.App = {
 
               <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-center min-w-[100px]">
                 <p class="text-[10px] text-outline font-bold uppercase">Điểm Trung Bình</p>
-                <p class="font-display-lg text-xl font-bold text-on-surface mt-0.5">${selectedMetric.avgScore}%</p>
+                <p class="font-display-lg text-xl font-bold text-on-surface mt-0.5">${selectedMetric.totalTests > 0 ? selectedMetric.avgScore + '%' : '--'}</p>
               </div>
 
               <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-center min-w-[100px]">
                 <p class="text-[10px] text-outline font-bold uppercase">Điểm Cao Nhất</p>
-                <p class="font-display-lg text-xl font-bold text-green-700 mt-0.5">${selectedMetric.maxScore}%</p>
+                <p class="font-display-lg text-xl font-bold text-green-700 mt-0.5">${selectedMetric.totalTests > 0 ? selectedMetric.maxScore + '%' : '--'}</p>
               </div>
 
               <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-center min-w-[100px]">
                 <p class="text-[10px] text-outline font-bold uppercase">Thời Gian TB</p>
-                <p class="font-display-lg text-xl font-bold text-secondary mt-0.5">${selectedMetric.avgDuration}s</p>
+                <p class="font-display-lg text-xl font-bold text-secondary mt-0.5">${selectedMetric.totalTests > 0 ? selectedMetric.avgDuration + 's' : '--'}</p>
               </div>
             </div>
           </div>
@@ -4346,10 +4552,10 @@ window.App = {
                 <span class="font-bold text-xs text-on-surface flex items-center gap-1.5">
                   <span class="w-3 h-3 rounded-full bg-blue-500"></span> Điền Từ Tiếng Anh (type_en)
                 </span>
-                <span class="font-bold text-xs text-primary">${Math.min(100, selectedMetric.avgScore > 0 ? selectedMetric.avgScore + 2 : 88)}%</span>
+                <span class="font-bold text-xs text-primary">${selectedMetric.totalTests > 0 ? Math.min(100, selectedMetric.avgScore + 2) + '%' : 'Chờ thi'}</span>
               </div>
               <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden mb-2">
-                <div class="bg-primary h-full rounded-full" style="width: ${Math.min(100, selectedMetric.avgScore > 0 ? selectedMetric.avgScore + 2 : 88)}%;"></div>
+                <div class="bg-primary h-full rounded-full" style="width: ${selectedMetric.totalTests > 0 ? Math.min(100, selectedMetric.avgScore + 2) : 0}%;"></div>
               </div>
               <p class="text-[11px] text-outline">Kỹ năng chính tả & nhớ từ vựng tiếng Anh trực tiếp.</p>
             </div>
@@ -4359,10 +4565,10 @@ window.App = {
                 <span class="font-bold text-xs text-on-surface flex items-center gap-1.5">
                   <span class="w-3 h-3 rounded-full bg-purple-500"></span> Điền Nghĩa Tiếng Việt (type_vi)
                 </span>
-                <span class="font-bold text-xs text-purple-700">${Math.min(100, selectedMetric.avgScore > 0 ? selectedMetric.avgScore + 5 : 92)}%</span>
+                <span class="font-bold text-xs text-purple-700">${selectedMetric.totalTests > 0 ? Math.min(100, selectedMetric.avgScore + 5) + '%' : 'Chờ thi'}</span>
               </div>
               <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden mb-2">
-                <div class="bg-purple-600 h-full rounded-full" style="width: ${Math.min(100, selectedMetric.avgScore > 0 ? selectedMetric.avgScore + 5 : 92)}%;"></div>
+                <div class="bg-purple-600 h-full rounded-full" style="width: ${selectedMetric.totalTests > 0 ? Math.min(100, selectedMetric.avgScore + 5) : 0}%;"></div>
               </div>
               <p class="text-[11px] text-outline">Kỹ năng hiểu nghĩa và ngữ cảnh dịch thuật.</p>
             </div>
@@ -4372,10 +4578,10 @@ window.App = {
                 <span class="font-bold text-xs text-on-surface flex items-center gap-1.5">
                   <span class="w-3 h-3 rounded-full bg-green-500"></span> Trắc Nghiệm & Ngữ Pháp
                 </span>
-                <span class="font-bold text-xs text-green-700">${Math.min(100, selectedMetric.avgScore > 0 ? selectedMetric.avgScore - 3 : 85)}%</span>
+                <span class="font-bold text-xs text-green-700">${selectedMetric.totalTests > 0 ? Math.max(0, selectedMetric.avgScore - 3) + '%' : 'Chờ thi'}</span>
               </div>
               <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden mb-2">
-                <div class="bg-green-600 h-full rounded-full" style="width: ${Math.min(100, selectedMetric.avgScore > 0 ? selectedMetric.avgScore - 3 : 85)}%;"></div>
+                <div class="bg-green-600 h-full rounded-full" style="width: ${selectedMetric.totalTests > 0 ? Math.max(0, selectedMetric.avgScore - 3) : 0}%;"></div>
               </div>
               <p class="text-[11px] text-outline">Phản xạ chọn đáp án và áp dụng cấu trúc câu vào 10.</p>
             </div>
@@ -4452,12 +4658,13 @@ window.App = {
     const totalClassTests = studentMetrics.reduce((acc, m) => acc + m.totalTests, 0);
     const avgClassScore = studentMetrics.length > 0 && totalClassTests > 0
       ? Math.round(studentMetrics.reduce((acc, m) => acc + (m.avgScore * m.totalTests), 0) / totalClassTests)
-      : 86;
-    const topStudent = studentMetrics.length > 0
-      ? studentMetrics.reduce((prev, curr) => (curr.avgScore > prev.avgScore ? curr : prev), studentMetrics[0])
       : null;
-    const targetAchievedCount = studentMetrics.filter(m => m.avgScore >= 90).length;
-    const targetPercentage = studentMetrics.length > 0 ? Math.round((targetAchievedCount / studentMetrics.length) * 100) : 0;
+    const activeTestedStudents = studentMetrics.filter(m => m.totalTests > 0);
+    const topStudent = activeTestedStudents.length > 0
+      ? activeTestedStudents.reduce((prev, curr) => (curr.avgScore > prev.avgScore ? curr : prev), activeTestedStudents[0])
+      : null;
+    const targetAchievedCount = studentMetrics.filter(m => m.totalTests > 0 && m.avgScore >= 90).length;
+    const targetPercentage = activeTestedStudents.length > 0 ? Math.round((targetAchievedCount / activeTestedStudents.length) * 100) : 0;
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
@@ -4509,7 +4716,7 @@ window.App = {
               <span class="bg-surface-container-highest text-secondary font-label-sm px-2.5 py-0.5 rounded-full text-xs font-bold">Mục tiêu 9.0</span>
             </div>
             <h3 class="font-label-md text-xs text-on-surface-variant uppercase tracking-wider">Điểm Trung Bình Lớp</h3>
-            <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${avgClassScore}%</p>
+            <p class="font-display-lg text-3xl font-bold text-on-surface mt-1">${avgClassScore !== null ? avgClassScore + '%' : '<span class="text-base font-normal text-outline">Chưa có bài thi</span>'}</p>
           </div>
 
           <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 hover-lift">
@@ -4571,8 +4778,8 @@ window.App = {
                     </td>
                     <td class="p-4 font-mono font-bold text-primary">@${m.student.username}</td>
                     <td class="p-4 text-center font-semibold">${m.totalTests} bài</td>
-                    <td class="p-4 text-center font-bold text-primary text-sm">${m.avgScore}%</td>
-                    <td class="p-4 text-center font-bold text-green-700">${m.maxScore}%</td>
+                    <td class="p-4 text-center font-bold text-primary text-sm">${m.totalTests > 0 ? m.avgScore + '%' : '--'}</td>
+                    <td class="p-4 text-center font-bold text-green-700">${m.totalTests > 0 ? m.maxScore + '%' : '--'}</td>
                     <td class="p-4 text-center font-bold text-amber-600">🔥 ${this.getStudentRealtimeStreak(m.student)} ngày</td>
                     <td class="p-4 text-center">
                       <span class="px-2.5 py-1 rounded-full font-bold text-[11px] border ${m.evalClass}">
@@ -4689,7 +4896,7 @@ window.App = {
             <div class="space-y-2 text-xs">
               <p><span class="font-bold text-outline">Họ và tên:</span> ${user.full_name}</p>
               <p><span class="font-bold text-outline">Tên đăng nhập:</span> @${user.username}</p>
-              <p><span class="font-bold text-outline">Vai trò:</span> ${user.role === 'host' ? 'Quản trị viên (Host)' : user.role === 'assistant_teacher' ? 'Giáo viên phụ' : 'Học sinh'}</p>
+              <p><span class="font-bold text-outline">Vai trò:</span> ${(user.role === 'host' || user.role === 'teacher') ? 'Quản trị viên (Host)' : user.role === 'assistant_teacher' ? 'Giáo viên phụ' : 'Học sinh'}</p>
             </div>
             <div class="pt-3 border-t border-outline-variant/30">
               <button onclick="App.openChangeMyPasswordModal()" class="w-full bg-primary text-on-primary py-2.5 rounded-xl font-bold text-xs btn-press flex items-center justify-center gap-1.5 hover-lift">

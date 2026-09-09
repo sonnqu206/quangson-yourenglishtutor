@@ -458,13 +458,25 @@ export const SupabaseService = {
     if (client) {
       try {
         const { data, error } = await client.from('lessons').insert([newLesson]).select();
-        if (!error && data && data[0]) return data[0];
+        if (!error && data && data[0]) {
+          const local = getLocalData();
+          if (!local.lessons) local.lessons = [];
+          if (!local.lessons.some(l => l.id === data[0].id)) {
+            local.lessons.push(data[0]);
+            saveLocalData(local);
+          }
+          return data[0];
+        }
+        if (error) {
+          console.warn("Supabase createLesson error:", error);
+        }
       } catch (err) {
         console.warn("Supabase createLesson fallback:", err);
       }
     }
 
     const local = getLocalData();
+    if (!local.lessons) local.lessons = [];
     const newId = local.lessons.length ? Math.max(...local.lessons.map(l => l.id)) + 1 : 1;
     const item = { id: newId, ...newLesson };
     local.lessons.push(item);
@@ -550,6 +562,23 @@ export const SupabaseService = {
    */
   async ensureClassLesson(classId) {
     const targetClassId = Number(classId) || 1;
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { data: sbLessons } = await client.from('lessons').select('*').eq('class_id', targetClassId).order('id', { ascending: true });
+        if (sbLessons && sbLessons.length > 0) {
+          const local = getLocalData();
+          if (!local.lessons) local.lessons = [];
+          sbLessons.forEach(sl => {
+            if (!local.lessons.some(l => l.id === sl.id)) local.lessons.push(sl);
+          });
+          saveLocalData(local);
+          return sbLessons[0].id;
+        }
+      } catch (err) {
+        console.warn("Supabase check lessons in ensureClassLesson:", err);
+      }
+    }
     const lessons = await this.getLessons(targetClassId);
     if (lessons && lessons.length > 0) {
       return lessons[0].id;
@@ -591,8 +620,24 @@ export const SupabaseService = {
     const client = getSupabase();
     if (client) {
       try {
+        // Đảm bảo lesson_id tồn tại trên Supabase để không dính lỗi foreign key constraint
+        const { data: checkL } = await client.from('lessons').select('id').eq('id', lesson_id).single();
+        if (!checkL) {
+          lesson_id = await this.ensureClassLesson(class_id);
+          item.lesson_id = lesson_id;
+        }
         const { data, error } = await client.from('vocabulary').insert([item]).select();
-        if (!error && data && data[0]) return data[0];
+        if (!error && data && data[0]) {
+          const local = getLocalData();
+          if (!local.vocabulary.some(v => v.id === data[0].id)) {
+            local.vocabulary.unshift(data[0]);
+            saveLocalData(local);
+          }
+          return data[0];
+        }
+        if (error) {
+          console.warn("Supabase addVocabulary error:", error);
+        }
       } catch (err) {
         console.warn("Supabase addVocabulary fallback:", err);
       }
@@ -622,6 +667,18 @@ export const SupabaseService = {
       }
     }
 
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { data: checkL } = await client.from('lessons').select('id').eq('id', targetLessonId).single();
+        if (!checkL) {
+          targetLessonId = await this.ensureClassLesson(targetClassId);
+        }
+      } catch (e) {
+        console.warn("Verify lesson in bulkInsertVocabulary:", e);
+      }
+    }
+
     const records = vocabList.map(v => ({
       class_id: targetClassId,
       lesson_id: targetLessonId,
@@ -635,11 +692,20 @@ export const SupabaseService = {
 
     if (records.length === 0) return [];
 
-    const client = getSupabase();
     if (client) {
       try {
         const { data, error } = await client.from('vocabulary').insert(records).select();
-        if (!error && data) return data;
+        if (!error && data && data.length > 0) {
+          const local = getLocalData();
+          const existingIds = new Set(local.vocabulary.map(v => v.id));
+          const newItems = data.filter(d => !existingIds.has(d.id));
+          local.vocabulary = [...newItems, ...local.vocabulary];
+          saveLocalData(local);
+          return data;
+        }
+        if (error) {
+          console.warn("Supabase bulkInsert error:", error);
+        }
       } catch (err) {
         console.warn("Supabase bulkInsert fallback:", err);
       }
@@ -726,20 +792,27 @@ export const SupabaseService = {
   },
 
   /**
-   * Lưu kết quả làm bài kiểm tra (Tự động gắn đúng class_id)
+   * Lưu kết quả làm bài kiểm tra (Tự động gắn đúng class_id, hỗ trợ cả UUID và Custom ID)
    */
   async saveTestSession(sessionData, detailsList = []) {
+    const isUuid = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    const validUserId = isUuid(sessionData.user_id) ? sessionData.user_id : null;
+
     const record = {
-      user_id: sessionData.user_id || "00000000-0000-0000-0000-000000000002",
+      user_id: validUserId,
       class_id: Number(sessionData.class_id) || 1,
       session_type: sessionData.session_type || 'lesson_based',
-      test_scope: sessionData.test_scope || {},
+      test_scope: {
+        ...(sessionData.test_scope || {}),
+        student_id: sessionData.user_id || null,
+        student_name: sessionData.student_name || sessionData.user_name || ''
+      },
       total_questions: sessionData.total_questions || 0,
       correct_count: sessionData.correct_count || 0,
       wrong_count: sessionData.wrong_count || 0,
       skipped_count: sessionData.skipped_count || 0,
       score_percentage: sessionData.score_percentage || 0,
-      duration_seconds: sessionData.duration_seconds || 0,
+      duration_seconds: Number(sessionData.duration_seconds) || 0,
       created_at: new Date().toISOString()
     };
 
@@ -750,17 +823,28 @@ export const SupabaseService = {
         if (!error && sessionRes && sessionRes[0]) {
           const sessionId = sessionRes[0].id;
           if (detailsList.length > 0) {
-            const details = detailsList.map(d => ({
-              session_id: sessionId,
-              word_id: d.word_id,
-              user_answer: d.user_answer,
-              correct_answer: d.correct_answer,
-              is_correct: d.is_correct,
-              is_skipped: Boolean(d.is_skipped)
-            }));
-            await client.from('session_details').insert(details);
+            try {
+              const details = detailsList.map(d => ({
+                session_id: sessionId,
+                word_id: d.word_id,
+                user_answer: d.user_answer,
+                correct_answer: d.correct_answer,
+                is_correct: d.is_correct,
+                is_skipped: Boolean(d.is_skipped)
+              }));
+              await client.from('session_details').insert(details);
+            } catch (e) {
+              console.warn("Supabase session_details insert fallback:", e);
+            }
           }
-          return sessionRes[0];
+          const local = getLocalData();
+          const localRecord = { ...sessionRes[0], user_id: sessionData.user_id };
+          local.test_sessions.unshift(localRecord);
+          saveLocalData(local);
+          return localRecord;
+        }
+        if (error) {
+          console.warn("Supabase saveTestSession error:", error);
         }
       } catch (err) {
         console.warn("Supabase saveTestSession fallback:", err);
@@ -769,7 +853,7 @@ export const SupabaseService = {
 
     const local = getLocalData();
     const newId = local.test_sessions.length ? Math.max(...local.test_sessions.map(s => s.id)) + 1 : 1;
-    const saved = { id: newId, ...record };
+    const saved = { id: newId, ...record, user_id: sessionData.user_id };
     local.test_sessions.unshift(saved);
     
     if (detailsList.length > 0) {
@@ -852,15 +936,15 @@ export const SupabaseService = {
    */
   async saveStudySession(sessionData) {
     const record = {
-      user_id: sessionData.user_id || "anonymous",
-      user_name: sessionData.user_name || "Học sinh",
+      user_id: sessionData.user_id ? String(sessionData.user_id) : 'guest',
+      user_name: sessionData.user_name || 'Học sinh',
       class_id: Number(sessionData.class_id) || 1,
       lesson_id: sessionData.lesson_id ? Number(sessionData.lesson_id) : null,
       activity_type: sessionData.activity_type || 'flashcard', // 'flashcard' | 'quiz' | 'vocabulary'
-      duration_seconds: Math.max(1, Number(sessionData.duration_seconds) || 1),
+      duration_seconds: Math.max(0, Number(sessionData.duration_seconds) || 0),
       cards_viewed: Number(sessionData.cards_viewed) || 0,
       cards_mastered: Number(sessionData.cards_mastered) || 0,
-      score: sessionData.score !== undefined ? Number(sessionData.score) : null,
+      score: sessionData.score !== undefined && sessionData.score !== null ? Number(sessionData.score) : null,
       created_at: new Date().toISOString()
     };
 
