@@ -136,6 +136,39 @@
       transform: rotateY(180deg);
     }
 
+    /* SEEE 3D Flip Card Styles */
+    .seee-card-scene {
+      perspective: 1200px;
+      width: 100%;
+      min-height: 340px;
+    }
+    .seee-card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 340px;
+      transition: transform .55s cubic-bezier(.4,0,.2,1);
+      transform-style: preserve-3d;
+    }
+    .seee-card-scene.flipped .seee-card-inner {
+      transform: rotateY(180deg);
+    }
+    .seee-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 1.5rem;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+    .seee-face-back {
+      transform: rotateY(180deg);
+    }
+
     /* Custom Scrollbar */
     ::-webkit-scrollbar {
       width: 6px;
@@ -513,6 +546,13 @@
             class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-mono uppercase focus:outline-none focus:border-primary text-xs"
           />
         </div>
+        <div>
+          <label class="block font-bold text-xs text-on-surface mb-1">Phân loại Lớp</label>
+          <select id="input-class-category" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-semibold">
+            <option value="STANDARD">Lớp Ôn Thi Vào 10 Thông Thường</option>
+            <option value="HUST_CHILD">Lớp con / Chuyên đề thuộc HUST20261-SƠN (SEEE)</option>
+          </select>
+        </div>
         <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30">
           <button type="button" onclick="App.closeModal('create-class-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
           <button type="submit" class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press">Tạo Lớp Học</button>
@@ -623,6 +663,16 @@
           />
         </div>
 
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Definition (Định nghĩa tiếng Anh / Ví dụ câu)</label>
+          <textarea 
+            id="input-vocab-definition" 
+            rows="2"
+            placeholder="Ví dụ: Physical substance in the universe. (Bắt buộc cho lớp HUST SEEE)" 
+            class="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-normal"
+          ></textarea>
+        </div>
+
         <div class="flex items-center gap-2 pt-1">
           <input type="checkbox" id="input-vocab-is-grammar" class="w-4 h-4 rounded text-primary focus:ring-primary border-outline-variant/50" />
           <label for="input-vocab-is-grammar" class="text-xs font-bold text-on-surface cursor-pointer select-none">
@@ -707,6 +757,16 @@
             placeholder="Ví dụ: /juːˈbɪk.wə.təs/" 
             class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl font-mono focus:outline-none focus:border-primary text-xs text-outline"
           />
+        </div>
+
+        <div>
+          <label class="block font-bold text-on-surface mb-1">Definition (Định nghĩa tiếng Anh / Ví dụ câu)</label>
+          <textarea 
+            id="input-edit-vocab-definition" 
+            rows="2"
+            placeholder="Ví dụ: Physical substance in the universe." 
+            class="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-normal"
+          ></textarea>
         </div>
 
         <div class="flex items-center gap-2 pt-1">

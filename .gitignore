@@ -18,3 +18,5 @@ dist/
 .output/
 .vercel/
 .netlify/
+scratch/
+test_merge.js

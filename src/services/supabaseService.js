@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from '../config.js';
+import { SEEE_DATA } from '../data/seeeData.js';
 
 let supabaseClient = null;
 
@@ -292,26 +293,118 @@ const SEED_DATA = {
 
 const LOCAL_STORAGE_KEY = "QUANG_SON_LMS_ISOLATED_DATA_V3";
 
-function getLocalData() {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (!parsed.study_sessions) parsed.study_sessions = [];
-      return parsed;
-    }
-  } catch (e) {
-    console.warn("Could not read local data:", e);
+function ensureSEEEData(parsed) {
+  if (!parsed.classes) parsed.classes = [];
+  if (!parsed.lessons) parsed.lessons = [];
+  if (!parsed.vocabulary) parsed.vocabulary = [];
+  if (!parsed.study_sessions) parsed.study_sessions = [];
+
+  // Check if HUST class exists
+  let hustClass = parsed.classes.find(c => c.id === 11 || (c.class_code && c.class_code.toUpperCase() === 'HUST20261'));
+  if (!hustClass) {
+    hustClass = {
+      id: 11,
+      name: "HUST20261-SƠN",
+      class_code: "HUST20261",
+      category: "HUST",
+      is_hub: true,
+      created_at: "2026-09-09T13:32:23.454Z"
+    };
+    parsed.classes.push(hustClass);
+  } else {
+    hustClass.category = "HUST";
+    hustClass.is_hub = true;
   }
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(SEED_DATA));
-  return JSON.parse(JSON.stringify(SEED_DATA));
+
+  // Check if SEEE lessons exist
+  const unitTitles = Object.keys(SEEE_DATA);
+  const lessonMap = {
+    "Unit 1: Electrons": 15,
+    "Unit 2: Electric Current": 16,
+    "Unit 3: Cells & Batteries": 17,
+    "Unit 4: Sources of Power": 18,
+    "Unit 5: Mains Electricity, Plugs & Fuses": 19,
+    "Unit 6: Electricity & Magnetism": 20,
+    "Unit 7: Resistors": 21,
+    "Unit 8: Capacitors": 22,
+    "Unit 9: Inductors": 23,
+    "Unit 10: Semiconductor & Diodes": 24
+  };
+
+  unitTitles.forEach(title => {
+    const lId = lessonMap[title];
+    if (!parsed.lessons.some(l => l.id === lId)) {
+      parsed.lessons.push({
+        id: lId,
+        class_id: 11,
+        title: title,
+        created_at: "2026-09-09T13:33:00.000Z"
+      });
+    }
+  });
+
+  // Check vocabulary
+  const existingWords = new Set(parsed.vocabulary.filter(v => v.class_id === 11).map(v => v.word.toLowerCase()));
+  let vocabIdBase = 1000;
+  unitTitles.forEach(title => {
+    const lId = lessonMap[title];
+    const terms = SEEE_DATA[title] || [];
+    terms.forEach(t => {
+      if (!existingWords.has(t.term.toLowerCase())) {
+        existingWords.add(t.term.toLowerCase());
+        parsed.vocabulary.push({
+          id: vocabIdBase + (t.id || 0),
+          class_id: 11,
+          lesson_id: lId,
+          word: t.term,
+          meaning: t.meaning,
+          meaning_vi_long: t.vi || "",
+          vi: t.vi || "",
+          ipa: t.phonetics || "",
+          example: t.en || "",
+          definition: t.en || "",
+          en: t.en || "",
+          is_grammar: false,
+          created_at: "2026-09-09T13:33:00.000Z"
+        });
+      }
+    });
+  });
+
+  return parsed;
+}
+
+let inMemoryFallback = null;
+
+function getLocalData() {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        ensureSEEEData(parsed);
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("Could not read local data:", e);
+    }
+  } else if (inMemoryFallback) {
+    return inMemoryFallback;
+  }
+  const fresh = JSON.parse(JSON.stringify(SEED_DATA));
+  ensureSEEEData(fresh);
+  saveLocalData(fresh);
+  return fresh;
 }
 
 function saveLocalData(data) {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn("Could not write local data:", e);
+  inMemoryFallback = data;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn("Could not write local data:", e);
+    }
   }
 }
 
@@ -343,7 +436,15 @@ export const SupabaseService = {
     }
     const local = getLocalData();
     const supabaseIds = new Set(supabaseData.map(c => c.id));
-    const mergedLocal = local.classes.filter(c => !supabaseIds.has(c.id));
+    const supabaseCodes = new Set(supabaseData.map(c => (c.class_code || '').toUpperCase()));
+
+    // Merge metadata like creator_id or parent_id or category from local into supabaseData
+    supabaseData = supabaseData.map(sc => {
+      const matchedLocal = local.classes.find(lc => lc.id === sc.id || lc.class_code === sc.class_code);
+      return matchedLocal ? { ...matchedLocal, ...sc } : sc;
+    });
+
+    const mergedLocal = local.classes.filter(c => !supabaseIds.has(c.id) && !supabaseCodes.has((c.class_code || '').toUpperCase()));
     return [...supabaseData, ...mergedLocal].sort((a,b) => a.id - b.id);
   },
 
@@ -366,30 +467,46 @@ export const SupabaseService = {
   },
 
   /**
-   * Thêm lớp học mới (Hỗ trợ creator_id của Host và Giáo viên phụ)
+   * Thêm lớp học mới (Hỗ trợ creator_id, parent_id, category và tạo lớp không giới hạn)
    */
-  async createClass(name, customCode = null, creatorId = null) {
+  async createClass(name, customCode = null, creatorId = null, extraMeta = {}) {
     const code = customCode ? customCode.trim().toUpperCase() : "QS" + Math.random().toString(36).substring(2, 7).toUpperCase();
-    const newClass = {
+    const supabasePayload = {
       name: name.trim(),
       class_code: code,
-      creator_id: creatorId || null,
       created_at: new Date().toISOString()
     };
 
+    let created = null;
     const client = getSupabase();
     if (client) {
       try {
-        const { data, error } = await client.from('classes').insert([newClass]).select();
-        if (!error && data && data[0]) return data[0];
+        const { data, error } = await client.from('classes').insert([supabasePayload]).select();
+        if (!error && data && data[0]) {
+          created = data[0];
+        } else if (error) {
+          console.warn("Supabase createClass error:", error);
+        }
       } catch (err) {
         console.warn("Supabase createClass fallback:", err);
       }
     }
 
     const local = getLocalData();
+    if (created) {
+      const fullItem = { ...created, creator_id: creatorId || null, ...extraMeta };
+      const existingIdx = local.classes.findIndex(c => c.id === fullItem.id || c.class_code.toUpperCase() === fullItem.class_code.toUpperCase());
+      if (existingIdx !== -1) {
+        local.classes[existingIdx] = { ...local.classes[existingIdx], ...fullItem };
+      } else {
+        local.classes.push(fullItem);
+      }
+      saveLocalData(local);
+      return fullItem;
+    }
+
     const newId = local.classes.length ? Math.max(...local.classes.map(c => c.id)) + 1 : 1;
-    const item = { id: newId, ...newClass };
+    const item = { id: newId, ...supabasePayload, creator_id: creatorId || null, ...extraMeta };
     local.classes.push(item);
     saveLocalData(local);
     return item;
@@ -554,7 +671,11 @@ export const SupabaseService = {
     
     const supabaseIds = new Set(supabaseData.map(v => v.id));
     const mergedLocal = result.filter(v => !supabaseIds.has(v.id));
-    return [...supabaseData, ...mergedLocal].sort((a,b) => b.id - a.id);
+    return [...supabaseData, ...mergedLocal].map(v => ({
+      ...v,
+      definition: v.definition || v.example || "",
+      en: v.en || v.definition || v.example || ""
+    })).sort((a,b) => b.id - a.id);
   },
 
   /**
@@ -606,13 +727,14 @@ export const SupabaseService = {
       }
     }
 
+    const exampleVal = String(vocabData.example || vocabData.definition || "").trim();
     const item = {
       class_id: class_id,
       lesson_id: lesson_id,
       word: vocabData.word.trim(),
       meaning: vocabData.meaning.trim(),
       ipa: vocabData.ipa?.trim() || "",
-      example: vocabData.example?.trim() || "",
+      example: exampleVal,
       is_grammar: Boolean(vocabData.is_grammar),
       created_at: new Date().toISOString()
     };
@@ -629,11 +751,12 @@ export const SupabaseService = {
         const { data, error } = await client.from('vocabulary').insert([item]).select();
         if (!error && data && data[0]) {
           const local = getLocalData();
+          const enhanced = { ...data[0], definition: exampleVal, en: exampleVal };
           if (!local.vocabulary.some(v => v.id === data[0].id)) {
-            local.vocabulary.unshift(data[0]);
+            local.vocabulary.unshift(enhanced);
             saveLocalData(local);
           }
-          return data[0];
+          return enhanced;
         }
         if (error) {
           console.warn("Supabase addVocabulary error:", error);
@@ -645,7 +768,7 @@ export const SupabaseService = {
 
     const local = getLocalData();
     const newId = local.vocabulary.length ? Math.max(...local.vocabulary.map(v => v.id)) + 1 : 1;
-    const saved = { id: newId, ...item };
+    const saved = { id: newId, ...item, definition: exampleVal, en: exampleVal };
     local.vocabulary.unshift(saved);
     saveLocalData(local);
     return saved;
@@ -685,7 +808,7 @@ export const SupabaseService = {
       word: String(v.word || "").trim(),
       meaning: String(v.meaning || "").trim(),
       ipa: String(v.ipa || "").trim(),
-      example: String(v.example || "").trim(),
+      example: String(v.example || v.definition || "").trim(),
       is_grammar: Boolean(v.is_grammar),
       created_at: new Date().toISOString()
     })).filter(v => v.word && v.meaning);
@@ -698,7 +821,11 @@ export const SupabaseService = {
         if (!error && data && data.length > 0) {
           const local = getLocalData();
           const existingIds = new Set(local.vocabulary.map(v => v.id));
-          const newItems = data.filter(d => !existingIds.has(d.id));
+          const newItems = data.filter(d => !existingIds.has(d.id)).map(d => ({
+            ...d,
+            definition: d.example || "",
+            en: d.example || ""
+          }));
           local.vocabulary = [...newItems, ...local.vocabulary];
           saveLocalData(local);
           return data;
@@ -715,7 +842,7 @@ export const SupabaseService = {
     let currentId = local.vocabulary.length ? Math.max(...local.vocabulary.map(v => v.id)) : 0;
     const inserted = records.map(r => {
       currentId += 1;
-      return { id: currentId, ...r };
+      return { id: currentId, ...r, definition: r.example, en: r.example };
     });
     local.vocabulary = [...inserted, ...local.vocabulary];
     saveLocalData(local);
@@ -726,11 +853,34 @@ export const SupabaseService = {
    * Cập nhật từ vựng
    */
   async updateVocabulary(id, vocabData) {
+    const payload = {};
+    if (vocabData.lesson_id) payload.lesson_id = Number(vocabData.lesson_id);
+    if (vocabData.word !== undefined) payload.word = String(vocabData.word || "").trim();
+    if (vocabData.meaning !== undefined) payload.meaning = String(vocabData.meaning || "").trim();
+    if (vocabData.ipa !== undefined) payload.ipa = String(vocabData.ipa || "").trim();
+    if (vocabData.example !== undefined || vocabData.definition !== undefined) {
+      payload.example = String(vocabData.example || vocabData.definition || "").trim();
+    }
+    if (vocabData.is_grammar !== undefined) payload.is_grammar = Boolean(vocabData.is_grammar);
+
     const client = getSupabase();
     if (client) {
       try {
-        const { data, error } = await client.from('vocabulary').update(vocabData).eq('id', id).select();
-        if (!error && data && data[0]) return data[0];
+        const { data, error } = await client.from('vocabulary').update(payload).eq('id', id).select();
+        if (!error && data && data[0]) {
+          const local = getLocalData();
+          const idx = local.vocabulary.findIndex(v => v.id === Number(id));
+          if (idx !== -1) {
+            local.vocabulary[idx] = { 
+              ...local.vocabulary[idx], 
+              ...payload, 
+              definition: payload.example, 
+              en: payload.example 
+            };
+            saveLocalData(local);
+          }
+          return { ...data[0], definition: payload.example, en: payload.example };
+        }
       } catch (err) {
         console.warn("Supabase updateVocabulary fallback:", err);
       }
@@ -739,11 +889,16 @@ export const SupabaseService = {
     const local = getLocalData();
     const idx = local.vocabulary.findIndex(v => v.id === Number(id));
     if (idx !== -1) {
-      local.vocabulary[idx] = { ...local.vocabulary[idx], ...vocabData };
+      local.vocabulary[idx] = { 
+        ...local.vocabulary[idx], 
+        ...payload, 
+        definition: payload.example, 
+        en: payload.example 
+      };
       saveLocalData(local);
       return local.vocabulary[idx];
     }
-    return null;
+    return { id: Number(id), ...payload, definition: payload.example || "", en: payload.example || "" };
   },
 
   /**

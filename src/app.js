@@ -10,6 +10,7 @@ import { SupabaseService } from './services/supabaseService.js';
 import { GeminiService } from './services/geminiService.js';
 import { ExcelService } from './services/excelService.js';
 import { audioService } from './services/audioService.js';
+import { SEEE_DATA, SEEE_UNITS, ALL_SEEE_TERMS } from './data/seeeData.js';
 
 // Application State
 export const state = {
@@ -69,7 +70,23 @@ export const state = {
       sender: 'bot',
       text: 'Chào em! Thầy là trợ lý học tập AI của Thầy Quang Sơn. Em có thắc mắc gì về từ vựng, ngữ pháp hay các dạng bài thi tiếng Anh vào lớp 10 không? Hãy nhắn cho thầy nhé!'
     }
-  ]
+  ],
+
+  // SEEE Master Study Mode (HUST20261-SƠN Special Terminology Hub)
+  seee: {
+    mode: 'MENU', // 'MENU' | 'FLASHCARD' | 'QUIZ_UNIT' | 'QUIZ_CUSTOM' | 'QUIZ_ALL' | 'CUSTOM_SETUP' | 'END'
+    currentUnitIdx: 0,
+    deck: [],
+    currentIndex: 0,
+    isFlipped: false,
+    isShuffle: false,
+    score: 0,
+    answers: [],
+    isAnswerChecked: false,
+    wrongTerms: [],
+    customSelectedUnits: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    quizTitle: 'SEEE Quiz'
+  }
 };
 
 // Toast Notification Utility
@@ -179,22 +196,22 @@ window.App = {
    * Lấy danh sách các lớp học mà người dùng có quyền quản lý/truy cập
    */
   getManagedClasses(user = state.currentUser) {
-    if (!user) return [];
+    if (!user) return state.classes;
     if ((user.role === 'host' || user.role === 'teacher')) return state.classes;
-    if (user.role === 'student') {
-      return state.classes.filter(c => c.id === Number(user.class_id));
-    }
-    if (user.role === 'assistant_teacher') {
-      const userAssigned = Number(user.class_id);
-      const managedList = Array.isArray(user.managed_classes) ? user.managed_classes.map(Number) : [];
-      return state.classes.filter(c => 
-        c.id === userAssigned || 
-        managedList.includes(c.id) || 
-        c.creator_id === user.id || 
-        c.created_by === user.id
-      );
-    }
-    return [];
+    const userAssigned = Number(user.class_id);
+    const managedList = Array.isArray(user.managed_classes) ? user.managed_classes.map(Number) : [];
+    
+    // Always include assigned class, HUST Hub, child classes of HUST, and any created classes
+    return state.classes.filter(c => 
+      c.id === userAssigned || 
+      c.id === 11 || 
+      c.category === 'HUST' || 
+      c.category === 'HUST_CHILD' || 
+      c.parent_id === 11 || 
+      managedList.includes(c.id) || 
+      c.creator_id === user.id || 
+      c.created_by === user.id
+    );
   },
 
   /**
@@ -1158,27 +1175,34 @@ window.App = {
   // CLASS & LESSON MODALS
   // =========================================================================
 
-  openCreateClassModal() {
-    if (state.currentUser?.role === 'student') return;
+  openCreateClassModal(category = 'STANDARD') {
     const modal = document.getElementById('create-class-modal');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) {
+      modal.classList.remove('hidden');
+      const catSelect = document.getElementById('input-class-category');
+      if (catSelect) catSelect.value = category;
+    }
   },
 
   async handleCreateClass(e) {
     e.preventDefault();
-    if (state.currentUser?.role === 'student') return;
     const name = document.getElementById('input-class-name')?.value.trim();
     const code = document.getElementById('input-class-code')?.value.trim();
+    const category = document.getElementById('input-class-category')?.value || 'STANDARD';
     if (!name) {
       showToast("Vui lòng nhập tên lớp học!", "error");
       return;
     }
     try {
       const creatorId = state.currentUser?.id;
-      const created = await SupabaseService.createClass(name, code, creatorId);
+      const extraMeta = {
+        category: category,
+        parent_id: category === 'HUST_CHILD' ? 11 : null
+      };
+      const created = await SupabaseService.createClass(name, code, creatorId, extraMeta);
 
-      // If assistant teacher created the class, track it in managed_classes
-      if (state.currentUser?.role === 'assistant_teacher') {
+      // If assistant teacher or student created the class, track it in managed_classes
+      if (state.currentUser?.role === 'assistant_teacher' || state.currentUser?.role === 'student') {
         if (!Array.isArray(state.currentUser.managed_classes)) {
           state.currentUser.managed_classes = [];
         }
@@ -1400,6 +1424,8 @@ window.App = {
     if (meaningInput) meaningInput.value = '';
     const ipaInput = document.getElementById('input-vocab-ipa');
     if (ipaInput) ipaInput.value = '';
+    const defInput = document.getElementById('input-vocab-definition');
+    if (defInput) defInput.value = '';
     const grammarCheck = document.getElementById('input-vocab-is-grammar');
     if (grammarCheck) grammarCheck.checked = false;
 
@@ -1483,18 +1509,29 @@ window.App = {
     }
 
     try {
+      const definition = document.getElementById('input-vocab-definition')?.value?.trim() || "";
       const item = await SupabaseService.addVocabulary({
         class_id: classId,
         lesson_id: lessonId,
         word: word,
         meaning: meaning,
         ipa: ipa,
-        example: "",
+        example: definition,
+        definition: definition,
         is_grammar: isGrammar
       });
 
       showToast(`Đã thêm từ "${word}" vào bài học thành công! 🎉`, "success");
       this.closeModal('create-vocabulary-modal');
+      const defInput = document.getElementById('input-vocab-definition');
+      if (defInput) defInput.value = '';
+      const wordInput = document.getElementById('input-vocab-word');
+      if (wordInput) wordInput.value = '';
+      const meanInput = document.getElementById('input-vocab-meaning');
+      if (meanInput) meanInput.value = '';
+      const ipaInput = document.getElementById('input-vocab-ipa');
+      if (ipaInput) ipaInput.value = '';
+
       await this.loadAllData();
       if (item && item.lesson_id) {
         state.selectedLessonId = item.lesson_id;
@@ -1542,6 +1579,9 @@ window.App = {
     const ipaInput = document.getElementById('input-edit-vocab-ipa');
     if (ipaInput) ipaInput.value = item.ipa || "";
     
+    const defInput = document.getElementById('input-edit-vocab-definition');
+    if (defInput) defInput.value = item.definition || item.example || item.en || "";
+
     const grammarCheck = document.getElementById('input-edit-vocab-is-grammar');
     if (grammarCheck) grammarCheck.checked = Boolean(item.is_grammar);
 
@@ -1600,6 +1640,7 @@ window.App = {
     const word = document.getElementById('input-edit-vocab-word')?.value?.trim();
     const meaning = document.getElementById('input-edit-vocab-meaning')?.value?.trim();
     const ipa = document.getElementById('input-edit-vocab-ipa')?.value?.trim() || "";
+    const definition = document.getElementById('input-edit-vocab-definition')?.value?.trim() || "";
     const isGrammar = Boolean(document.getElementById('input-edit-vocab-is-grammar')?.checked);
 
     if (!id || !word || !meaning) {
@@ -1607,13 +1648,16 @@ window.App = {
       return;
     }
 
+    const example = definition || "";
+
     try {
       await SupabaseService.updateVocabulary(id, {
         lesson_id: lessonId,
         word: word,
         meaning: meaning,
         ipa: ipa,
-        example: "",
+        example: example,
+        definition: definition,
         is_grammar: isGrammar
       });
 
@@ -1627,6 +1671,8 @@ window.App = {
           meaning,
           ipa,
           example,
+          definition,
+          en: definition,
           is_grammar: isGrammar
         };
       }
@@ -2066,11 +2112,51 @@ window.App = {
 
   bindGlobalEvents() {
     window.addEventListener('keydown', (e) => {
+      // SEEE Quiz Input Enter handler (even when focused in INPUT)
+      if (state.currentTab === 'seee_study' && document.activeElement?.id === 'seee-quiz-input') {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.seeeqzCheck();
+          return;
+        }
+      }
+
+      // Allow Enter to advance SEEE Quiz when answer is already checked
+      if (state.currentTab === 'seee_study' && ['QUIZ_UNIT', 'QUIZ_CUSTOM', 'QUIZ_ALL', 'QUIZ_REDO'].includes(state.seee?.mode)) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (state.seee.isAnswerChecked) {
+            this.seeeqzNext();
+          } else {
+            this.seeeqzCheck();
+          }
+          return;
+        }
+      }
+
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
       if (e.key === 'Escape') {
         App.safeGoBack();
         return;
       }
+
+      // SEEE Flashcard shortcuts
+      if (state.currentTab === 'seee_study' && state.seee?.mode === 'FLASHCARD') {
+        if (e.code === 'Space' || e.key === ' ') {
+          e.preventDefault();
+          this.seeefcFlip();
+          return;
+        } else if (e.code === 'ArrowRight' || e.key === 'Enter') {
+          e.preventDefault();
+          this.seeefcNext();
+          return;
+        } else if (e.code === 'ArrowLeft') {
+          e.preventDefault();
+          this.seeefcPrev();
+          return;
+        }
+      }
+
       if (state.currentTab === 'flashcards') {
         if (e.code === 'Space' || e.key === ' ') {
           e.preventDefault();
@@ -2195,6 +2281,7 @@ window.App = {
         quiz_result: 'Kết Quả Bài Thi',
         table_input: `Bảng Nhập Từ • ${activeClass?.name || ''}`,
         vocabulary: `Kho Từ Vựng • ${activeClass?.name || ''}`,
+        seee_study: '⚡ SEEE Master Study • English for Electricity (HUST)',
         tutor: 'Gia Sư AI Quang Son',
         settings: 'Cài Đặt Hệ Thống'
       };
@@ -2219,6 +2306,7 @@ window.App = {
       flashcards: this.renderFlashcardsView,
       quiz: this.renderQuizView,
       quiz_result: this.renderQuizResultView,
+      seee_study: this.renderSEEEStudyView,
       reports: this.renderReportsView,
       tutor: this.renderTutorView,
       settings: this.renderSettingsView
@@ -3012,11 +3100,16 @@ window.App = {
             const classStudents = state.usersList.filter(u => u.class_id === c.id && u.role === 'student');
             const isCreator = c.creator_id === state.currentUser?.id || c.created_by === state.currentUser?.id;
 
+            const isHUST = c.id === 11 || c.class_code === 'HUST20261' || c.category === 'HUST' || (c.name && c.name.includes('HUST'));
+            const isHUSTChild = c.category === 'HUST_CHILD' || c.parent_id === 11;
+
             return `
-              <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift">
+              <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border ${isHUST ? 'border-amber-500/40 ring-2 ring-amber-500/20' : isHUSTChild ? 'border-amber-500/30' : 'border-outline-variant/30'} flex flex-col justify-between hover-lift">
                 <div>
                   <div class="flex items-center justify-between mb-3">
-                    <span class="px-3 py-1 rounded-full bg-primary-container/20 text-primary font-mono font-bold text-xs">Mã: ${c.class_code}</span>
+                    <span class="px-3 py-1 rounded-full ${isHUST ? 'bg-amber-500 text-black font-black' : isHUSTChild ? 'bg-amber-500/20 text-amber-500 font-bold' : 'bg-primary-container/20 text-primary font-bold'} font-mono text-xs">
+                      ${isHUST ? '⚡ HUST HUB' : isHUSTChild ? '⚡ LỚP CON HUST' : `Mã: ${c.class_code}`}
+                    </span>
                     <button onclick="navigator.clipboard.writeText('${c.class_code}'); App.showToast('Đã copy mã lớp ${c.class_code}!', 'success')" class="text-outline hover:text-primary p-1" title="Copy mã lớp">
                       <span class="material-symbols-outlined text-base">content_copy</span>
                     </button>
@@ -3029,16 +3122,29 @@ window.App = {
                     <span>•</span>
                     <span>👥 <strong>${classStudents.length}</strong> học sinh</span>
                   </div>
+                  ${isHUST ? `
+                    <div class="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-500 font-bold flex items-center justify-between">
+                      <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">bolt</span> SEEE Terminology Hub</span>
+                      <span class="bg-amber-500 text-black px-1.5 py-0.5 rounded text-[10px] font-black">179 TERMS</span>
+                    </div>
+                  ` : ''}
                 </div>
-                <div class="flex items-center gap-2 pt-4 border-t border-outline-variant/30">
-                  <button onclick="App.openClassDetail(${c.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift transition-colors text-center flex items-center justify-center gap-1">
-                    <span class="material-symbols-outlined text-base">school</span> 👉 Vào Lớp Học
-                  </button>
-                  ${(isHost || isCreator) ? `
-                    <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa lớp">
-                      <span class="material-symbols-outlined text-base">delete</span>
+                <div>
+                  ${isHUST ? `
+                    <button onclick="App.openSEEEStudy(${c.id})" class="w-full mb-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1.5 shadow-md">
+                      <span class="material-symbols-outlined text-base">bolt</span> ⚡ Vào Học SEEE Terms (Definition ➔ Term)
                     </button>
                   ` : ''}
+                  <div class="flex items-center gap-2 pt-3 border-t border-outline-variant/30">
+                    <button onclick="App.openClassDetail(${c.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift transition-colors text-center flex items-center justify-center gap-1">
+                      <span class="material-symbols-outlined text-base">school</span> 👉 Vào Chi Tiết Lớp
+                    </button>
+                    ${(isHost || isCreator) ? `
+                      <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa lớp">
+                        <span class="material-symbols-outlined text-base">delete</span>
+                      </button>
+                    ` : ''}
+                  </div>
                 </div>
               </div>
             `;
@@ -3114,6 +3220,23 @@ window.App = {
             </button>
           </div>
         </div>
+
+        ${(targetClassId === 11 || activeClass.class_code === 'HUST20261' || (activeClass.name && activeClass.name.includes('HUST'))) ? `
+          <div class="p-5 md:p-6 rounded-3xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ambient-shadow">
+            <div class="space-y-1">
+              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-black font-black text-xs">
+                <span class="material-symbols-outlined text-sm">bolt</span> SEEE MASTER STUDY • ENGLISH FOR ELECTRICITY
+              </div>
+              <h3 class="font-headline-md text-base md:text-lg font-black text-on-surface">Chương Trình Thuật Ngữ Kỹ Thuật Điện Chuyên Sâu (10 Units • 179 Terms)</h3>
+              <p class="text-xs text-on-surface-variant max-w-2xl">
+                Chế độ bài tập đặc biệt: Cho Đề bài là Định nghĩa tiếng Anh (Definition) và gõ tay Thuật ngữ (Term). Hỗ trợ kiểm tra theo từng Unit, tự chọn Unit, kiểm tra ngẫu nhiên và làm lại câu sai.
+              </p>
+            </div>
+            <button onclick="App.openSEEEStudy(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs md:text-sm px-5 py-3 rounded-2xl flex items-center gap-2 hover-lift shadow-lg whitespace-nowrap">
+              <span class="material-symbols-outlined text-lg">bolt</span> Vào Học SEEE Terms Ngay
+            </button>
+          </div>
+        ` : ''}
 
         <!-- Class Section Navigation Tabs (Always 4 Tabs) -->
         <div class="flex items-center gap-2 border-b border-outline-variant/30 pb-2 overflow-x-auto">
@@ -4874,9 +4997,835 @@ window.App = {
           >
             <span class="material-symbols-outlined text-sm">send</span> Gửi
           </button>
-        </form>
       </div>
     `;
+  },
+
+  // =========================================================================
+  // 10.5. SEEE MASTER STUDY (HUST20261-SƠN Technical Terminology Hub)
+  // =========================================================================
+
+  shuffleArray(arr) {
+    const list = [...arr];
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+  },
+
+  getHUSTLessonsAndTerms() {
+    const hustLessons = state.lessons.filter(l => l.class_id === 11 || (l.title && l.title.toLowerCase().startsWith('unit ')));
+    const hustVocab = state.vocabulary.filter(v => v.class_id === 11);
+
+    if (hustLessons.length >= 10 && hustVocab.length >= 100) {
+      const units = hustLessons.map((l, idx) => {
+        const terms = hustVocab.filter(v => v.lesson_id === l.id).map(v => ({
+          id: v.id,
+          term: v.word,
+          phonetics: v.phonetics || "",
+          en: v.example || v.definition || "",
+          vi: v.meaning || "",
+          unitTitle: l.title,
+          unitIdx: idx
+        }));
+        return {
+          id: l.id,
+          unitIdx: idx,
+          title: l.title,
+          terms: terms.length > 0 ? terms : (SEEE_UNITS[idx]?.terms || [])
+        };
+      });
+      const allTerms = units.flatMap(u => u.terms);
+      return { units, allTerms };
+    }
+
+    // Fallback to official dataset
+    const units = SEEE_UNITS.map((u, idx) => ({
+      id: u.id,
+      unitIdx: idx,
+      title: u.title,
+      terms: u.terms.map(t => ({
+        ...t,
+        unitTitle: u.title,
+        unitIdx: idx
+      }))
+    }));
+    const allTerms = units.flatMap(u => u.terms);
+    return { units, allTerms };
+  },
+
+  openSEEEStudy(classId = 11) {
+    state.selectedClassId = Number(classId) || 11;
+    state.currentTab = 'seee_study';
+    state.seee.mode = 'MENU';
+    this.render();
+  },
+
+  openSEEECustomSetup() {
+    state.seee.mode = 'CUSTOM_SETUP';
+    this.render();
+  },
+
+  switchSEEEUnit(unitIdx) {
+    const { units } = this.getHUSTLessonsAndTerms();
+    const unit = units[unitIdx] || units[0];
+    state.seee.currentUnitIdx = unitIdx;
+    state.seee.deck = [...unit.terms];
+    state.seee.currentIndex = 0;
+    state.seee.isFlipped = false;
+    state.seee.isShuffle = false;
+    state.seee.mode = 'FLASHCARD';
+    this.render();
+  },
+
+  startSEEETypingQuiz(unitIdx) {
+    const { units } = this.getHUSTLessonsAndTerms();
+    const unit = units[unitIdx] || units[0];
+    state.seee.currentUnitIdx = unitIdx;
+    state.seee.deck = this.shuffleArray([...unit.terms]);
+    state.seee.currentIndex = 0;
+    state.seee.score = 0;
+    state.seee.answers = [];
+    state.seee.wrongTerms = [];
+    state.seee.isAnswerChecked = false;
+    state.seee.mode = 'QUIZ_UNIT';
+    state.seee.quizTitle = `Kiểm Tra Thuật Ngữ • ${unit.title}`;
+    this.render();
+    setTimeout(() => {
+      const input = document.getElementById('seee-quiz-input');
+      input?.focus?.();
+    }, 100);
+  },
+
+  startSEEECustomQuiz() {
+    const { units } = this.getHUSTLessonsAndTerms();
+    const selectedIndices = state.seee.customSelectedUnits || [];
+    if (selectedIndices.length === 0) {
+      this.showToast('Vui lòng chọn ít nhất một Unit để bắt đầu kiểm tra!', 'error');
+      return;
+    }
+    const collectedTerms = [];
+    selectedIndices.forEach(idx => {
+      if (units[idx]) collectedTerms.push(...units[idx].terms);
+    });
+    if (collectedTerms.length === 0) {
+      this.showToast('Không tìm thấy thuật ngữ nào trong các Unit đã chọn!', 'error');
+      return;
+    }
+    state.seee.deck = this.shuffleArray([...collectedTerms]);
+    state.seee.currentIndex = 0;
+    state.seee.score = 0;
+    state.seee.answers = [];
+    state.seee.wrongTerms = [];
+    state.seee.isAnswerChecked = false;
+    state.seee.mode = 'QUIZ_CUSTOM';
+    state.seee.quizTitle = `Kiểm Tra Tự Chọn (${selectedIndices.length} Units • ${collectedTerms.length} Terms)`;
+    this.render();
+    setTimeout(() => {
+      const input = document.getElementById('seee-quiz-input');
+      input?.focus?.();
+    }, 100);
+  },
+
+  startSEEEFullQuiz() {
+    const { allTerms } = this.getHUSTLessonsAndTerms();
+    state.seee.deck = this.shuffleArray([...allTerms]);
+    state.seee.currentIndex = 0;
+    state.seee.score = 0;
+    state.seee.answers = [];
+    state.seee.wrongTerms = [];
+    state.seee.isAnswerChecked = false;
+    state.seee.mode = 'QUIZ_ALL';
+    state.seee.quizTitle = `Kiểm Tra Toàn Bộ 10 Units (179 Thuật Ngữ)`;
+    this.render();
+    setTimeout(() => {
+      const input = document.getElementById('seee-quiz-input');
+      input?.focus?.();
+    }, 100);
+  },
+
+  redoSEEEWrongTerms() {
+    if (!state.seee.wrongTerms || state.seee.wrongTerms.length === 0) {
+      this.showToast('Không có thuật ngữ nào bị sai để làm lại!', 'info');
+      return;
+    }
+    state.seee.deck = this.shuffleArray([...state.seee.wrongTerms]);
+    state.seee.currentIndex = 0;
+    state.seee.score = 0;
+    state.seee.answers = [];
+    state.seee.wrongTerms = [];
+    state.seee.isAnswerChecked = false;
+    state.seee.mode = 'QUIZ_REDO';
+    state.seee.quizTitle = `Làm Lại Các Thuật Ngữ Bị Sai (${state.seee.deck.length} Câu)`;
+    this.render();
+    setTimeout(() => {
+      const input = document.getElementById('seee-quiz-input');
+      input?.focus?.();
+    }, 100);
+  },
+
+  toggleSEEEUnitCheckbox(unitIdx) {
+    const current = state.seee.customSelectedUnits || [];
+    if (current.includes(unitIdx)) {
+      state.seee.customSelectedUnits = current.filter(i => i !== unitIdx);
+    } else {
+      state.seee.customSelectedUnits = [...current, unitIdx].sort((a, b) => a - b);
+    }
+    this.render();
+  },
+
+  toggleSEEEAllUnits(selectAll) {
+    if (selectAll) {
+      state.seee.customSelectedUnits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    } else {
+      state.seee.customSelectedUnits = [];
+    }
+    this.render();
+  },
+
+  // Flashcard Controls
+  seeefcFlip() {
+    state.seee.isFlipped = !state.seee.isFlipped;
+    const card = document.getElementById('seee-card-inner');
+    if (card) {
+      if (state.seee.isFlipped) {
+        card.classList.add('rotate-y-180');
+      } else {
+        card.classList.remove('rotate-y-180');
+      }
+    } else {
+      this.render();
+    }
+  },
+
+  seeefcNext() {
+    if (state.seee.currentIndex < state.seee.deck.length - 1) {
+      state.seee.currentIndex++;
+      state.seee.isFlipped = false;
+      this.render();
+    } else {
+      this.showToast('🎉 Đã xem hết tất cả các thẻ trong Unit!', 'success');
+    }
+  },
+
+  seeefcPrev() {
+    if (state.seee.currentIndex > 0) {
+      state.seee.currentIndex--;
+      state.seee.isFlipped = false;
+      this.render();
+    }
+  },
+
+  seeefcToggleShuffle() {
+    state.seee.isShuffle = !state.seee.isShuffle;
+    const { units } = this.getHUSTLessonsAndTerms();
+    const currentUnit = units[state.seee.currentUnitIdx] || units[0];
+    if (state.seee.isShuffle) {
+      state.seee.deck = this.shuffleArray([...currentUnit.terms]);
+      this.showToast('🔀 Đã xáo trộn thứ tự thẻ!', 'info');
+    } else {
+      state.seee.deck = [...currentUnit.terms];
+      this.showToast('Đã khôi phục thứ tự chuẩn!', 'info');
+    }
+    state.seee.currentIndex = 0;
+    state.seee.isFlipped = false;
+    this.render();
+  },
+
+  seeefcRestart() {
+    state.seee.currentIndex = 0;
+    state.seee.isFlipped = false;
+    this.render();
+  },
+
+  // Typing Quiz Checking & Navigation
+  seeeqzCheck() {
+    if (state.seee.isAnswerChecked) {
+      this.seeeqzNext();
+      return;
+    }
+    const currentItem = state.seee.deck[state.seee.currentIndex];
+    if (!currentItem) return;
+
+    const input = document.getElementById('seee-quiz-input');
+    const userVal = (input?.value || '').trim();
+
+    if (!userVal) {
+      this.showToast('Vui lòng nhập thuật ngữ trước khi kiểm tra!', 'info');
+      input?.focus();
+      return;
+    }
+
+    const normalize = (s) => (s || "").toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    const cleanUser = normalize(userVal);
+    const cleanTerm = normalize(currentItem.term);
+
+    const acceptable = [cleanTerm];
+    const parenMatch = currentItem.term.match(/^([^(]+)\(([^)]+)\)$/);
+    if (parenMatch) {
+      acceptable.push(normalize(parenMatch[1]));
+      acceptable.push(normalize(parenMatch[2]));
+    }
+    if (currentItem.term.includes('/')) {
+      currentItem.term.split('/').forEach(part => acceptable.push(normalize(part)));
+    }
+
+    const isCorrect = acceptable.includes(cleanUser);
+
+    state.seee.isAnswerChecked = true;
+    if (isCorrect) {
+      state.seee.score++;
+      audioService.speak(currentItem.term);
+    } else {
+      state.seee.wrongTerms.push(currentItem);
+    }
+
+    state.seee.answers.push({
+      item: currentItem,
+      userAnswer: userVal,
+      isCorrect
+    });
+
+    this.render();
+
+    setTimeout(() => {
+      const nextBtn = document.getElementById('seee-btn-next');
+      if (nextBtn) nextBtn.focus();
+    }, 50);
+  },
+
+  seeeqzNext() {
+    if (!state.seee.isAnswerChecked) {
+      this.seeeqzCheck();
+      return;
+    }
+    if (state.seee.currentIndex < state.seee.deck.length - 1) {
+      state.seee.currentIndex++;
+      state.seee.isAnswerChecked = false;
+      this.render();
+      setTimeout(() => {
+        const input = document.getElementById('seee-quiz-input');
+        input?.focus?.();
+      }, 80);
+    } else {
+      state.seee.mode = 'END';
+      this.render();
+    }
+  },
+
+  // Main SEEE Study View Renderer
+  renderSEEEStudyView() {
+    const { units, allTerms } = this.getHUSTLessonsAndTerms();
+    const mode = state.seee?.mode || 'MENU';
+    const deck = state.seee?.deck || [];
+    const currentIndex = state.seee?.currentIndex || 0;
+    const currentItem = deck[currentIndex];
+
+    // TOP BREADCRUMB / HEADER BAR (Persistent across SEEE modes)
+    const headerHtml = `
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline-variant/30">
+        <div class="flex items-center gap-3">
+          <button onclick="App.openClassDetail(state.selectedClassId || 11)" class="p-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors shrink-0" title="Về chi tiết lớp">
+            <span class="material-symbols-outlined text-lg">arrow_back</span>
+          </button>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-black font-black text-xs">
+                <span class="material-symbols-outlined text-xs">bolt</span> SEEE MASTER STUDY
+              </span>
+              <span class="text-xs text-outline font-mono">HUST20261-SƠN</span>
+            </div>
+            <h2 class="font-display-lg text-lg sm:text-2xl font-black text-on-surface mt-0.5">
+              English for Electricity • Thuật Ngữ Kỹ Thuật Điện
+            </h2>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          ${mode !== 'MENU' ? `
+            <button onclick="App.state.seee.mode = 'MENU'; App.render();" class="px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs flex items-center gap-1.5 transition-colors">
+              <span class="material-symbols-outlined text-sm">dashboard</span> Danh Sách Unit
+            </button>
+          ` : ''}
+          <div class="px-3 py-1.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-outline font-bold">
+            ⚡ 10 Units • ${allTerms.length} Terms
+          </div>
+        </div>
+      </div>
+    `;
+
+    // MODE 1: MENU
+    if (mode === 'MENU') {
+      return `
+        <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+          ${headerHtml}
+
+          <!-- Quick Action Launchers (Hero Cards) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+            
+            <!-- Full Quiz Launcher -->
+            <div class="p-6 rounded-3xl bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-transparent border border-amber-500/40 ambient-shadow flex flex-col justify-between hover-lift">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-amber-500 text-black flex items-center justify-center font-black text-xl mb-4 shadow-md">
+                  <span class="material-symbols-outlined text-2xl">bolt</span>
+                </div>
+                <h3 class="font-headline-md text-base font-black text-on-surface mb-1">
+                  Kiểm Tra Toàn Bộ 179 Thuật Ngữ
+                </h3>
+                <p class="text-xs text-on-surface-variant mb-4">
+                  Đề bài cho Definition tiếng Anh ngẫu nhiên, gõ tay thuật ngữ bằng bàn phím. Thử thách cao nhất!
+                </p>
+              </div>
+              <button onclick="App.startSEEEFullQuiz()" class="w-full bg-amber-500 hover:bg-amber-600 text-black font-black text-xs py-3 rounded-xl btn-press flex items-center justify-center gap-2 shadow-md">
+                <span class="material-symbols-outlined text-base">play_arrow</span> Bắt Đầu Full Quiz (179 Terms)
+              </button>
+            </div>
+
+            <!-- Custom Quiz Launcher -->
+            <div class="p-6 rounded-3xl bg-gradient-to-br from-blue-500/20 via-indigo-500/10 to-transparent border border-blue-500/40 ambient-shadow flex flex-col justify-between hover-lift">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-xl mb-4 shadow-md">
+                  <span class="material-symbols-outlined text-2xl">checklist</span>
+                </div>
+                <h3 class="font-headline-md text-base font-black text-on-surface mb-1">
+                  Tự Chọn Các Unit Kiểm Tra
+                </h3>
+                <p class="text-xs text-on-surface-variant mb-4">
+                  Tự do chọn 1 hoặc nhiều Unit (ví dụ Unit 1 + 2 hoặc Unit 7 + 8) để kiểm tra theo trọng tâm.
+                </p>
+              </div>
+              <button onclick="App.openSEEECustomSetup()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3 rounded-xl btn-press flex items-center justify-center gap-2 shadow-md">
+                <span class="material-symbols-outlined text-base">tune</span> Cấu Hình & Bắt Đầu
+              </button>
+            </div>
+
+            <!-- Redo Wrong Terms Launcher -->
+            <div class="p-6 rounded-3xl bg-gradient-to-br from-rose-500/20 via-red-500/10 to-transparent border border-rose-500/40 ambient-shadow flex flex-col justify-between hover-lift">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black text-xl mb-4 shadow-md">
+                  <span class="material-symbols-outlined text-2xl">refresh</span>
+                </div>
+                <div class="flex items-center justify-between mb-1">
+                  <h3 class="font-headline-md text-base font-black text-on-surface">
+                    Làm Lại Thuật Ngữ Bị Sai
+                  </h3>
+                  <span class="px-2 py-0.5 rounded-full ${state.seee.wrongTerms?.length > 0 ? 'bg-rose-500 text-white' : 'bg-outline-variant/30 text-outline'} text-[10px] font-bold font-mono">
+                    ${state.seee.wrongTerms?.length || 0} từ sai
+                  </span>
+                </div>
+                <p class="text-xs text-on-surface-variant mb-4">
+                  Ôn luyện lại dứt điểm những câu bạn đã trả lời sai trong phiên học hiện tại để ghi nhớ 100%.
+                </p>
+              </div>
+              <button onclick="App.redoSEEEWrongTerms()" ${!state.seee.wrongTerms || state.seee.wrongTerms.length === 0 ? 'disabled' : ''} class="w-full ${state.seee.wrongTerms?.length > 0 ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-surface-container text-outline cursor-not-allowed'} font-bold text-xs py-3 rounded-xl btn-press flex items-center justify-center gap-2 shadow-md">
+                <span class="material-symbols-outlined text-base">repeat</span> Luyện Lại Từ Sai Ngay
+              </button>
+            </div>
+
+          </div>
+
+          <!-- 10 Units Master Grid -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-headline-md text-base sm:text-lg font-bold text-on-surface">
+                  Danh Sách 10 Chuyên Đề Kỹ Thuật Điện (Units 1 – 10)
+                </h3>
+                <p class="text-xs text-outline">Chọn Flashcards để học định nghĩa hoặc chọn Kiểm Tra Gõ Tay để làm bài tập.</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+              ${units.map((u, idx) => `
+                <div class="bg-surface-container-lowest p-5 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 font-mono font-bold text-xs">
+                        CHUYÊN ĐỀ ${idx + 1}
+                      </span>
+                      <span class="text-xs font-bold text-outline">
+                        ${u.terms.length} thuật ngữ
+                      </span>
+                    </div>
+                    <h4 class="font-headline-md text-base font-bold text-on-surface mb-2">
+                      ${u.title}
+                    </h4>
+                    <div class="flex flex-wrap gap-1.5 mb-4">
+                      ${u.terms.slice(0, 4).map(t => `
+                        <span class="px-2 py-0.5 rounded-lg bg-surface-container text-[11px] text-on-surface-variant font-medium">
+                          ${t.term}
+                        </span>
+                      `).join('')}
+                      ${u.terms.length > 4 ? `
+                        <span class="px-2 py-0.5 rounded-lg bg-surface-container text-[11px] text-outline font-bold">
+                          +${u.terms.length - 4} từ nữa
+                        </span>
+                      ` : ''}
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-3 border-t border-outline-variant/30">
+                    <button onclick="App.switchSEEEUnit(${idx})" class="bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
+                      <span class="material-symbols-outlined text-base text-primary">style</span> Flashcards 3D
+                    </button>
+                    <button onclick="App.startSEEETypingQuiz(${idx})" class="bg-amber-500 hover:bg-amber-600 text-black font-black text-xs py-2.5 rounded-xl btn-press flex items-center justify-center gap-1.5 shadow-sm">
+                      <span class="material-symbols-outlined text-base">edit</span> Gõ Thuật Ngữ
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // MODE 2: CUSTOM SETUP (CHECKBOXES)
+    if (mode === 'CUSTOM_SETUP') {
+      const selected = state.seee.customSelectedUnits || [];
+      let totalSelectedTerms = 0;
+      selected.forEach(idx => {
+        if (units[idx]) totalSelectedTerms += units[idx].terms.length;
+      });
+
+      return `
+        <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+          ${headerHtml}
+
+          <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="font-headline-md text-base sm:text-lg font-bold text-on-surface">
+                  🎯 Chọn Các Unit Muốn Kiểm Tra Cùng Lúc
+                </h3>
+                <p class="text-xs text-outline">Tick chọn những Unit bạn muốn ôn luyện. Hệ thống sẽ xáo trộn các câu hỏi từ các Unit đã chọn.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="App.toggleSEEEAllUnits(true)" class="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-primary transition-colors">
+                  Chọn tất cả
+                </button>
+                <button onclick="App.toggleSEEEAllUnits(false)" class="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-outline transition-colors">
+                  Bỏ chọn tất cả
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              ${units.map((u, idx) => {
+                const isChecked = selected.includes(idx);
+                return `
+                  <div onclick="App.toggleSEEEUnitCheckbox(${idx})" class="p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-3 ${isChecked ? 'border-amber-500 bg-amber-500/10' : 'border-outline-variant/30 bg-surface-container-low hover:border-outline-variant'}">
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} class="w-5 h-5 accent-amber-500 rounded cursor-pointer pointer-events-none" />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-black text-on-surface truncate">${u.title}</p>
+                      <p class="text-[11px] text-outline font-medium">${u.terms.length} thuật ngữ</p>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            <div class="pt-4 border-t border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="text-xs text-on-surface-variant font-bold">
+                Đã chọn: <span class="text-amber-500 font-black">${selected.length} / 10 Units</span> (${totalSelectedTerms} thuật ngữ)
+              </div>
+              <button onclick="App.startSEEECustomQuiz()" ${selected.length === 0 ? 'disabled' : ''} class="bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-black font-black text-xs sm:text-sm px-6 py-3 rounded-xl btn-press flex items-center justify-center gap-2 shadow-lg">
+                <span class="material-symbols-outlined text-lg">play_arrow</span> Bắt Đầu Kiểm Tra Gõ Tay Ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // MODE 3: FLASHCARD
+    if (mode === 'FLASHCARD') {
+      const currentUnit = units[state.seee.currentUnitIdx] || units[0];
+      return `
+        <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+          ${headerHtml}
+
+          <!-- Flashcard Action Bar -->
+          <div class="bg-surface-container-lowest p-4 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <button onclick="App.state.seee.mode = 'MENU'; App.render();" class="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-on-surface flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">arrow_back</span> Menu
+              </button>
+              <div>
+                <h3 class="font-headline-md text-sm font-bold text-on-surface">${currentUnit.title}</h3>
+                <p class="text-[11px] text-outline">Thẻ ${currentIndex + 1} / ${deck.length}</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="App.seeefcToggleShuffle()" class="px-3 py-1.5 rounded-xl ${state.seee.isShuffle ? 'bg-amber-500 text-black font-black' : 'bg-surface-container text-on-surface-variant font-bold'} text-xs flex items-center gap-1 transition-colors">
+                <span class="material-symbols-outlined text-sm">shuffle</span> Xáo trộn
+              </button>
+              <button onclick="App.seeefcRestart()" class="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-bold text-xs flex items-center gap-1 transition-colors">
+                <span class="material-symbols-outlined text-sm">restart_alt</span> Bắt đầu lại
+              </button>
+              <button onclick="App.startSEEETypingQuiz(${state.seee.currentUnitIdx})" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-black text-xs flex items-center gap-1 shadow-sm">
+                <span class="material-symbols-outlined text-sm">edit</span> Gõ tay Unit này
+              </button>
+            </div>
+          </div>
+
+          <!-- 3D Flashcard Canvas -->
+          <div class="seee-card-scene w-full max-w-2xl h-80 sm:h-96 mx-auto cursor-pointer select-none" onclick="App.seeefcFlip()">
+            <div id="seee-card-inner" class="seee-card-inner ${state.seee.isFlipped ? 'rotate-y-180' : ''}">
+              
+              <!-- Front Face: English Definition -->
+              <div class="seee-face seee-face-front p-8 flex flex-col justify-between bg-surface-container-lowest border-2 border-amber-500/30 rounded-3xl ambient-shadow">
+                <div class="flex items-center justify-between">
+                  <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-500 font-black text-xs uppercase tracking-wider">
+                    Definition (Định nghĩa)
+                  </span>
+                  <span class="text-xs text-outline font-mono">#${currentIndex + 1} / ${deck.length}</span>
+                </div>
+                
+                <div class="my-auto text-center px-4">
+                  <p class="font-display-md text-lg sm:text-2xl font-bold text-on-surface leading-relaxed">
+                    "${currentItem.en || currentItem.definition || currentItem.example}"
+                  </p>
+                </div>
+
+                <div class="text-center text-xs text-outline font-medium flex items-center justify-center gap-1.5">
+                  <span class="material-symbols-outlined text-sm">touch_app</span> Click thẻ hoặc nhấn [SPACE] để xem Thuật ngữ
+                </div>
+              </div>
+
+              <!-- Back Face: Term, Phonetics, Meaning -->
+              <div class="seee-face seee-face-back p-8 flex flex-col justify-between bg-surface-container-lowest border-2 border-emerald-500/40 rounded-3xl ambient-shadow">
+                <div class="flex items-center justify-between">
+                  <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-500 font-black text-xs uppercase tracking-wider">
+                    Technical Term (Thuật ngữ)
+                  </span>
+                  <button onclick="event.stopPropagation(); App.audioService.speak('${currentItem.term}')" class="p-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary transition-colors" title="Phát âm tiếng Anh">
+                    <span class="material-symbols-outlined text-base">volume_up</span>
+                  </button>
+                </div>
+
+                <div class="my-auto text-center px-4 space-y-3">
+                  <h3 class="font-display-lg text-2xl sm:text-3xl font-black text-amber-500 tracking-wide">
+                    ${currentItem.term}
+                  </h3>
+                  ${currentItem.phonetics ? `
+                    <div class="font-mono text-sm text-outline tracking-wider">[ ${currentItem.phonetics} ]</div>
+                  ` : ''}
+                  <p class="text-sm sm:text-base font-bold text-on-surface max-w-lg mx-auto">
+                    ${currentItem.vi || currentItem.meaning}
+                  </p>
+                </div>
+
+                <div class="text-center text-xs text-outline font-medium flex items-center justify-center gap-1.5">
+                  <span class="material-symbols-outlined text-sm">touch_app</span> Click thẻ hoặc nhấn [SPACE] để quay lại định nghĩa
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Bottom Nav Controls -->
+          <div class="flex items-center justify-center gap-3 max-w-md mx-auto w-full">
+            <button onclick="App.seeefcPrev()" ${currentIndex === 0 ? 'disabled' : ''} class="flex-1 py-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 hover:bg-surface-container disabled:opacity-40 font-bold text-xs text-on-surface flex items-center justify-center gap-1.5 shadow-sm">
+              <span class="material-symbols-outlined text-base">arrow_back</span> [←] Trước
+            </button>
+            <button onclick="App.seeefcFlip()" class="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md">
+              <span class="material-symbols-outlined text-base">sync</span> [Space] Lật
+            </button>
+            <button onclick="App.seeefcNext()" ${currentIndex === deck.length - 1 ? 'disabled' : ''} class="flex-1 py-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 hover:bg-surface-container disabled:opacity-40 font-bold text-xs text-on-surface flex items-center justify-center gap-1.5 shadow-sm">
+              Tiếp [→] <span class="material-symbols-outlined text-base">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // MODE 4: TYPING QUIZ (QUIZ_UNIT, QUIZ_CUSTOM, QUIZ_ALL, QUIZ_REDO)
+    if (['QUIZ_UNIT', 'QUIZ_CUSTOM', 'QUIZ_ALL', 'QUIZ_REDO'].includes(mode)) {
+      const progressPercent = Math.round(((currentIndex + 1) / deck.length) * 100);
+      const isChecked = state.seee.isAnswerChecked;
+      const currentAns = state.seee.answers[currentIndex];
+
+      return `
+        <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+          ${headerHtml}
+
+          <!-- Quiz Status Header -->
+          <div class="bg-surface-container-lowest p-5 rounded-3xl ambient-shadow border border-outline-variant/30 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <button onclick="App.state.seee.mode = 'MENU'; App.render();" class="p-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-outline">
+                  <span class="material-symbols-outlined text-sm">close</span>
+                </button>
+                <div>
+                  <h3 class="font-headline-md text-sm sm:text-base font-black text-on-surface">${state.seee.quizTitle}</h3>
+                  <p class="text-xs text-outline">${currentItem.unitTitle || ''}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <div class="px-3 py-1 rounded-xl bg-green-500/15 border border-green-500/30 text-green-700 dark:text-green-300 font-mono font-black text-xs">
+                  Điểm: ${state.seee.score} / ${state.seee.answers.length}
+                </div>
+                <div class="px-3 py-1 rounded-xl bg-surface-container font-mono font-bold text-xs text-on-surface">
+                  Câu ${currentIndex + 1} / ${deck.length}
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
+              <div class="bg-gradient-to-r from-amber-500 to-orange-500 h-full transition-all duration-300 rounded-full" style="width: ${progressPercent}%"></div>
+            </div>
+          </div>
+
+          <!-- Question Box (Definition Prompt) -->
+          <div class="max-w-2xl mx-auto w-full space-y-4">
+            
+            <div class="p-6 sm:p-8 rounded-3xl bg-surface-container-lowest border-2 border-primary/20 ambient-shadow text-center space-y-3">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 font-black text-xs uppercase tracking-wider">
+                <span class="material-symbols-outlined text-xs">help</span> ĐỀ BÀI: DEFINITION (ĐỊNH NGHĨA)
+              </span>
+              <p class="font-display-md text-lg sm:text-2xl font-bold text-on-surface leading-relaxed pt-2">
+                "${currentItem.en || currentItem.definition || currentItem.example}"
+              </p>
+            </div>
+
+            <!-- Typing Input Area -->
+            <div class="space-y-3">
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="seee-quiz-input"
+                  autocomplete="off"
+                  spellcheck="false"
+                  ${isChecked ? 'disabled' : ''}
+                  value="${currentAns ? currentAns.userAnswer : ''}"
+                  placeholder="Gõ chính xác thuật ngữ tiếng Anh vào đây..."
+                  class="w-full px-5 py-4 text-base sm:text-lg rounded-2xl bg-surface-container-lowest border-2 ${isChecked ? (currentAns?.isCorrect ? 'border-green-500 bg-green-50/10' : 'border-red-500 bg-red-50/10') : 'border-primary/50 focus:border-amber-500'} font-bold text-on-surface focus:outline-none transition-all shadow-inner"
+                />
+                <div class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-outline hidden sm:flex items-center gap-1">
+                  <span class="font-mono bg-surface-container px-1.5 py-0.5 rounded text-[10px]">Enter</span>
+                </div>
+              </div>
+
+              <!-- Instant Feedback Box if Checked -->
+              ${isChecked ? `
+                <div class="p-5 rounded-2xl ${currentAns?.isCorrect ? 'bg-green-500/15 border border-green-500/40 text-green-700 dark:text-green-300' : 'bg-red-500/15 border border-red-500/40 text-red-700 dark:text-red-300'} animate-fade-in space-y-2.5">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 font-black text-sm">
+                      <span class="material-symbols-outlined">${currentAns?.isCorrect ? 'check_circle' : 'cancel'}</span>
+                      <span>${currentAns?.isCorrect ? 'CHÍNH XÁC! (+1 ĐIỂM)' : 'CHƯA CHÍNH XÁC!'}</span>
+                    </div>
+                    <button onclick="App.audioService.speak('${currentItem.term}')" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary flex items-center gap-1 text-xs font-bold" title="Nghe phát âm">
+                      <span class="material-symbols-outlined text-base">volume_up</span> Nghe
+                    </button>
+                  </div>
+
+                  ${!currentAns?.isCorrect ? `
+                    <p class="text-xs">Bạn đã nhập: <strong class="line-through">${currentAns?.userAnswer || '(để trống)'}</strong></p>
+                  ` : ''}
+
+                  <div class="pt-2 border-t border-current/20 flex flex-wrap items-center gap-3 text-xs">
+                    <span>Thuật ngữ chuẩn: <strong class="text-base text-amber-500 underline">${currentItem.term}</strong></span>
+                    ${currentItem.phonetics ? `<span class="font-mono text-outline">[${currentItem.phonetics}]</span>` : ''}
+                    <span>• Nghĩa tiếng Việt: <strong>${currentItem.vi || currentItem.meaning}</strong></span>
+                  </div>
+                </div>
+              ` : ''}
+
+              <!-- Action Submit / Next Button -->
+              <div>
+                ${!isChecked ? `
+                  <button onclick="App.seeeqzCheck()" class="w-full bg-amber-500 hover:bg-amber-600 text-black font-black text-sm py-4 rounded-2xl btn-press shadow-lg flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-lg">check</span> Kiểm Tra Đáp Án (Enter)
+                  </button>
+                ` : `
+                  <button id="seee-btn-next" onclick="App.seeeqzNext()" class="w-full bg-primary text-on-primary font-black text-sm py-4 rounded-2xl btn-press shadow-lg flex items-center justify-center gap-2">
+                    <span>${currentIndex < deck.length - 1 ? 'Câu Tiếp Theo (Enter)' : 'Xem Kết Quả Tổng Kết (Enter)'}</span>
+                    <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                  </button>
+                `}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+    }
+
+    // MODE 5: END / SUMMARY SCREEN
+    if (mode === 'END') {
+      const score = state.seee.score || 0;
+      const total = deck.length || 1;
+      const pct = Math.round((score / total) * 100);
+      const wrongList = state.seee.wrongTerms || [];
+
+      return `
+        <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+          ${headerHtml}
+
+          <div class="max-w-xl mx-auto w-full text-center space-y-6">
+            <div class="p-8 rounded-3xl bg-surface-container-lowest ambient-shadow border border-outline-variant/30 space-y-4">
+              <div class="w-20 h-20 rounded-full ${pct >= 80 ? 'bg-amber-500 text-black' : pct >= 50 ? 'bg-primary text-on-primary' : 'bg-red-500 text-white'} mx-auto flex items-center justify-center font-black text-2xl shadow-lg">
+                ${pct}%
+              </div>
+              <div>
+                <h3 class="font-display-lg text-2xl font-black text-on-surface">
+                  ${pct >= 90 ? 'Xuất Sắc! Nắm Vững Thuật Ngữ!' : pct >= 70 ? 'Khá Tốt! Tiếp Tục Phát Huy!' : 'Cần Ôn Luyện Thêm!'}
+                </h3>
+                <p class="text-xs text-outline mt-1">
+                  Đúng <strong class="text-on-surface">${score}</strong> / ${total} câu (${pct}%)
+                </p>
+              </div>
+
+              ${wrongList.length > 0 ? `
+                <div class="pt-4 border-t border-outline-variant/30">
+                  <button onclick="App.redoSEEEWrongTerms()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs sm:text-sm py-3.5 rounded-2xl btn-press shadow-md flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-base">repeat</span> 🔥 Làm Lại ${wrongList.length} Thuật Ngữ Bị Sai Ngay
+                  </button>
+                </div>
+              ` : ''}
+
+              <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="App.state.seee.mode = 'MENU'; App.render();" class="py-3 rounded-2xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs flex items-center justify-center gap-1.5">
+                  <span class="material-symbols-outlined text-base">dashboard</span> Về Menu SEEE
+                </button>
+                <button onclick="App.openSEEEStudy()" class="py-3 rounded-2xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+                  <span class="material-symbols-outlined text-base">refresh</span> Ôn Luyện Tiếp
+                </button>
+              </div>
+            </div>
+
+            <!-- List of Wrong Terms (Review details) -->
+            ${wrongList.length > 0 ? `
+              <div class="text-left space-y-3">
+                <h4 class="font-headline-md text-sm font-bold text-on-surface flex items-center gap-2">
+                  <span class="material-symbols-outlined text-rose-500 text-base">warning</span>
+                  Chi Tiết ${wrongList.length} Thuật Ngữ Cần Ghi Nhớ
+                </h4>
+                <div class="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                  ${wrongList.map(item => `
+                    <div class="p-4 rounded-2xl bg-surface-container-lowest border border-rose-500/30 space-y-1.5 text-xs">
+                      <div class="flex items-center justify-between">
+                        <span class="font-black text-amber-500 text-sm">${item.term}</span>
+                        <span class="font-mono text-outline text-[11px]">[${item.phonetics || ''}]</span>
+                      </div>
+                      <p class="text-on-surface-variant font-medium">"${item.en || item.definition || item.example}"</p>
+                      <p class="text-outline text-[11px] font-bold">👉 Nghĩa: ${item.vi || item.meaning}</p>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    return '';
   },
 
   // 11. Settings View
