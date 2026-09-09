@@ -116,6 +116,8 @@ function formatMarkdown(text) {
     .replace(/\n/g, '<br/>');
 }
 
+window.showToast = showToast;
+
 // Global App Object
 window.App = {
   state,
@@ -124,6 +126,7 @@ window.App = {
   ExcelService,
   GeminiService,
   SupabaseService,
+  showToast,
 
   /**
    * Khởi động ứng dụng & kiểm tra phiên đăng nhập từ Cookies
