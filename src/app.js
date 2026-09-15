@@ -1673,10 +1673,6 @@ window.App = {
   },
 
   openCreateLessonModal(targetClassId = null) {
-    if (state.currentUser?.role === 'student') {
-      showToast("Học sinh không có quyền tạo bài học mới! Bạn có thể thêm từ vựng vào kho từ.", "warning");
-      return;
-    }
     try {
       const modal = document.getElementById('create-lesson-modal');
       if (!modal) {
@@ -1685,34 +1681,16 @@ window.App = {
       }
       const classSelect = document.getElementById('modal-lesson-class');
       const isStudent = state.currentUser?.role === 'student';
-      const isAssistant = state.currentUser?.role === 'assistant_teacher';
       const allowedClasses = this.getManagedClasses(state.currentUser);
       
       const effectiveClassId = Number(targetClassId || state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || (state.classes[0]?.id || 1));
 
       if (classSelect) {
-        if (isStudent) {
-          const studentClassId = Number(state.currentUser?.class_id || effectiveClassId);
-          const userClass = state.classes.find(c => c.id === studentClassId) || state.classes[0];
-          classSelect.innerHTML = `<option value="${userClass ? userClass.id : studentClassId}">${userClass ? userClass.name : 'Lớp của bạn'}</option>`;
-          classSelect.disabled = true;
-        } else if (isAssistant) {
-          if (allowedClasses.length > 1) {
-            classSelect.disabled = false;
-            classSelect.innerHTML = allowedClasses.map(c => 
-              `<option value="${c.id}" ${c.id === effectiveClassId ? 'selected' : ''}>${c.name}</option>`
-            ).join('');
-          } else {
-            const userClass = allowedClasses[0] || state.classes.find(c => c.id === effectiveClassId) || state.classes[0];
-            classSelect.innerHTML = `<option value="${userClass.id}">${userClass.name}</option>`;
-            classSelect.disabled = true;
-          }
-        } else {
-          classSelect.disabled = false;
-          classSelect.innerHTML = state.classes.map(c => 
-            `<option value="${c.id}" ${c.id === effectiveClassId ? 'selected' : ''}>${c.name}</option>`
-          ).join('');
-        }
+        const availableClasses = (isStudent && allowedClasses.length > 0) ? allowedClasses : state.classes;
+        classSelect.disabled = false;
+        classSelect.innerHTML = availableClasses.map(c => 
+          `<option value="${c.id}" ${Number(c.id) === effectiveClassId ? 'selected' : ''}>${c.name}</option>`
+        ).join('');
       }
 
       const titleInput = document.getElementById('input-lesson-title');
@@ -1731,11 +1709,8 @@ window.App = {
   async handleCreateLesson(e) {
     try {
       e.preventDefault();
-      const isStudent = state.currentUser?.role === 'student';
       const classSelect = document.getElementById('modal-lesson-class');
-      const classId = isStudent
-        ? Number(state.currentUser.class_id || 1)
-        : Number(classSelect?.value || state.selectedClassDetailId || state.selectedClassId || 1);
+      const classId = Number(classSelect?.value || state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || 1);
       const title = document.getElementById('input-lesson-title')?.value.trim();
       if (!title) {
         showToast("Vui lòng nhập tên bài học!", "error");
@@ -3808,6 +3783,9 @@ window.App = {
                 <span class="material-symbols-outlined text-sm">arrow_back</span> Về Lớp Cha (HUST)
               </button>
             ` : ''}
+            <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary font-bold text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-sm hover-lift">
+              <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học
+            </button>
             <button onclick="App.openImportVocabAIModal(${targetClassId})" class="bg-primary-container text-on-primary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">smart_toy</span> Nhập File AI (PDF/Excel)
             </button>
@@ -3861,11 +3839,9 @@ window.App = {
                 <p class="text-xs text-on-surface-variant">Luyện tập từ vựng, flashcard 3D và thi thử theo từng Unit của lớp.</p>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
-                ${isTeacher ? `
-                  <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
-                    <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
-                  </button>
-                ` : ''}
+                <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+                  <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
+                </button>
                 <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
                   <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
                 </button>
@@ -3908,13 +3884,9 @@ window.App = {
               }).join('') : `
                 <div class="col-span-full p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                   <p class="text-outline font-semibold">Chưa có bài học nào trong lớp này.</p>
-                  ${isTeacher ? `
-                    <button onclick="App.openCreateLessonModal(${targetClassId})" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold">
-                      + Tạo Bài Học Đầu Tiên
-                    </button>
-                  ` : `
-                    <p class="text-xs text-on-surface-variant mt-2">Bạn có thể vào tab "Kho Từ Vựng" để học và bổ sung từ mới cho lớp nhé!</p>
-                  `}
+                  <button onclick="App.openCreateLessonModal(${targetClassId})" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+                    <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Đầu Tiên
+                  </button>
                 </div>
               `}
             </div>
@@ -3930,6 +3902,9 @@ window.App = {
                 <p class="text-xs text-on-surface-variant">Tra cứu và quản lý toàn bộ từ vựng của lớp.</p>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-surface-container hover:bg-surface-container-high text-on-surface px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors border border-outline-variant/30">
+                  <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học
+                </button>
                 <button onclick="App.openImportVocabAIModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
                   <span class="material-symbols-outlined text-sm">smart_toy</span> Nhập Từ Bằng AI (PDF/Excel)
                 </button>
@@ -4392,9 +4367,14 @@ window.App = {
                       <button onclick="App.openClassDetail(${child.id})" class="w-full bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1.5 shadow-sm">
                         <span class="material-symbols-outlined text-base">${isStudent ? 'auto_stories' : 'login'}</span> ${isStudent ? 'Vào Học & Thêm Từ Vựng' : 'Vào Quản Lý Lớp Nhỏ'}
                       </button>
-                      <button onclick="App.openClassDetail(${child.id}, 'vocabulary')" class="w-full bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
-                        <span class="material-symbols-outlined text-base">menu_book</span> ${isStudent ? 'Kho Từ Vựng' : 'Xem Từ Vựng'} (${childVocab.length} từ)
-                      </button>
+                      <div class="flex items-center gap-2">
+                        <button onclick="App.openCreateLessonModal(${child.id})" class="flex-1 bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1 transition-colors border border-outline-variant/30 hover-lift">
+                          <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học
+                        </button>
+                        <button onclick="App.openClassDetail(${child.id}, 'vocabulary')" class="flex-1 bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1 transition-colors border border-outline-variant/30">
+                          <span class="material-symbols-outlined text-sm">menu_book</span> Kho Từ (${childVocab.length})
+                        </button>
+                      </div>
                     </div>
                   </div>
                 `;
@@ -4445,11 +4425,9 @@ window.App = {
             <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Từ Vựng
             </button>
-            ${isTeacher ? `
-              <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
-                <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
-              </button>
-            ` : ''}
+            <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
+            </button>
           </div>
         </div>
 
@@ -6058,11 +6036,9 @@ window.App = {
                   Lớp học này hiện chưa có thuật ngữ nào. Bạn có thể tự tạo các Bài học / Unit và tự nhập Thuật ngữ kèm Definition tiếng Anh để bắt đầu học flashcard 3D và làm bài tập gõ tay.
                 </p>
                 <div class="flex flex-wrap items-center justify-center gap-3">
-                  ${authService.isTeacher() ? `
-                    <button onclick="App.openCreateLessonModal(${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs flex items-center gap-2 transition-colors">
-                      <span class="material-symbols-outlined text-base text-primary">add</span> + Thêm Bài Học / Unit
-                    </button>
-                  ` : ''}
+                  <button onclick="App.openCreateLessonModal(${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-base text-primary">add</span> + Thêm Bài Học / Unit
+                  </button>
                   <button onclick="App.openCreateVocabularyModal(null, ${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-black text-xs flex items-center gap-2 shadow-md btn-press">
                     <span class="material-symbols-outlined text-base">add_circle</span> + Thêm Thuật Ngữ Mới
                   </button>
