@@ -67,7 +67,7 @@ export const state = {
   chatMessages: [
     {
       sender: 'bot',
-      text: 'Chào em! Thầy là trợ lý học tập AI của Thầy Quang Sơn. Em có thắc mắc gì về từ vựng, ngữ pháp hay các dạng bài thi tiếng Anh vào lớp 10 không? Hãy nhắn cho thầy nhé!'
+      text: 'Chào bạn! Mình là trợ lý học tập AI của Quang Sơn (Host). Bạn có thắc mắc gì về từ vựng, ngữ pháp hay bài tập tiếng Anh không? Hãy nhắn cho mình nhé!'
     }
   ],
 
@@ -197,16 +197,20 @@ window.App = {
   getManagedClasses(user = state.currentUser) {
     if (!user) return state.classes;
     if ((user.role === 'host' || user.role === 'teacher')) return state.classes;
+    
+    // Đối với học sinh: Chỉ hiển thị các lớp học sinh được phân công (hỗ trợ 1 hoặc nhiều lớp)
+    if (user.role === 'student') {
+      const enrolledIds = Array.isArray(user.enrolled_classes) && user.enrolled_classes.length > 0
+        ? user.enrolled_classes.map(Number)
+        : (user.class_id ? [Number(user.class_id)] : []);
+      return state.classes.filter(c => enrolledIds.includes(Number(c.id)));
+    }
+
+    // Trợ giảng / Giáo viên phụ:
     const userAssigned = Number(user.class_id);
     const managedList = Array.isArray(user.managed_classes) ? user.managed_classes.map(Number) : [];
-    
-    // Always include assigned class, HUST Hub, child classes of HUST, and any created classes
     return state.classes.filter(c => 
       c.id === userAssigned || 
-      c.id === 11 || 
-      c.category === 'HUST' || 
-      c.category === 'HUST_CHILD' || 
-      c.parent_id === 11 || 
       managedList.includes(c.id) || 
       c.creator_id === user.id || 
       c.created_by === user.id
@@ -234,10 +238,21 @@ window.App = {
       state.usersList = users || AuthService.getAllUsers();
       state.studySessions = studySessions || [];
 
-      // For students, lock selectedClassId strictly to their assigned class
+      // Luôn đồng bộ lại thông tin mới nhất của currentUser từ usersList
+      if (state.currentUser) {
+        const freshUser = state.usersList.find(u => u.id === state.currentUser.id || u.username === state.currentUser.username);
+        if (freshUser) {
+          state.currentUser = { ...state.currentUser, ...freshUser };
+        }
+      }
+
+      // For students, lock selectedClassId strictly to their assigned classes
       if (state.currentUser && state.currentUser.role === 'student') {
-        state.selectedClassId = Number(state.currentUser.class_id) || 1;
-        state.selectedClassDetailId = state.selectedClassId;
+        const myClasses = this.getManagedClasses(state.currentUser);
+        if (!state.selectedClassId || !myClasses.some(c => c.id === Number(state.selectedClassId))) {
+          state.selectedClassId = myClasses[0]?.id || Number(state.currentUser.class_id) || 11;
+          state.selectedClassDetailId = state.selectedClassId;
+        }
       } else if (state.currentUser && state.currentUser.role === 'assistant_teacher') {
         const myClasses = this.getManagedClasses(state.currentUser);
         if (!state.selectedClassId || !myClasses.some(c => c.id === state.selectedClassId)) {
@@ -490,6 +505,374 @@ window.App = {
   },
 
   // =========================================================================
+  // MULTI-CLASS ASSIGNMENT (HOST / TEACHER)
+  // =========================================================================
+
+  openAssignClassesModal(userId) {
+    const modal = document.getElementById('assign-classes-modal');
+    if (!modal) return;
+
+    const user = (state.usersList || []).find(u => String(u.id) === String(userId) || u.username === String(userId)) ||
+                 AuthService.getUsers().find(u => String(u.id) === String(userId) || u.username === String(userId));
+    if (!user) {
+      showToast("Không tìm thấy thông tin học sinh!", "error");
+      return;
+    }
+
+    const targetInput = document.getElementById('assign-target-user-id');
+    if (targetInput) targetInput.value = user.id;
+
+    const subtitle = document.getElementById('assign-classes-subtitle');
+    if (subtitle) {
+      subtitle.textContent = `Học sinh: ${user.full_name} (@${user.username})`;
+    }
+
+    let enrolledIds = [];
+    if (Array.isArray(user.enrolled_classes) && user.enrolled_classes.length > 0) {
+      enrolledIds = user.enrolled_classes.map(Number);
+    } else if (user.class_id) {
+      enrolledIds = [Number(user.class_id)];
+    }
+
+    const listContainer = document.getElementById('assign-classes-list');
+    if (listContainer) {
+      listContainer.innerHTML = state.classes.map(c => {
+        const isChecked = enrolledIds.includes(Number(c.id));
+        const isChild = Boolean(c.parent_id || c.category === 'HUST_CHILD');
+        return `
+          <label class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-container cursor-pointer border border-outline-variant/30 transition-colors">
+            <input 
+              type="checkbox" 
+              value="${c.id}" 
+              ${isChecked ? 'checked' : ''} 
+              class="assign-class-checkbox w-4 h-4 rounded text-primary border-outline-variant focus:ring-primary"
+            />
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-xs text-on-surface">${c.name}</span>
+                ${isChild ? '<span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold">Lớp con HUST</span>' : ''}
+              </div>
+              <span class="text-[11px] text-outline font-mono">Mã lớp: ${c.class_code}</span>
+            </div>
+          </label>
+        `;
+      }).join('');
+    }
+
+    modal.classList.remove('hidden');
+  },
+
+  async handleSaveStudentClassAssignment() {
+    const userId = document.getElementById('assign-target-user-id')?.value;
+    if (!userId) {
+      showToast("Không xác định được học sinh!", "error");
+      return;
+    }
+
+    const checkedBoxes = document.querySelectorAll('.assign-class-checkbox:checked');
+    const classIds = Array.from(checkedBoxes).map(cb => Number(cb.value));
+
+    if (classIds.length === 0) {
+      showToast("Vui lòng chọn ít nhất 1 lớp học cho học sinh!", "warning");
+      return;
+    }
+
+    try {
+      await AuthService.assignStudentClasses(userId, classIds);
+      showToast("Đã phân lớp thành công và lưu trực tiếp vào Database chung!", "success");
+      this.closeModal('assign-classes-modal');
+      await this.loadAllData();
+      this.render();
+    } catch (err) {
+      showToast("Lỗi khi lưu phân lớp: " + err.message, "error");
+    }
+  },
+
+  // =========================================================================
+  // AI VOCABULARY IMPORT (PDF / EXCEL WITH GEMINI)
+  // =========================================================================
+
+  openImportVocabAIModal(prefilledClassId = null, prefilledLessonId = null) {
+    const modal = document.getElementById('import-vocab-ai-modal');
+    if (!modal) return;
+
+    const targetClassId = Number(prefilledClassId || state.selectedClassDetailId || state.selectedClassId || 1);
+
+    const classSelect = document.getElementById('import-ai-target-class');
+    if (classSelect) {
+      classSelect.innerHTML = state.classes.map(c => 
+        `<option value="${c.id}" ${Number(c.id) === targetClassId ? 'selected' : ''}>${c.name} (Mã: ${c.class_code})</option>`
+      ).join('');
+    }
+
+    this.handleImportClassChange(targetClassId, prefilledLessonId);
+
+    // Reset file and state
+    state.pendingImportRawText = "";
+    state.pendingImportFile = null;
+    state.pendingImportExtractedTerms = [];
+
+    const filePill = document.getElementById('import-ai-file-pill');
+    if (filePill) filePill.classList.add('hidden');
+    const dropLabel = document.getElementById('import-ai-drop-label');
+    if (dropLabel) dropLabel.textContent = "Bấm để chọn file hoặc kéo thả file vào đây";
+    const fileInput = document.getElementById('import-ai-file-input');
+    if (fileInput) fileInput.value = "";
+    const noteInput = document.getElementById('import-ai-custom-note');
+    if (noteInput) noteInput.value = "";
+    const loading = document.getElementById('import-ai-loading');
+    if (loading) loading.classList.add('hidden');
+    const previewContainer = document.getElementById('import-ai-preview-container');
+    if (previewContainer) previewContainer.classList.add('hidden');
+    const saveBtn = document.getElementById('btn-save-ai-vocab-to-db');
+    if (saveBtn) saveBtn.disabled = true;
+
+    // Attach drag & drop handler if not already attached
+    const dropzone = document.getElementById('import-ai-dropzone');
+    if (dropzone && !dropzone._dndBound) {
+      dropzone._dndBound = true;
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('border-primary', 'bg-primary/20');
+        }, false);
+      });
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('border-primary', 'bg-primary/20');
+        }, false);
+      });
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt?.files;
+        if (files && files.length > 0) {
+          this.handleImportFileSelected({ target: { files: files } });
+        }
+      }, false);
+    }
+
+    modal.classList.remove('hidden');
+  },
+
+  handleImportClassChange(classId, prefilledLessonId = null) {
+    const lessonSelect = document.getElementById('import-ai-target-lesson');
+    if (!lessonSelect) return;
+
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === Number(classId));
+    const targetLessonId = prefilledLessonId ? Number(prefilledLessonId) : (classLessons[0]?.id || null);
+
+    lessonSelect.innerHTML = `
+      <option value="">-- Tự động tạo / Gán Unit mặc định --</option>
+      ${classLessons.map(l => 
+        `<option value="${l.id}" ${Number(l.id) === targetLessonId ? 'selected' : ''}>${l.title}</option>`
+      ).join('')}
+    `;
+  },
+
+  async handleImportFileSelected(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+
+    state.pendingImportFile = file;
+
+    const fileNameEl = document.getElementById('import-ai-file-name');
+    const fileSizeEl = document.getElementById('import-ai-file-size');
+    const filePill = document.getElementById('import-ai-file-pill');
+    const dropLabel = document.getElementById('import-ai-drop-label');
+
+    if (fileNameEl) fileNameEl.textContent = file.name;
+    if (fileSizeEl) fileSizeEl.textContent = `(${Math.round(file.size / 1024)} KB)`;
+    if (filePill) filePill.classList.remove('hidden');
+    if (dropLabel) dropLabel.textContent = `Đã chọn: ${file.name}`;
+
+    showToast(`Đang đọc nội dung file "${file.name}"...`, "info");
+
+    try {
+      const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+      const arrayBuffer = await file.arrayBuffer();
+
+      let extractedText = "";
+
+      if (isPdf) {
+        if (typeof pdfjsLib === 'undefined') {
+          throw new Error("Thư viện PDF.js chưa sẵn sàng!");
+        }
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdfDoc = await loadingTask.promise;
+        const totalPages = pdfDoc.numPages;
+        const textParts = [];
+
+        for (let i = 1; i <= totalPages; i++) {
+          const page = await pdfDoc.getPage(i);
+          const content = await page.getTextContent();
+          const pageStr = content.items.map(it => it.str).join(" ");
+          textParts.push(`--- Trang ${i} ---\n${pageStr}`);
+        }
+        extractedText = textParts.join("\n\n");
+      } else {
+        // Excel (.xlsx, .xls, .csv)
+        if (typeof XLSX === 'undefined') {
+          throw new Error("Thư viện XLSX chưa sẵn sàng!");
+        }
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const textParts = [];
+
+        workbook.SheetNames.forEach(sheetName => {
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          if (rows && rows.length > 0) {
+            textParts.push(`--- Sheet: ${sheetName} ---`);
+            rows.forEach(r => {
+              if (r && r.length > 0) {
+                textParts.push(r.filter(cell => cell !== undefined && cell !== null).join(" | "));
+              }
+            });
+          }
+        });
+        extractedText = textParts.join("\n");
+      }
+
+      if (!extractedText.trim()) {
+        throw new Error("Không thể đọc được nội dung văn bản từ file này. Vui lòng kiểm tra lại file!");
+      }
+
+      state.pendingImportRawText = extractedText;
+      showToast(`Đã nhận diện file (${extractedText.length} ký tự). Sẵn sàng trích xuất bằng Gemini AI!`, "success");
+    } catch (err) {
+      console.error("Lỗi đọc file tài liệu:", err);
+      showToast("Lỗi đọc file: " + err.message, "error");
+      this.clearImportFile();
+    }
+  },
+
+  clearImportFile(event) {
+    if (event) event.stopPropagation();
+    state.pendingImportFile = null;
+    state.pendingImportRawText = "";
+    state.pendingImportExtractedTerms = [];
+
+    const filePill = document.getElementById('import-ai-file-pill');
+    if (filePill) filePill.classList.add('hidden');
+    const fileInput = document.getElementById('import-ai-file-input');
+    if (fileInput) fileInput.value = "";
+    const dropLabel = document.getElementById('import-ai-drop-label');
+    if (dropLabel) dropLabel.textContent = "Bấm để chọn file hoặc kéo thả file vào đây";
+    const previewContainer = document.getElementById('import-ai-preview-container');
+    if (previewContainer) previewContainer.classList.add('hidden');
+    const saveBtn = document.getElementById('btn-save-ai-vocab-to-db');
+    if (saveBtn) saveBtn.disabled = true;
+  },
+
+  async handleStartAIExtraction() {
+    if (!state.pendingImportRawText || !state.pendingImportRawText.trim()) {
+      showToast("Vui lòng chọn hoặc tải lên file PDF/Excel trước!", "warning");
+      return;
+    }
+
+    const note = document.getElementById('import-ai-custom-note')?.value.trim() || "";
+    const loading = document.getElementById('import-ai-loading');
+    const triggerBtn = document.getElementById('btn-trigger-ai-extract');
+    const previewContainer = document.getElementById('import-ai-preview-container');
+    const saveBtn = document.getElementById('btn-save-ai-vocab-to-db');
+
+    if (loading) loading.classList.remove('hidden');
+    if (triggerBtn) triggerBtn.disabled = true;
+    if (previewContainer) previewContainer.classList.add('hidden');
+    if (saveBtn) saveBtn.disabled = true;
+
+    try {
+      const terms = await GeminiService.extractVocabularyFromText(state.pendingImportRawText, note);
+      if (!terms || terms.length === 0) {
+        showToast("AI không phát hiện được từ vựng hoặc thuật ngữ nào trong nội dung này!", "warning");
+        return;
+      }
+
+      state.pendingImportExtractedTerms = terms;
+
+      const tbody = document.getElementById('import-ai-preview-tbody');
+      const countEl = document.getElementById('import-ai-count');
+      if (countEl) countEl.textContent = terms.length;
+
+      if (tbody) {
+        tbody.innerHTML = terms.map((t, idx) => `
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="p-2.5 text-center">
+              <input type="checkbox" data-idx="${idx}" checked class="import-ai-item-checkbox w-4 h-4 rounded text-primary" />
+            </td>
+            <td class="p-2.5 font-bold text-primary">${t.word}</td>
+            <td class="p-2.5 font-mono text-outline text-xs">${t.ipa || ''}</td>
+            <td class="p-2.5 font-medium text-on-surface">${t.meaning}</td>
+            <td class="p-2.5 text-xs text-on-surface-variant max-w-xs truncate" title="${t.example || t.definition || ''}">
+              ${t.example || t.definition || ''}
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      if (previewContainer) previewContainer.classList.remove('hidden');
+      if (saveBtn) saveBtn.disabled = false;
+      showToast(`⚡ Gemini AI đã trích xuất thành công ${terms.length} từ vựng!`, "success");
+    } catch (err) {
+      console.error("Lỗi khi trích xuất từ vựng AI:", err);
+      showToast("Lỗi trích xuất AI: " + err.message, "error");
+    } finally {
+      if (loading) loading.classList.add('hidden');
+      if (triggerBtn) triggerBtn.disabled = false;
+    }
+  },
+
+  toggleSelectAllImportItems(selectAll) {
+    const checkboxes = document.querySelectorAll('.import-ai-item-checkbox');
+    checkboxes.forEach(cb => { cb.checked = selectAll; });
+  },
+
+  async handleSaveImportedVocabToDatabase() {
+    const targetClassId = Number(document.getElementById('import-ai-target-class')?.value || 1);
+    const lessonVal = document.getElementById('import-ai-target-lesson')?.value;
+    const targetLessonId = lessonVal ? Number(lessonVal) : null;
+
+    const checkedBoxes = document.querySelectorAll('.import-ai-item-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+      showToast("Vui lòng chọn ít nhất 1 từ vựng để lưu vào Database!", "warning");
+      return;
+    }
+
+    const selectedTerms = [];
+    checkedBoxes.forEach(cb => {
+      const idx = Number(cb.getAttribute('data-idx'));
+      if (state.pendingImportExtractedTerms[idx]) {
+        selectedTerms.push(state.pendingImportExtractedTerms[idx]);
+      }
+    });
+
+    const saveBtn = document.getElementById('btn-save-ai-vocab-to-db');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `<span class="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></span> Đang đồng bộ vào Database Supabase...`;
+    }
+
+    try {
+      const inserted = await SupabaseService.bulkInsertVocabulary(selectedTerms, targetClassId, targetLessonId);
+      showToast(`🎉 Đã lưu thành công ${inserted.length || selectedTerms.length} từ vựng vào Database chung! Tất cả mọi người đều có thể học ngay.`, "success");
+      
+      this.closeModal('import-vocab-ai-modal');
+      await this.loadAllData();
+      this.render();
+    } catch (err) {
+      console.error("Lỗi lưu từ vựng vào Supabase:", err);
+      showToast("Lỗi lưu vào database: " + err.message, "error");
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<span class="material-symbols-outlined text-base">cloud_upload</span> <span>Lưu Vào Database (Supabase)</span>`;
+      }
+    }
+  },
+
+  // =========================================================================
   // BÁO CÁO TIẾN ĐỘ TỪNG HỌC SINH (INDIVIDUAL STUDENT REPORTS)
   // =========================================================================
 
@@ -714,19 +1097,34 @@ window.App = {
   // SAFE NAVIGATION & CLASS DRILLDOWN LOGIC
   // =========================================================================
 
-  openClassDetail(classId, tab = 'units') {
+  openClassDetail(classId, tab = null) {
     const targetId = Number(classId);
     const allowedClasses = this.getManagedClasses(state.currentUser);
     const isAllowed = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher') || allowedClasses.some(c => c.id === targetId);
 
     if (!isAllowed) {
-      showToast("Bạn chỉ được phép truy cập lớp học thuộc quyền phụ trách của mình!", "error");
+      showToast("Bạn chỉ được phép truy cập lớp học thuộc quyền của mình!", "error");
       return;
     }
 
     state.selectedClassId = targetId;
     state.selectedClassDetailId = targetId;
-    state.classDetailTab = tab;
+
+    // Nếu là học sinh và tab là accounts -> Chặn, chuyển về units
+    if (state.currentUser?.role === 'student' && tab === 'accounts') {
+      tab = 'units';
+    }
+
+    // Kiểm tra xem lớp này có lớp con không (như HUST20261-SƠN):
+    const childClasses = state.classes.filter(c => Number(c.parent_id) === targetId || (targetId === 11 && c.category === 'HUST_CHILD'));
+    if (tab) {
+      state.classDetailTab = tab;
+    } else if (childClasses.length > 0 || targetId === 11) {
+      state.classDetailTab = 'subclasses'; // Xuất hiện các lớp con ngay sau khi bấm vào lớp lớn!
+    } else {
+      state.classDetailTab = 'units';
+    }
+
     state.selectedLessonId = null;
     this.updateStudyList();
     this.switchTab('classes');
@@ -2194,7 +2592,7 @@ window.App = {
       console.error("Gemini Tutor Error:", err);
       state.chatMessages.push({
         sender: 'bot',
-        text: `Chào em! Thầy nhận thấy câu hỏi "${userText}" rất hay. Để thầy phân tích chi tiết: ${err.message?.includes("403") || err.message?.includes("key") ? "Vui lòng kiểm tra lại cấu hình GEMINI_API_KEY trong file .env.local nhé!" : "Em hãy thử hỏi lại hoặc nêu rõ câu bài tập cần thầy hướng dẫn nhé!"}`
+        text: `Chào bạn! Mình nhận thấy câu hỏi "${userText}" rất hay. Để mình phân tích chi tiết: ${err.message?.includes("403") || err.message?.includes("key") ? "Vui lòng kiểm tra lại cấu hình GEMINI_API_KEY trong hệ thống nhé!" : "Bạn hãy thử hỏi lại hoặc nêu rõ câu bài tập cần mình hướng dẫn nhé!"}`
       });
     } finally {
       state.isTutorTyping = false;
@@ -2379,15 +2777,15 @@ window.App = {
         classes: state.selectedClassDetailId ? (activeClass?.name || 'Chi Tiết Lớp Học') : 'Lớp Học & Chuyên Đề',
         accounts: 'Quản Lý Tài Khoản',
         flashcards: `Flashcard 3D • ${activeClass?.name || ''}`,
-        quiz: `Luyện Đề Vào 10 • ${activeClass?.name || ''}`,
+        quiz: `Luyện Đề Thi • ${activeClass?.name || ''}`,
         quiz_result: 'Kết Quả Bài Thi',
         table_input: `Bảng Nhập Từ • ${activeClass?.name || ''}`,
         vocabulary: `Kho Từ Vựng • ${activeClass?.name || ''}`,
-        seee_study: '⚡ SEEE Master Study • English for Electricity (HUST)',
+        seee_study: `Thuật Ngữ Chuyên Ngành • ${activeClass?.name || 'HUST'}`,
         tutor: 'Gia Sư AI Quang Son',
         settings: 'Cài Đặt Hệ Thống'
       };
-      breadcrumbPage.textContent = titles[state.currentTab] || 'Ôn Thi Tiếng Anh Vào 10';
+      breadcrumbPage.textContent = titles[state.currentTab] || 'Học Tập Tiếng Anh Cá Nhân';
     }
 
     const viewRenderers = {
@@ -2535,7 +2933,7 @@ window.App = {
             </div>
             <h1 class="font-display-lg text-2xl font-bold text-primary">Quang Son</h1>
             <p class="text-xs font-bold text-secondary uppercase tracking-wider">Your English Tutor</p>
-            <p class="text-xs text-on-surface-variant mt-1">Hệ thống Ôn thi Tiếng Anh vào 10 Chuyên Sâu</p>
+            <p class="text-xs text-on-surface-variant mt-1">Hệ thống Học Tập Tiếng Anh Cá Nhân</p>
           </div>
 
           <!-- Login Form -->
@@ -2645,7 +3043,7 @@ window.App = {
             </h1>
             <p class="font-body-md text-sm text-on-surface-variant mt-2 max-w-xl">
               ${isStudent 
-                ? 'Không gian ôn thi Tiếng Anh vào 10 cá nhân hóa. Bấm vào từng thư mục lớp bên dưới để luyện bài học và thi thử.' 
+                ? 'Không gian học tập Tiếng Anh cá nhân hóa. Bấm vào từng thư mục lớp bên dưới để học bài và luyện tập.' 
                 : 'Phân hệ quản trị & giảng dạy. Quản lý các thư mục lớp học, bài học, kho từ vựng, tài khoản học sinh và báo cáo bên dưới.'
               }
             </p>
@@ -2684,100 +3082,129 @@ window.App = {
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-stack-md">
-            ${visibleClasses.length > 0 ? visibleClasses.map(c => {
-              const cLessons = state.lessons.filter(l => l.class_id === c.id);
-              const cVocab = state.vocabulary.filter(v => v.class_id === c.id);
-              const cStudents = state.usersList.filter(u => u.role === 'student' && u.class_id === c.id);
-              
-              return `
-                <div class="bg-surface-container-lowest rounded-3xl ambient-shadow border border-outline-variant/30 p-6 flex flex-col justify-between gap-5 hover-lift transition-all">
-                  
-                  <!-- Folder Top Header -->
-                  <div>
-                    <div class="flex items-start justify-between gap-3 mb-3">
-                      <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center font-bold shadow-sm shrink-0">
-                          <span class="material-symbols-outlined text-2xl">folder</span>
-                        </div>
-                        <div>
-                          <div class="flex items-center gap-2 flex-wrap">
-                            <h4 class="font-headline-md text-base sm:text-lg font-bold text-on-surface">${c.name}</h4>
-                            <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary font-mono text-[11px] font-bold">Mã: ${c.class_code}</span>
+            ${(() => {
+              // CHỈ HIỂN THỊ CÁC LỚP LỚN / LỚP CHA Ở BÊN NGOÀI MÀN HÌNH CHÍNH
+              const rootClasses = visibleClasses.filter(c => !c.parent_id && c.category !== 'HUST_CHILD');
+              if (rootClasses.length === 0) {
+                return `
+                  <div class="col-span-full p-8 bg-surface-container-lowest rounded-3xl border border-outline-variant/30 text-center">
+                    <span class="material-symbols-outlined text-4xl text-outline mb-2">folder_off</span>
+                    <p class="font-bold text-sm text-on-surface">Chưa có thư mục lớp học nào</p>
+                    ${isTeacher ? `
+                      <button onclick="App.openCreateClassModal()" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">add</span> Tạo Lớp Đầu Tiên
+                      </button>
+                    ` : ''}
+                  </div>
+                `;
+              }
+
+              return rootClasses.map(c => {
+                const cLessons = state.lessons.filter(l => l.class_id === c.id);
+                const cVocab = state.vocabulary.filter(v => v.class_id === c.id);
+                const cStudents = state.usersList.filter(u => u.role === 'student' && (u.class_id === c.id || (Array.isArray(u.enrolled_classes) && u.enrolled_classes.includes(c.id))));
+                const childCount = state.classes.filter(sub => Number(sub.parent_id) === c.id || (c.id === 11 && sub.category === 'HUST_CHILD')).length;
+                
+                return `
+                  <div class="bg-surface-container-lowest rounded-3xl ambient-shadow border border-outline-variant/30 p-6 flex flex-col justify-between gap-5 hover-lift transition-all">
+                    
+                    <!-- Folder Top Header -->
+                    <div>
+                      <div class="flex items-start justify-between gap-3 mb-3">
+                        <div class="flex items-center gap-3">
+                          <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center font-bold shadow-sm shrink-0">
+                            <span class="material-symbols-outlined text-2xl">folder</span>
                           </div>
-                          <p class="text-xs text-outline mt-0.5">Không gian lớp học độc lập</p>
+                          <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                              <h4 class="font-headline-md text-base sm:text-lg font-bold text-on-surface">${c.name}</h4>
+                              <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary font-mono text-[11px] font-bold">Mã: ${c.class_code}</span>
+                            </div>
+                            <p class="text-xs text-outline mt-0.5">${childCount > 0 ? `Lớp lớn (${childCount} lớp con bên trong)` : 'Không gian lớp học độc lập'}</p>
+                          </div>
                         </div>
+                      </div>
+
+                      <!-- 4 Sub-Folders / Mini Tabs directly inside this class folder card -->
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                        
+                        <!-- 1. Bài học -->
+                        <button onclick="App.openClassDetail(${c.id}, 'units')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-primary/10 hover:text-primary text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                          <div class="flex items-center justify-between">
+                            <span class="material-symbols-outlined text-primary text-base group-hover:scale-110 transition-transform">auto_stories</span>
+                            <span class="font-bold text-[11px] text-outline">${cLessons.length}</span>
+                          </div>
+                          <span class="font-bold text-[11px]">1. Bài Học</span>
+                        </button>
+
+                        <!-- 2. Từ vựng -->
+                        <button onclick="App.openClassDetail(${c.id}, 'vocabulary')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-secondary/10 hover:text-secondary text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                          <div class="flex items-center justify-between">
+                            <span class="material-symbols-outlined text-secondary text-base group-hover:scale-110 transition-transform">menu_book</span>
+                            <span class="font-bold text-[11px] text-outline">${cVocab.length}</span>
+                          </div>
+                          <span class="font-bold text-[11px]">2. Từ Vựng</span>
+                        </button>
+
+                        <!-- 3. Quản lý tài khoản (Chỉ Host/Giáo viên thấy) HOẶC Lớp con nếu có -->
+                        ${isTeacher ? `
+                          <button onclick="App.openClassDetail(${c.id}, 'accounts')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-blue-500/10 hover:text-blue-700 text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                            <div class="flex items-center justify-between">
+                              <span class="material-symbols-outlined text-blue-600 text-base group-hover:scale-110 transition-transform">manage_accounts</span>
+                              <span class="font-bold text-[11px] text-outline">${cStudents.length}</span>
+                            </div>
+                            <span class="font-bold text-[11px]">3. Cấp Acc</span>
+                          </button>
+                        ` : childCount > 0 ? `
+                          <button onclick="App.openClassDetail(${c.id}, 'subclasses')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-primary/10 hover:text-primary text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                            <div class="flex items-center justify-between">
+                              <span class="material-symbols-outlined text-primary text-base group-hover:scale-110 transition-transform">account_tree</span>
+                              <span class="font-bold text-[11px] text-outline">${childCount}</span>
+                            </div>
+                            <span class="font-bold text-[11px]">3. Lớp Con</span>
+                          </button>
+                        ` : `
+                          <button onclick="App.openClassDetail(${c.id}, 'reports')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-green-500/10 hover:text-green-700 text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                            <div class="flex items-center justify-between">
+                              <span class="material-symbols-outlined text-green-600 text-base group-hover:scale-110 transition-transform">analytics</span>
+                              <span class="font-bold text-[11px] text-outline">Xem</span>
+                            </div>
+                            <span class="font-bold text-[11px]">3. Tiến Độ</span>
+                          </button>
+                        `}
+
+                        <!-- 4. Báo cáo thống kê -->
+                        <button onclick="App.openClassDetail(${c.id}, 'reports')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-green-500/10 hover:text-green-700 text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
+                          <div class="flex items-center justify-between">
+                            <span class="material-symbols-outlined text-green-600 text-base group-hover:scale-110 transition-transform">analytics</span>
+                            <span class="font-bold text-[11px] text-outline">Xem</span>
+                          </div>
+                          <span class="font-bold text-[11px]">4. Báo Cáo</span>
+                        </button>
                       </div>
                     </div>
 
-                    <!-- 4 Sub-Folders / Mini Tabs directly inside this class folder card -->
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-                      
-                      <!-- 1. Bài học -->
-                      <button onclick="App.openClassDetail(${c.id}, 'units')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-primary/10 hover:text-primary text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
-                        <div class="flex items-center justify-between">
-                          <span class="material-symbols-outlined text-primary text-base group-hover:scale-110 transition-transform">auto_stories</span>
-                          <span class="font-bold text-[11px] text-outline">${cLessons.length}</span>
-                        </div>
-                        <span class="font-bold text-[11px]">1. Bài Học</span>
-                      </button>
+                    <!-- Folder Quick Actions Bar -->
+                    <div class="flex items-center justify-between gap-2 pt-3 border-t border-outline-variant/30 flex-wrap">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <button onclick="App.selectClass(${c.id}); App.startLessonFlashcard(null);" class="px-3 py-1.5 bg-surface-container text-primary hover:bg-primary hover:text-on-primary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
+                          <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
+                        </button>
+                        <button onclick="App.selectClass(${c.id}); App.startNewQuiz(null, true);" class="px-3 py-1.5 bg-surface-container text-on-surface hover:bg-secondary hover:text-on-secondary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
+                          <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
+                        </button>
+                      </div>
 
-                      <!-- 2. Từ vựng -->
-                      <button onclick="App.openClassDetail(${c.id}, 'vocabulary')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-secondary/10 hover:text-secondary text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
-                        <div class="flex items-center justify-between">
-                          <span class="material-symbols-outlined text-secondary text-base group-hover:scale-110 transition-transform">menu_book</span>
-                          <span class="font-bold text-[11px] text-outline">${cVocab.length}</span>
-                        </div>
-                        <span class="font-bold text-[11px]">2. Từ Vựng</span>
-                      </button>
-
-                      <!-- 3. Quản lý / Cấp tài khoản -->
-                      <button onclick="App.openClassDetail(${c.id}, 'accounts')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-blue-500/10 hover:text-blue-700 text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
-                        <div class="flex items-center justify-between">
-                          <span class="material-symbols-outlined text-blue-600 text-base group-hover:scale-110 transition-transform">manage_accounts</span>
-                          <span class="font-bold text-[11px] text-outline">${cStudents.length}</span>
-                        </div>
-                        <span class="font-bold text-[11px]">3. ${isTeacher ? 'Cấp Acc' : 'Học Sinh'}</span>
-                      </button>
-
-                      <!-- 4. Báo cáo thống kê -->
-                      <button onclick="App.openClassDetail(${c.id}, 'reports')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-green-500/10 hover:text-green-700 text-on-surface border border-outline-variant/30 text-left transition-all flex flex-col gap-1 group">
-                        <div class="flex items-center justify-between">
-                          <span class="material-symbols-outlined text-green-600 text-base group-hover:scale-110 transition-transform">analytics</span>
-                          <span class="font-bold text-[11px] text-outline">Xem</span>
-                        </div>
-                        <span class="font-bold text-[11px]">4. Báo Cáo</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- Folder Quick Actions Bar -->
-                  <div class="flex items-center justify-between gap-2 pt-3 border-t border-outline-variant/30 flex-wrap">
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                      <button onclick="App.selectClass(${c.id}); App.startLessonFlashcard(null);" class="px-3 py-1.5 bg-surface-container text-primary hover:bg-primary hover:text-on-primary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
-                        <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
-                      </button>
-                      <button onclick="App.selectClass(${c.id}); App.startNewQuiz(null, true);" class="px-3 py-1.5 bg-surface-container text-on-surface hover:bg-secondary hover:text-on-secondary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
-                        <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
+                      <button onclick="App.openClassDetail(${c.id})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs btn-press flex items-center gap-1 hover-lift shadow-sm">
+                        <span>Mở Lớp Học</span>
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
                       </button>
                     </div>
 
-                    <button onclick="App.openClassDetail(${c.id})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs btn-press flex items-center gap-1 hover-lift shadow-sm">
-                      <span>Mở Lớp Học</span>
-                      <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                    </button>
                   </div>
-
-                </div>
-              `;
-            }).join('') : `
-              <div class="col-span-full p-8 bg-surface-container-lowest rounded-3xl border border-outline-variant/30 text-center">
-                <span class="material-symbols-outlined text-4xl text-outline mb-2">folder_off</span>
-                <p class="font-bold text-sm text-on-surface">Chưa có thư mục lớp học nào</p>
-                <button onclick="App.openCreateClassModal()" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs inline-flex items-center gap-1">
-                  <span class="material-symbols-outlined text-sm">add</span> Tạo Lớp Đầu Tiên
-                </button>
-              </div>
-            `}
+                `;
+              }).join('');
+            })()}
           </div>
         </div>
 
@@ -2851,8 +3278,8 @@ window.App = {
               <span class="material-symbols-outlined text-2xl">psychology</span>
             </div>
             <div>
-              <h4 class="font-headline-md text-base font-bold text-on-surface">Cần Thầy Giải Thích Từ Vựng Hoặc Ngữ Pháp?</h4>
-              <p class="text-xs text-on-surface-variant">Gia Sư AI Quang Son luôn sẵn sàng 24/7 giải đáp mọi cấu trúc và đề thi vào 10.</p>
+              <h4 class="font-headline-md text-base font-bold text-on-surface">Cần Giải Thích Từ Vựng Hoặc Ngữ Pháp?</h4>
+              <p class="text-xs text-on-surface-variant">Gia Sư AI Quang Son luôn sẵn sàng 24/7 giải đáp mọi cấu trúc và câu hỏi bài tập.</p>
             </div>
           </div>
           <button onclick="App.switchTab('tutor')" class="bg-secondary-container text-on-secondary-container px-5 py-2.5 rounded-xl font-bold text-xs hover-lift shadow-sm whitespace-nowrap">
@@ -2955,10 +3382,21 @@ window.App = {
                         </span>
                       </td>
                       <td class="p-4 text-on-surface">
-                        ${isUserHost ? '<span class="text-primary font-bold">Toàn bộ các lớp</span>' : itemClass ? itemClass.name : 'Chưa gán'}
+                        ${isUserHost ? '<span class="text-primary font-bold">Toàn bộ các lớp</span>' : (() => {
+                          const enrolled = Array.isArray(u.enrolled_classes) && u.enrolled_classes.length > 0
+                            ? u.enrolled_classes
+                            : (u.class_id ? [u.class_id] : []);
+                          const names = enrolled.map(cid => state.classes.find(c => Number(c.id) === Number(cid))?.name).filter(Boolean);
+                          return names.length > 0 ? names.join(', ') : (itemClass ? itemClass.name : 'Chưa gán');
+                        })()}
                       </td>
                       <td class="p-4 text-center">
                         <div class="flex items-center justify-center gap-2">
+                          ${!isUserHost && u.role === 'student' ? `
+                            <button onclick="App.openAssignClassesModal('${u.id}')" class="px-2.5 py-1 rounded-lg bg-secondary-container hover:bg-secondary-container/80 text-on-secondary-container font-bold text-[11px] transition-colors" title="Phân quyền vào nhiều lớp">
+                              Phân Lớp
+                            </button>
+                          ` : ''}
                           <button onclick="App.handleChangePassword('${u.id}', '${u.full_name}')" class="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-[11px] transition-colors" title="Đổi mật khẩu">
                             Đổi Pass
                           </button>
@@ -3165,86 +3603,74 @@ window.App = {
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
     const isHost = (state.currentUser?.role === 'host' || state.currentUser?.role === 'teacher');
 
-    // If student, directly render their single assigned class
-    if (isStudent) {
-      const studentClassId = Number(state.currentUser?.class_id || 1);
-      return this.renderClassDetailView(studentClassId);
-    }
-
-    // If teacher has clicked into a specific class, render its detail
+    // If student has selected a class detail, render that detail
     if (state.selectedClassDetailId) {
       return this.renderClassDetailView(state.selectedClassDetailId);
     }
 
     const visibleClasses = this.getManagedClasses(state.currentUser);
 
+    // If student has exactly 1 class and hasn't explicitly navigated out, show that class
+    if (isStudent && visibleClasses.length === 1) {
+      return this.renderClassDetailView(visibleClasses[0].id);
+    }
+
+    // CHỈ HIỂN THỊ CÁC LỚP LỚN / LỚP CHA Ở BÊN NGOÀI MÀN HÌNH QUẢN LÝ LỚP HỌC
+    const rootClasses = visibleClasses.filter(c => !c.parent_id && c.category !== 'HUST_CHILD');
+
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">
-              ${isHost ? 'Quản lý Lớp học & Chuyên đề' : 'Lớp học của bạn'}
+              ${isHost ? 'Quản lý Lớp học & Chuyên đề' : 'Danh sách Lớp học'}
             </h2>
             <p class="font-body-md text-sm text-on-surface-variant">
-              ${isHost ? 'Bấm vào từng lớp học để xem các bài học, kho từ vựng và báo cáo học sinh.' : 'Quản lý các lớp bạn phụ trách hoặc tự tạo mới.'}
+              ${isHost ? 'Bấm vào từng lớp học để xem các bài học, kho từ vựng và phân lớp học sinh.' : 'Chọn lớp học của bạn để bắt đầu luyện tập từ vựng và làm bài tập.'}
             </p>
           </div>
-          <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift self-start sm:self-auto shadow-md">
-            <span class="material-symbols-outlined">add</span>
-            Tạo Lớp Học Mới
-          </button>
+          ${!isStudent ? `
+            <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 btn-press hover-lift self-start sm:self-auto shadow-md">
+              <span class="material-symbols-outlined">add</span>
+              Tạo Lớp Học Mới
+            </button>
+          ` : ''}
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-          ${visibleClasses.length > 0 ? visibleClasses.map(c => {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+          ${rootClasses.length > 0 ? rootClasses.map(c => {
             const classVocab = state.vocabulary.filter(v => v.class_id === c.id);
             const classLessons = state.lessons.filter(l => l.class_id === c.id);
-            const classStudents = state.usersList.filter(u => u.class_id === c.id && u.role === 'student');
+            const classStudents = state.usersList.filter(u => u.role === 'student' && (u.class_id === c.id || (Array.isArray(u.enrolled_classes) && u.enrolled_classes.includes(c.id))));
             const isCreator = c.creator_id === state.currentUser?.id || c.created_by === state.currentUser?.id;
-
+            const childCount = state.classes.filter(sub => Number(sub.parent_id) === c.id || (c.id === 11 && (sub.category === 'HUST_CHILD' || (sub.name && sub.name.includes('HUST-'))))).length;
             const isHUST = c.id === 11 || c.class_code === 'HUST20261' || c.category === 'HUST' || (c.name && c.name.includes('HUST'));
-            const isHUSTChild = c.category === 'HUST_CHILD' || c.parent_id === 11;
 
             return `
-              <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border ${isHUST ? 'border-amber-500/40 ring-2 ring-amber-500/20' : isHUSTChild ? 'border-amber-500/30' : 'border-outline-variant/30'} flex flex-col justify-between hover-lift">
+              <div class="bg-surface-container-lowest p-6 rounded-3xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift transition-all">
                 <div>
                   <div class="flex items-center justify-between mb-3">
-                    <span class="px-3 py-1 rounded-full ${isHUST ? 'bg-amber-500 text-black font-black' : isHUSTChild ? 'bg-amber-500/20 text-amber-500 font-bold' : 'bg-primary-container/20 text-primary font-bold'} font-mono text-xs">
-                      ${isHUST ? '⚡ HUST HUB' : isHUSTChild ? '⚡ LỚP CON HUST' : `Mã: ${c.class_code}`}
+                    <span class="px-3 py-1 rounded-full bg-primary-container/20 text-primary font-mono text-xs font-bold">
+                      ${childCount > 0 ? `LỚP LỚN • ${childCount} LỚP CON` : `Mã: ${c.class_code}`}
                     </span>
                     <button onclick="navigator.clipboard.writeText('${c.class_code}'); App.showToast('Đã copy mã lớp ${c.class_code}!', 'success')" class="text-outline hover:text-primary p-1" title="Copy mã lớp">
                       <span class="material-symbols-outlined text-base">content_copy</span>
                     </button>
                   </div>
                   <h3 class="font-headline-md text-lg font-bold text-on-surface mb-2">${c.name}</h3>
-                  <div class="flex items-center gap-3 text-xs text-on-surface-variant mb-4">
+                  <div class="flex items-center gap-3 text-xs text-on-surface-variant mb-4 flex-wrap">
                     <span>📖 <strong>${classLessons.length}</strong> bài học</span>
                     <span>•</span>
                     <span>📚 <strong>${classVocab.length}</strong> từ</span>
-                    <span>•</span>
-                    <span>👥 <strong>${classStudents.length}</strong> học sinh</span>
+                    ${!isStudent ? `<span>•</span> <span>👥 <strong>${classStudents.length}</strong> học sinh</span>` : ''}
+                    ${childCount > 0 ? `<span>•</span> <span class="text-primary font-bold">⚡ <strong>${childCount}</strong> lớp con</span>` : ''}
                   </div>
-                  ${isHUST ? `
-                    <div class="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-500 font-bold flex items-center justify-between">
-                      <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">bolt</span> SEEE Terminology Hub</span>
-                      <span class="bg-amber-500 text-black px-1.5 py-0.5 rounded text-[10px] font-black">${classVocab.length} TERMS</span>
-                    </div>
-                  ` : ''}
                 </div>
                 <div>
-                  ${isHUST ? `
-                    <div class="grid grid-cols-2 gap-2 mb-2">
-                      <button onclick="App.openSEEEStudy(${c.id})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1 shadow-md">
-                        <span class="material-symbols-outlined text-sm">bolt</span> Vào Học Terms
-                      </button>
-                      <button onclick="App.openCreateChildClassModal(${c.id})" class="bg-surface-container hover:bg-surface-container-high border border-amber-500/40 text-amber-500 font-bold text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1">
-                        <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Lớp Nhỏ
-                      </button>
-                    </div>
-                  ` : ''}
                   <div class="flex items-center gap-2 pt-3 border-t border-outline-variant/30">
-                    <button onclick="App.openClassDetail(${c.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift transition-colors text-center flex items-center justify-center gap-1">
-                      <span class="material-symbols-outlined text-base">school</span> 👉 Vào Chi Tiết Lớp
+                    <button onclick="App.openClassDetail(${c.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift transition-colors text-center flex items-center justify-center gap-1.5 shadow-sm">
+                      <span class="material-symbols-outlined text-base">school</span>
+                      <span>${childCount > 0 ? '👉 Mở Lớp Lớn & Xem Lớp Con' : '👉 Vào Chi Tiết Lớp'}</span>
                     </button>
                     ${(isHost || isCreator) ? `
                       <button onclick="App.deleteClass(${c.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa lớp">
@@ -3259,10 +3685,14 @@ window.App = {
             <div class="col-span-full p-12 bg-surface-container-lowest rounded-3xl border border-outline-variant/30 text-center">
               <span class="material-symbols-outlined text-5xl text-outline mb-2">school</span>
               <p class="text-on-surface font-bold text-base mb-1">Chưa có lớp học nào</p>
-              <p class="text-outline text-xs mb-4">Bấm nút "Tạo Lớp Học Mới" ở trên để tạo lớp đầu tiên của bạn!</p>
-              <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 hover-lift">
-                <span class="material-symbols-outlined text-base">add</span> Tạo Lớp Ngay
-              </button>
+              ${!isStudent ? `
+                <p class="text-outline text-xs mb-4">Bấm nút "Tạo Lớp Học Mới" ở trên để tạo lớp đầu tiên của bạn!</p>
+                <button onclick="App.openCreateClassModal()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 hover-lift">
+                  <span class="material-symbols-outlined text-base">add</span> Tạo Lớp Ngay
+                </button>
+              ` : `
+                <p class="text-outline text-xs">Vui lòng liên hệ Host để được phân vào lớp học của bạn.</p>
+              `}
             </div>
           `}
         </div>
@@ -3327,15 +3757,18 @@ window.App = {
 
           <!-- Fast Launcher Actions -->
           <div class="flex items-center gap-2 flex-wrap">
-            ${isHUSTHub ? `
-              <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-md hover-lift">
+            ${(isHUSTHub && isTeacher) ? `
+              <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-primary text-on-primary font-bold text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-sm hover-lift">
                 <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Lớp Nhỏ
               </button>
             ` : isHUSTChild ? `
-              <button onclick="App.openClassDetail(11)" class="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/30 px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
+              <button onclick="App.openClassDetail(11)" class="bg-surface-container text-on-surface hover:bg-surface-container-high border border-outline-variant/40 px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
                 <span class="material-symbols-outlined text-sm">arrow_back</span> Về Lớp Cha (HUST)
               </button>
             ` : ''}
+            <button onclick="App.openImportVocabAIModal(${targetClassId})" class="bg-primary-container text-on-primary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">smart_toy</span> Nhập File AI (PDF/Excel)
+            </button>
             <button onclick="App.startLessonFlashcard(null)" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">style</span> Luyện Flashcard
             </button>
@@ -3345,38 +3778,10 @@ window.App = {
           </div>
         </div>
 
-        ${isHUSTFamily ? `
-          <div class="p-5 md:p-6 rounded-3xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ambient-shadow">
-            <div class="space-y-1">
-              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-black font-black text-xs">
-                <span class="material-symbols-outlined text-sm">bolt</span> ${isHUSTChild ? '⚡ LỚP CON THUỘC HUST20261-SƠN' : 'SEEE MASTER STUDY • SPECIAL TERMINOLOGY HUB'}
-              </div>
-              <h3 class="font-headline-md text-base md:text-lg font-black text-on-surface">Chương Trình Thuật Ngữ Chuyên Ngành (${classLessons.length} Units • ${classVocab.length} Terms)</h3>
-              <p class="text-xs text-on-surface-variant max-w-2xl">
-                Chế độ bài tập đặc biệt: Cho Đề bài là Định nghĩa tiếng Anh (Definition) và gõ tay Thuật ngữ (Term). Hỗ trợ kiểm tra theo từng Unit, tự chọn Unit, kiểm tra ngẫu nhiên và Flashcard 3D.
-              </p>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              ${isHUSTHub ? `
-                <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-surface-container-lowest border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 font-bold text-xs md:text-sm px-4 py-3 rounded-2xl flex items-center gap-1.5 hover-lift shadow">
-                  <span class="material-symbols-outlined text-lg">account_tree</span> + Thêm Lớp Nhỏ
-                </button>
-              ` : `
-                <button onclick="App.openClassDetail(11)" class="bg-surface-container-lowest border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 font-bold text-xs md:text-sm px-4 py-3 rounded-2xl flex items-center gap-1.5 hover-lift shadow">
-                  <span class="material-symbols-outlined text-lg">arrow_back</span> Về Lớp Cha
-                </button>
-              `}
-              <button onclick="App.openSEEEStudy(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs md:text-sm px-5 py-3 rounded-2xl flex items-center gap-2 hover-lift shadow-lg whitespace-nowrap">
-                <span class="material-symbols-outlined text-lg">bolt</span> Vào Học SEEE Terms (${classVocab.length} từ)
-              </button>
-            </div>
-          </div>
-        ` : ''}
-
         <!-- Class Section Navigation Tabs -->
         <div class="flex items-center gap-2 border-b border-outline-variant/30 pb-2 overflow-x-auto">
           ${isHUSTHub ? `
-            <button onclick="App.setClassDetailTab('subclasses')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'subclasses' ? 'bg-amber-500 text-black shadow-md' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+            <button onclick="App.setClassDetailTab('subclasses')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'subclasses' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
               <span class="material-symbols-outlined text-base">account_tree</span>
               <span>Lớp Nhỏ / Phân Nhánh (${childClasses.length})</span>
             </button>
@@ -3392,14 +3797,16 @@ window.App = {
             <span>2. Kho Từ Vựng (${classVocab.length})</span>
           </button>
 
-          <button onclick="App.setClassDetailTab('accounts')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'accounts' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
-            <span class="material-symbols-outlined text-base">manage_accounts</span>
-            <span>3. ${isTeacher ? `Học Sinh & Cấp Tài Khoản (${classStudents.length})` : `Danh Sách Thành Viên Lớp (${classStudents.length})`}</span>
-          </button>
+          ${isTeacher ? `
+            <button onclick="App.setClassDetailTab('accounts')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'accounts' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+              <span class="material-symbols-outlined text-base">manage_accounts</span>
+              <span>3. Học Sinh & Cấp Tài Khoản (${classStudents.length})</span>
+            </button>
+          ` : ''}
 
           <button onclick="App.setClassDetailTab('reports')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'reports' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
             <span class="material-symbols-outlined text-base">analytics</span>
-            <span>4. ${isTeacher ? 'Báo Cáo Học Sinh & Thời Gian Học' : 'Báo Cáo Học Tập Cá Nhân'}</span>
+            <span>${isTeacher ? '4. Báo Cáo Học Sinh & Thời Gian Học' : '3. Báo Cáo Học Tập Cá Nhân'}</span>
           </button>
         </div>
 
@@ -3472,10 +3879,13 @@ window.App = {
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 class="font-headline-md text-base font-bold text-on-surface">Kho Từ Vựng Của Lớp</h3>
-                <p class="text-xs text-on-surface-variant">Tra cứu và quản lý toàn bộ từ vựng ôn thi vào 10 của lớp.</p>
+                <p class="text-xs text-on-surface-variant">Tra cứu và quản lý toàn bộ từ vựng của lớp.</p>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                <button onclick="App.openImportVocabAIModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                  <span class="material-symbols-outlined text-sm">smart_toy</span> Nhập Từ Bằng AI (PDF/Excel)
+                </button>
+                <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
                   <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
                 </button>
                 <button onclick="App.openBatchTableModal(null, ${targetClassId})" class="bg-primary-container text-on-primary-container px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
@@ -3695,6 +4105,9 @@ window.App = {
                             </td>
                             <td class="p-3.5 text-center">
                               <div class="flex items-center justify-center gap-1.5">
+                                <button onclick="App.openAssignClassesModal('${u.id}')" class="px-2.5 py-1 rounded-lg bg-secondary-container hover:bg-secondary-container/80 text-on-secondary-container font-bold text-[11px] transition-colors" title="Phân quyền vào nhiều lớp">
+                                  Phân Lớp
+                                </button>
                                 <button onclick="App.handleChangePassword('${u.id}', '${u.full_name}')" class="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-[11px] transition-colors" title="Đổi mật khẩu">
                                   Đổi Pass
                                 </button>
@@ -3901,10 +4314,12 @@ window.App = {
                 <h3 class="font-headline-md text-base font-bold text-on-surface">Các Lớp Nhỏ / Phân Nhánh Thuộc HUST20261-SƠN</h3>
                 <p class="text-xs text-on-surface-variant">Phân chia các môn học con, chuyên đề kỹ thuật điện để quản lý bài học và từ vựng riêng biệt.</p>
               </div>
-              <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-md hover-lift self-start sm:self-auto">
-                <span class="material-symbols-outlined text-base">add_circle</span>
-                <span>+ Thêm Lớp Nhỏ Mới</span>
-              </button>
+              ${isTeacher ? `
+                <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-primary text-on-primary font-bold text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-sm hover-lift self-start sm:self-auto">
+                  <span class="material-symbols-outlined text-base">add_circle</span>
+                  <span>+ Thêm Lớp Nhỏ Mới</span>
+                </button>
+              ` : ''}
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
@@ -3912,10 +4327,10 @@ window.App = {
                 const childLessons = state.lessons.filter(l => Number(l.class_id) === Number(child.id));
                 const childVocab = state.vocabulary.filter(v => Number(v.class_id) === Number(child.id));
                 return `
-                  <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-amber-500/30 flex flex-col justify-between hover-lift">
+                  <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-outline-variant/30 flex flex-col justify-between hover-lift">
                     <div>
                       <div class="flex items-center justify-between mb-2">
-                        <span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-bold text-xs font-mono">⚡ LỚP CON</span>
+                        <span class="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold text-xs font-mono">LỚP CON</span>
                         <span class="text-outline text-xs font-mono">Mã: ${child.class_code}</span>
                       </div>
                       <h4 class="font-headline-md text-base font-bold text-on-surface mb-2">${child.name}</h4>
@@ -3929,25 +4344,27 @@ window.App = {
                       <button onclick="App.openClassDetail(${child.id})" class="w-full bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1.5 shadow-sm">
                         <span class="material-symbols-outlined text-base">login</span> Vào Quản Lý Lớp Nhỏ
                       </button>
-                      <button onclick="App.openSEEEStudy(${child.id})" class="w-full bg-surface-container hover:bg-amber-500/20 text-amber-500 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
-                        <span class="material-symbols-outlined text-base">bolt</span> Vào Học SEEE Terms (${childVocab.length} từ)
+                      <button onclick="App.openClassDetail(${child.id}, 'vocabulary')" class="w-full bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
+                        <span class="material-symbols-outlined text-base">menu_book</span> Xem Từ Vựng (${childVocab.length} từ)
                       </button>
                     </div>
                   </div>
                 `;
               }).join('') : `
                 <div class="col-span-full p-10 bg-surface-container-lowest rounded-3xl border border-dashed border-outline-variant/40 text-center flex flex-col items-center justify-center">
-                  <div class="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-3">
+                  <div class="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3">
                     <span class="material-symbols-outlined text-3xl">account_tree</span>
                   </div>
                   <h4 class="font-headline-md text-base font-bold text-on-surface mb-1">Chưa có lớp nhỏ nào trong HUST20261-SƠN</h4>
                   <p class="text-xs text-on-surface-variant max-w-md mb-4 leading-relaxed">
-                    Bạn có thể tự tạo các lớp nhỏ (chuyên đề, môn học con) để phân loại từ vựng và bài kiểm tra riêng biệt theo từng môn học của bạn.
+                    Bạn có thể tự tạo các lớp nhỏ (chuyên đề, môn học con) để phân loại từ vựng và bài kiểm tra riêng biệt theo từng môn học.
                   </p>
-                  <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-amber-500 hover:bg-amber-600 text-black font-black text-xs px-5 py-2.5 rounded-xl btn-press flex items-center gap-2 shadow-md hover-lift">
-                    <span class="material-symbols-outlined text-base">add_circle</span>
-                    <span>Tạo Lớp Nhỏ Đầu Tiên</span>
-                  </button>
+                  ${isTeacher ? `
+                    <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-primary text-on-primary font-bold text-xs px-5 py-2.5 rounded-xl btn-press flex items-center gap-2 shadow-sm hover-lift">
+                      <span class="material-symbols-outlined text-base">add_circle</span>
+                      <span>Tạo Lớp Nhỏ Đầu Tiên</span>
+                    </button>
+                  ` : ''}
                 </div>
               `}
             </div>
@@ -3974,7 +4391,7 @@ window.App = {
               <span>LỚP HỌC: ${activeClass.name}</span>
             </div>
             <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Quản lý Bài học & Chuyên đề</h2>
-            <p class="font-body-md text-sm text-on-surface-variant">Danh mục chuyên đề ôn thi vào 10 cho ${activeClass.name}.</p>
+            <p class="font-body-md text-sm text-on-surface-variant">Danh mục chuyên đề & bài học cho ${activeClass.name}.</p>
           </div>
           <div class="flex items-center gap-3 flex-wrap">
             <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
@@ -4055,7 +4472,7 @@ window.App = {
             </div>
             <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Kho Từ Vựng Tiếng Anh</h2>
             <p class="font-body-md text-sm text-on-surface-variant">
-              ${isStudent ? `Toàn bộ từ vựng & cấu trúc ôn thi vào 10 dành riêng cho lớp ${activeClass.name}.` : 'Được cách ly riêng biệt theo từng lớp học ôn thi vào 10.'}
+              ${isStudent ? `Toàn bộ từ vựng & cấu trúc dành riêng cho lớp ${activeClass.name}.` : 'Được cách ly riêng biệt theo từng lớp học.'}
             </p>
           </div>
 
@@ -4843,7 +5260,7 @@ window.App = {
                     <span class="material-symbols-outlined text-sm text-amber-500">local_fire_department</span> Chuỗi ${this.getStudentRealtimeStreak(st)} ngày
                   </span>
                   <span>•</span>
-                  <span>Mục tiêu vào 10: <strong class="text-primary">9.0+ Điểm</strong></span>
+                  <span>Mục tiêu: <strong class="text-primary">9.0+ Điểm</strong></span>
                 </div>
               </div>
             </div>
@@ -4910,7 +5327,7 @@ window.App = {
               <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden mb-2">
                 <div class="bg-green-600 h-full rounded-full" style="width: ${selectedMetric.totalTests > 0 ? Math.max(0, selectedMetric.avgScore - 3) : 0}%;"></div>
               </div>
-              <p class="text-[11px] text-outline">Phản xạ chọn đáp án và áp dụng cấu trúc câu vào 10.</p>
+              <p class="text-[11px] text-outline">Phản xạ chọn đáp án và ghi nhớ kiến thức vững vàng.</p>
             </div>
           </div>
 
@@ -4919,7 +5336,7 @@ window.App = {
             <div class="p-5 border-b border-outline-variant/30 flex items-center justify-between">
               <div>
                 <h3 class="font-headline-md text-base font-bold text-on-surface">Lịch Sử Làm Bài Kiểm Tra (${sList.length} phiên thi)</h3>
-                <p class="text-xs text-on-surface-variant">Bấm "Xem lại bài thi" để kiểm tra các câu đúng, câu sai và lời giải của Thầy Quang Sơn.</p>
+                <p class="text-xs text-on-surface-variant">Bấm "Xem lại bài thi" để kiểm tra các câu đúng, câu sai và lời giải chi tiết của Host Quang Sơn.</p>
               </div>
             </div>
 
@@ -5003,7 +5420,7 @@ window.App = {
               <span>BÁO CÁO TIẾN ĐỘ & NĂNG LỰC HỌC TẬP</span>
             </div>
             <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Báo Cáo Học Sinh - ${activeClass.name}</h2>
-            <p class="font-body-md text-sm text-on-surface-variant">Theo dõi kết quả ôn thi vào 10 và xem báo cáo chi tiết của từng học sinh.</p>
+            <p class="font-body-md text-sm text-on-surface-variant">Theo dõi kết quả học tập và xem báo cáo chi tiết của từng học sinh.</p>
           </div>
 
           <div class="flex items-center gap-3 flex-wrap">
@@ -5148,8 +5565,8 @@ window.App = {
               <span class="material-symbols-outlined">psychology</span>
             </div>
             <div>
-              <h3 class="font-headline-md text-sm font-bold">Gia Sư AI - Thầy Quang Sơn</h3>
-              <p class="text-[11px] text-white/80">Luyện thi Tiếng Anh vào 10 (Chuẩn Sư Phạm • Gemini API)</p>
+              <h3 class="font-headline-md text-sm font-bold">Trợ Lý AI - Quang Sơn (Host)</h3>
+              <p class="text-[11px] text-white/80">Hỗ trợ học tập Tiếng Anh (Gemini API)</p>
             </div>
           </div>
           <span class="px-2.5 py-0.5 bg-green-500 text-white rounded-full text-[10px] font-bold">Online</span>
@@ -5176,7 +5593,7 @@ window.App = {
               <div class="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs font-bold shrink-0">QS</div>
               <div class="p-3.5 rounded-2xl bg-surface-container-lowest text-xs text-outline border border-outline-variant/30 rounded-tl-none flex items-center gap-2 shadow-sm">
                 <span class="material-symbols-outlined animate-spin text-sm text-primary">sync</span>
-                <span>Thầy Quang Sơn đang soạn câu trả lời chi tiết...</span>
+                <span>AI đang soạn câu trả lời chi tiết...</span>
               </div>
             </div>
           ` : ''}
@@ -5188,7 +5605,7 @@ window.App = {
             type="text" 
             id="tutor-chat-input"
             ${state.isTutorTyping ? 'disabled' : ''}
-            placeholder="Hỏi thầy về từ vựng, ngữ pháp hoặc các dạng bài thi vào 10..." 
+            placeholder="Đặt câu hỏi về từ vựng, ngữ pháp hoặc các bài tập tiếng Anh..." 
             class="flex-1 px-4 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs focus:outline-none focus:border-primary disabled:opacity-50"
           />
           <button 
@@ -5547,8 +5964,8 @@ window.App = {
           </button>
           <div>
             <div class="flex items-center gap-2">
-              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-black font-black text-xs">
-                <span class="material-symbols-outlined text-xs">bolt</span> SEEE MASTER STUDY
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary-container text-primary font-bold text-xs">
+                <span class="material-symbols-outlined text-xs">school</span> THUẬT NGỮ CHUYÊN NGÀNH
               </span>
               <span class="text-xs text-outline font-mono">${targetClass.name}</span>
             </div>
@@ -6119,9 +6536,75 @@ window.App = {
               </button>
             </div>
           </div>
+          ${(user.role === 'host' || user.role === 'teacher') ? `
+          <!-- Gemini AI Shared Database Key Configuration Card -->
+          <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-primary/20 space-y-4 md:col-span-2">
+            <div class="flex items-center justify-between">
+              <h3 class="font-headline-md text-base font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">psychology</span> Cấu Hình Gemini AI Dùng Chung (Đồng bộ Database Supabase)
+              </h3>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                Toàn Hệ Thống
+              </span>
+            </div>
+            <p class="text-xs text-on-surface-variant leading-relaxed">
+              Khóa API này được lưu trực tiếp vào <strong>Database đám mây (Supabase Cloud)</strong>. Khi Host cập nhật khóa này, tất cả các học sinh và thành viên khi truy cập web trên bất kỳ máy tính hay điện thoại nào đều sẽ tự động dùng chung để phân tích từ vựng, trích xuất PDF/Excel và dịch nghĩa mà không cần cấu hình thủ công từng máy!
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3 pt-2">
+              <div class="relative flex-1">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-base">key</span>
+                <input 
+                  type="password" 
+                  id="shared-gemini-key-input" 
+                  placeholder="Nhập hoặc dán Gemini API Key mới tại đây..." 
+                  class="w-full bg-surface-container pl-9 pr-10 py-2 rounded-xl border border-outline-variant/50 text-xs text-on-surface focus:outline-none focus:border-primary font-mono"
+                  value="${CONFIG.GEMINI.API_KEY || ''}"
+                />
+                <button type="button" onclick="const i = document.getElementById('shared-gemini-key-input'); i.type = i.type === 'password' ? 'text' : 'password';" class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface text-xs">
+                  <span class="material-symbols-outlined text-base">visibility</span>
+                </button>
+              </div>
+              <button 
+                id="btn-save-gemini-key"
+                onclick="App.handleSaveGeminiApiKeyToDatabase()" 
+                class="bg-primary text-on-primary px-5 py-2 rounded-xl font-bold text-xs btn-press flex items-center justify-center gap-1.5 hover-lift whitespace-nowrap shadow-sm"
+              >
+                <span class="material-symbols-outlined text-base">save</span> Lưu Vào Database Chung
+              </button>
+            </div>
+          </div>
+          ` : ''}
         </div>
       </div>
     `;
+  },
+
+  async handleSaveGeminiApiKeyToDatabase() {
+    const input = document.getElementById('shared-gemini-key-input');
+    if (!input) return;
+    const key = input.value.trim();
+    if (!key) {
+      alert("Vui lòng nhập API Key!");
+      return;
+    }
+    const btn = document.getElementById('btn-save-gemini-key');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-xs">progress_activity</span> Đang lưu...`;
+    }
+    try {
+      await SupabaseService.updateSystemConfig(key);
+      CONFIG.GEMINI.API_KEY = key;
+      alert("✅ Đã lưu cấu hình Gemini API Key vào Database chung thành công! Tất cả người dùng và thiết bị khác đều sẽ sử dụng khóa này.");
+      this.render();
+    } catch (e) {
+      alert("Lỗi lưu API Key vào Database: " + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span class="material-symbols-outlined text-base">save</span> Lưu Vào Database Chung`;
+      }
+    }
   }
 };
 

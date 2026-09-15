@@ -4,15 +4,41 @@
  */
 
 import { CONFIG } from '../config.js';
+import { SupabaseService } from './supabaseService.js';
+
+let cachedApiKey = "";
 
 export const GeminiService = {
+  /**
+   * Lấy API Key động từ Database chung (Supabase Cloud) hoặc cấu hình
+   */
+  async getEffectiveApiKey() {
+    if (cachedApiKey && cachedApiKey.length > 5) return cachedApiKey;
+    if (CONFIG.GEMINI.API_KEY && CONFIG.GEMINI.API_KEY.length > 5) {
+      cachedApiKey = CONFIG.GEMINI.API_KEY;
+      return cachedApiKey;
+    }
+    // Lấy API key dùng chung trực tiếp từ CSDL Supabase
+    try {
+      const dbKey = await SupabaseService.getSystemConfig('GEMINI_API_KEY');
+      if (dbKey && dbKey.length > 5) {
+        cachedApiKey = dbKey;
+        CONFIG.GEMINI.API_KEY = dbKey;
+        return cachedApiKey;
+      }
+    } catch (e) {
+      console.warn("Lỗi đọc GEMINI API Key từ Database:", e);
+    }
+    return "";
+  },
+
   /**
    * Helper to call Gemini API via REST endpoint or SDK
    */
   async generateContent(prompt, systemInstruction = "") {
-    const apiKey = CONFIG.GEMINI.API_KEY;
+    const apiKey = await this.getEffectiveApiKey();
     if (!apiKey || apiKey.length < 5) {
-      throw new Error("Chưa cấu hình GEMINI_API_KEY trong .env.local");
+      throw new Error("Chưa cấu hình GEMINI_API_KEY trong Cài đặt hệ thống!");
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -78,7 +104,7 @@ Cấu trúc JSON:
 {
   "word": "từ hoặc cụm từ gốc",
   "ipa": "phiên âm quốc tế IPA chuẩn Anh-Mỹ hoặc Anh-Anh, kẹp giữa dấu //",
-  "meaning": "định nghĩa tiếng Việt súc tích, chuẩn học thuật ôn thi vào 10",
+  "meaning": "định nghĩa tiếng Việt súc tích, chuẩn học thuật",
   "example": "1 câu ví dụ tiếng Anh tự nhiên chứa từ này",
   "example_vi": "bản dịch tiếng Việt của câu ví dụ",
   "part_of_speech": "Loại từ (n, v, adj, adv, phr v, grammar)",
@@ -105,7 +131,7 @@ Cấu trúc JSON:
       return {
         word: cleanWord,
         ipa: cleanWord.includes(" ") ? "/—/" : `/${cleanWord.toLowerCase()}/`,
-        meaning: customContext || "Từ vựng ôn thi vào 10",
+        meaning: customContext || "Từ vựng tiếng Anh",
         example: `Students should practice using '${cleanWord}' in their daily English exercises.`,
         example_vi: `Học sinh nên luyện tập sử dụng từ '${cleanWord}' trong các bài tập tiếng Anh hàng ngày.`,
         part_of_speech: "Từ vựng",
@@ -289,13 +315,70 @@ Trả về DUY NHẤT 1 mảng JSON các object theo đúng thứ tự (không k
     const systemPrompt = `Bạn là một gia sư Tiếng Anh nhiệt tình, chuyên giảng giải ngữ pháp và từ vựng một cách chi tiết, dễ hiểu, có ví dụ minh họa sinh động. Luôn dùng tiếng Việt chuẩn sư phạm để giải thích.`;
 
     const formattedHistory = chatHistory.slice(-6).map(m => 
-      `${m.sender === 'user' ? 'Học sinh' : 'Thầy Quang Sơn (Gia sư AI)'}: ${m.text}`
+      `${m.sender === 'user' ? 'Người học' : 'Quang Sơn (Gia sư AI)'}: ${m.text}`
     ).join('\n\n');
 
-    const prompt = `${formattedHistory ? `Lịch sử trao đổi trước đó:\n${formattedHistory}\n\n` : ''}Câu hỏi hiện tại của học sinh: "${userQuestion}"
+    const prompt = `${formattedHistory ? `Lịch sử trao đổi trước đó:\n${formattedHistory}\n\n` : ''}Câu hỏi hiện tại của người học: "${userQuestion}"
 
-Hãy giải thích chi tiết, ân cần, chỉ rõ bản chất ngữ pháp/từ vựng, đưa ra các câu ví dụ minh họa sinh động kèm bản dịch tiếng Việt và dặn dò mẹo tránh bẫy trong đề thi vào lớp 10.`;
+Hãy giải thích chi tiết, ân cần, chỉ rõ bản chất ngữ pháp/từ vựng, đưa ra các câu ví dụ minh họa sinh động kèm bản dịch tiếng Việt và dặn dò mẹo ghi nhớ, áp dụng tự nhiên.`;
 
     return await this.generateContent(prompt, systemPrompt);
+  },
+
+  /**
+   * Trích xuất danh sách từ vựng thông minh từ nội dung file PDF hoặc Excel
+   */
+  async extractVocabularyFromText(rawText, customInstruction = "") {
+    if (!rawText || rawText.trim().length === 0) {
+      throw new Error("Nội dung tài liệu trống!");
+    }
+
+    // Limit text to ~20,000 characters to fit context window smoothly
+    const truncatedText = rawText.slice(0, 25000);
+
+    const systemPrompt = `Bạn là một chuyên gia ngôn ngữ học AI cao cấp.
+Nhiệm vụ của bạn là đọc và phân tích toàn bộ văn bản hoặc bảng dữ liệu được trích xuất từ file (PDF, Excel, Word).
+Hãy tìm kiếm, nhận diện và trích xuất TOÀN BỘ các từ vựng tiếng Anh (English Vocabulary) hoặc thuật ngữ chuyên ngành (Technical/Academic Terms) có trong tài liệu.
+
+Định dạng trả về: DUY NHẤT một mảng JSON thuần túy (Array of Objects), không được có markdown \`\`\`json hay bất kỳ chữ nào bên ngoài mảng:
+[
+  {
+    "word": "từ hoặc thuật ngữ tiếng Anh gốc (bắt buộc)",
+    "meaning": "nghĩa tiếng Việt chính xác và ngắn gọn (bắt buộc)",
+    "ipa": "phiên âm quốc tế IPA chuẩn dạng /.../ (nếu không có thì tự suy luận chuẩn)",
+    "example": "câu ví dụ tiếng Anh tự nhiên chứa từ đó (nếu trong tài liệu có sẵn thì lấy, nếu không thì tự đặt 1 câu)",
+    "definition": "định nghĩa bằng tiếng Anh (nếu là thuật ngữ chuyên ngành hoặc thuật ngữ định nghĩa)",
+    "is_grammar": false
+  }
+]`;
+
+    const userPrompt = `Dưới đây là nội dung văn bản trích xuất từ tài liệu người dùng vừa tải lên:
+----------------------------------------
+${truncatedText}
+----------------------------------------
+${customInstruction ? `Yêu cầu thêm từ người dùng: ${customInstruction}\n` : ''}
+Hãy trích xuất danh sách từ vựng/thuật ngữ đầy đủ nhất có thể và trả về đúng mảng JSON.`;
+
+    const responseText = await this.generateContent(userPrompt, systemPrompt);
+    const cleanJson = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+    
+    try {
+      const parsed = JSON.parse(cleanJson);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item, idx) => ({
+          id: Date.now() + idx,
+          word: String(item.word || '').trim(),
+          meaning: String(item.meaning || '').trim(),
+          ipa: String(item.ipa || '').trim(),
+          example: String(item.example || '').trim(),
+          definition: String(item.definition || '').trim(),
+          is_grammar: Boolean(item.is_grammar)
+        })).filter(item => item.word.length > 0);
+      }
+      throw new Error("Dữ liệu phản hồi từ AI không phải dạng danh sách mảng JSON!");
+    } catch (parseErr) {
+      console.error("Lỗi parse JSON từ Gemini:", cleanJson, parseErr);
+      throw new Error("Không thể chuyển đổi dữ liệu AI thành danh sách từ vựng: " + parseErr.message);
+    }
   }
 };

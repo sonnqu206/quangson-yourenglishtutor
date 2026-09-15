@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quang Son - Your English Tutor | Nền tảng Luyện thi Tiếng Anh vào 10</title>
+  <title>Quang Son - Your English Tutor | Nền tảng Học Tiếng Anh Cá Nhân</title>
   
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/logo.png" type="image/png">
@@ -20,9 +20,15 @@
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   
-  <!-- Supabase JS Client & SheetJS (XLSX) -->
+  <!-- Supabase JS Client, SheetJS (XLSX) & PDF.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
 
   <script id="tailwind-config">
     tailwind.config = {
@@ -285,7 +291,7 @@
         <div id="desktop-breadcrumbs" class="hidden lg:flex items-center gap-2 text-xs font-semibold text-on-surface-variant ml-2">
           <span class="text-primary font-bold">Quang Son LMS</span>
           <span class="text-outline">/</span>
-          <span id="breadcrumb-current-page" class="text-on-surface">Luyện Thi Tiếng Anh Vào 10</span>
+          <span id="breadcrumb-current-page" class="text-on-surface">Không Gian Học Tiếng Anh</span>
         </div>
       </div>
 
@@ -315,7 +321,7 @@
     <footer class="bg-surface-container-lowest border-t border-outline-variant/30 py-4 px-4 md:px-margin-desktop text-center text-xs text-on-surface-variant">
       <div class="max-w-container-max mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
         <p class="font-medium">© 2026 Quang Son - Your English Tutor. All rights reserved.</p>
-        <p class="text-outline text-[11px]">Nền tảng Ôn thi Tiếng Anh vào 10 • Host Account & Cookies Authentication</p>
+        <p class="text-outline text-[11px]">Quang Son - Your English Tutor • Host Account & Cookies Authentication</p>
       </div>
     </footer>
 
@@ -549,8 +555,8 @@
         <div>
           <label class="block font-bold text-xs text-on-surface mb-1">Phân loại Lớp</label>
           <select id="input-class-category" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:outline-none focus:border-primary text-xs font-semibold">
-            <option value="STANDARD">Lớp Ôn Thi Vào 10 Thông Thường</option>
-            <option value="HUST_CHILD">Lớp con / Chuyên đề thuộc HUST20261-SƠN (SEEE)</option>
+            <option value="STANDARD">Lớp Học Tiêu Chuẩn</option>
+            <option value="HUST_CHILD">Lớp con / Phân nhánh thuộc HUST20261-SƠN</option>
           </select>
         </div>
         <div class="flex justify-end gap-3 pt-3 border-t border-outline-variant/30">
@@ -806,6 +812,183 @@
           </div>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Nhập Từ Vựng Bằng AI (PDF / Excel) -->
+  <div id="import-vocab-ai-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-3xl ambient-shadow max-w-3xl w-full p-5 sm:p-7 relative border border-outline-variant/30 max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-outline-variant/30 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary flex items-center justify-center font-bold shadow-md">
+            <span class="material-symbols-outlined text-xl">smart_toy</span>
+          </div>
+          <div>
+            <h3 class="font-headline-md text-base sm:text-lg font-bold text-on-surface">Nhập Từ Vựng Bằng AI (PDF / Excel)</h3>
+            <p class="text-xs text-on-surface-variant">Tự động nhận dạng nội dung, trích xuất từ vựng và lưu trực tiếp vào Database chung.</p>
+          </div>
+        </div>
+        <button onclick="App.closeModal('import-vocab-ai-modal')" class="text-outline hover:text-on-surface p-1.5 rounded-full hover:bg-surface-container">
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+        <!-- Target Class & Lesson Pickers -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-surface-container-low p-4 rounded-2xl border border-outline-variant/30">
+          <div>
+            <label class="block font-bold text-xs text-on-surface mb-1">Lớp Học Nhận Dữ Liệu</label>
+            <select id="import-ai-target-class" onchange="App.handleImportClassChange(this.value)" class="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant/40 rounded-xl text-xs font-semibold focus:outline-none focus:border-primary"></select>
+          </div>
+          <div>
+            <label class="block font-bold text-xs text-on-surface mb-1">Bài Học / Unit Tiếp Nhận</label>
+            <select id="import-ai-target-lesson" class="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant/40 rounded-xl text-xs font-semibold focus:outline-none focus:border-primary"></select>
+          </div>
+        </div>
+
+        <!-- File Upload Area -->
+        <div>
+          <label class="block font-bold text-xs text-on-surface mb-1.5">Tải lên file tài liệu (PDF hoặc Excel)</label>
+          <div 
+            id="import-ai-dropzone" 
+            onclick="document.getElementById('import-ai-file-input').click()"
+            class="border-2 border-dashed border-primary/40 hover:border-primary bg-primary/5 hover:bg-primary/10 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2"
+          >
+            <input type="file" id="import-ai-file-input" accept=".pdf, .xlsx, .xls, .csv" class="hidden" onchange="App.handleImportFileSelected(event)" />
+            <div class="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center">
+              <span class="material-symbols-outlined text-2xl">upload_file</span>
+            </div>
+            <div>
+              <p class="font-bold text-xs sm:text-sm text-on-surface" id="import-ai-drop-label">Bấm để chọn file hoặc kéo thả file vào đây</p>
+              <p class="text-[11px] text-outline mt-0.5">Hỗ trợ file PDF (.pdf) và Excel (.xlsx, .xls, .csv)</p>
+            </div>
+          </div>
+
+          <!-- Selected File Details Pill -->
+          <div id="import-ai-file-pill" class="hidden mt-2 p-2.5 bg-surface-container rounded-xl border border-outline-variant/40 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <span class="material-symbols-outlined text-primary text-base shrink-0">description</span>
+              <span id="import-ai-file-name" class="font-bold text-on-surface truncate">filename.pdf</span>
+              <span id="import-ai-file-size" class="text-outline text-[11px] shrink-0">(0 KB)</span>
+            </div>
+            <button onclick="App.clearImportFile(event)" class="text-outline hover:text-error p-1">
+              <span class="material-symbols-outlined text-sm">cancel</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Extra AI Instruction (Optional) -->
+        <div>
+          <label class="block font-bold text-xs text-on-surface mb-1">Yêu cầu bổ sung cho AI (Tùy chọn)</label>
+          <input 
+            type="text" 
+            id="import-ai-custom-note" 
+            placeholder="Ví dụ: Chỉ trích xuất các thuật ngữ kỹ thuật, lấy định nghĩa chuẩn..." 
+            class="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs focus:outline-none focus:border-primary"
+          />
+        </div>
+
+        <!-- Extract Trigger Button -->
+        <div class="pt-1">
+          <button 
+            type="button" 
+            id="btn-trigger-ai-extract"
+            onclick="App.handleStartAIExtraction()" 
+            class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3 rounded-xl font-bold text-xs sm:text-sm btn-press hover-lift flex items-center justify-center gap-2 shadow-md"
+          >
+            <span class="material-symbols-outlined text-lg">bolt</span>
+            <span>⚡ Phân Tích & Trích Xuất Bằng Gemini AI</span>
+          </button>
+        </div>
+
+        <!-- Loading / Progress Banner -->
+        <div id="import-ai-loading" class="hidden p-4 rounded-2xl bg-primary/10 border border-primary/30 flex items-center gap-3">
+          <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0"></div>
+          <div>
+            <p class="font-bold text-xs text-primary" id="import-ai-loading-text">Đang phân tích tài liệu bằng Gemini AI...</p>
+            <p class="text-[11px] text-outline">Vui lòng đợi giây lát, hệ thống đang bóc tách từ vựng, phiên âm và câu ví dụ.</p>
+          </div>
+        </div>
+
+        <!-- Preview Table of Extracted Terms -->
+        <div id="import-ai-preview-container" class="hidden space-y-2.5 pt-2">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <span class="font-bold text-xs text-on-surface flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base text-primary">checklist</span>
+              <span>Kết quả trích xuất: <strong id="import-ai-count" class="text-primary">0</strong> từ</span>
+            </span>
+            <div class="flex items-center gap-2">
+              <button onclick="App.toggleSelectAllImportItems(true)" class="text-[11px] text-primary font-bold hover:underline">Chọn tất cả</button>
+              <span class="text-outline text-xs">•</span>
+              <button onclick="App.toggleSelectAllImportItems(false)" class="text-[11px] text-outline font-bold hover:underline">Bỏ chọn</button>
+            </div>
+          </div>
+
+          <div class="max-h-60 overflow-y-auto border border-outline-variant/40 rounded-2xl bg-surface-container-lowest">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-surface-container-low text-outline uppercase font-bold sticky top-0 border-b border-outline-variant/30">
+                <tr>
+                  <th class="p-2.5 w-10 text-center">Chọn</th>
+                  <th class="p-2.5">Từ vựng (Word)</th>
+                  <th class="p-2.5">Phiên âm (IPA)</th>
+                  <th class="p-2.5">Nghĩa tiếng Việt</th>
+                  <th class="p-2.5">Ví dụ / Định nghĩa</th>
+                </tr>
+              </thead>
+              <tbody id="import-ai-preview-tbody" class="divide-y divide-outline-variant/20"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-3 border-t border-outline-variant/30 flex justify-between items-center shrink-0">
+        <button type="button" onclick="App.closeModal('import-vocab-ai-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Đóng</button>
+        <button 
+          type="button" 
+          id="btn-save-ai-vocab-to-db" 
+          onclick="App.handleSaveImportedVocabToDatabase()" 
+          disabled
+          class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs btn-press hover-lift flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+        >
+          <span class="material-symbols-outlined text-base">cloud_upload</span>
+          <span>Lưu Vào Database (Supabase)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Phân Lớp Cho Học Sinh (Multi-Class Assignment) -->
+  <div id="assign-classes-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-surface-container-lowest rounded-3xl ambient-shadow max-w-lg w-full p-6 relative border border-outline-variant/30">
+      <div class="flex items-center justify-between pb-3 border-b border-outline-variant/30">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+            <span class="material-symbols-outlined text-lg">school</span>
+          </div>
+          <div>
+            <h3 class="font-headline-md text-base font-bold text-on-surface">Phân Lớp Cho Học Sinh</h3>
+            <p class="text-xs text-on-surface-variant" id="assign-classes-subtitle">Chọn các lớp học sinh được phép truy cập</p>
+          </div>
+        </div>
+        <button onclick="App.closeModal('assign-classes-modal')" class="text-outline hover:text-on-surface p-1">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <input type="hidden" id="assign-target-user-id" value="" />
+
+      <div class="py-4 space-y-3">
+        <p class="text-xs text-outline">Đánh dấu chọn các lớp học bên dưới. Học sinh chỉ thấy và học trong các lớp được phân công:</p>
+        <div id="assign-classes-list" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+      </div>
+
+      <div class="pt-3 border-t border-outline-variant/30 flex justify-end gap-2.5">
+        <button type="button" onclick="App.closeModal('assign-classes-modal')" class="px-4 py-2 rounded-xl border border-outline-variant text-outline font-bold text-xs">Hủy</button>
+        <button type="button" onclick="App.handleSaveStudentClassAssignment()" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs btn-press shadow-md">
+          Lưu Phân Lớp Vào Database
+        </button>
+      </div>
     </div>
   </div>
 

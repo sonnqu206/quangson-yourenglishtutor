@@ -10,12 +10,12 @@ let supabaseClient = null;
 // Initial rich seed data with strict class_id assignments
 const SEED_DATA = {
   classes: [
-    { id: 1, name: "Lớp 9A - Luyện thi Chuyên & Vào 10", class_code: "QS9A2026", created_at: "2026-08-01T08:00:00Z" },
-    { id: 2, name: "Lớp 9B - Ôn thi Vào 10 Trọng điểm", class_code: "QS9B2026", created_at: "2026-08-05T09:00:00Z" },
-    { id: 3, name: "Lớp 10A1 - Luyện đề & Bứt phá Điểm số", class_code: "QS10A2026", created_at: "2026-08-10T10:00:00Z" }
+    { id: 1, name: "Lớp Tiếng Anh 9A", class_code: "QS9A2026", created_at: "2026-08-01T08:00:00Z" },
+    { id: 2, name: "Lớp Tiếng Anh 9B", class_code: "QS9B2026", created_at: "2026-08-05T09:00:00Z" },
+    { id: 3, name: "Lớp Tiếng Anh 10A1", class_code: "QS10A2026", created_at: "2026-08-10T10:00:00Z" }
   ],
   profiles: [
-    { id: "00000000-0000-0000-0000-000000000001", role: "teacher", full_name: "Thầy Quang Sơn", class_id: 1, email: "quangson.tutor@lingolms.edu.vn", updated_at: "2026-08-01T08:00:00Z" },
+    { id: "00000000-0000-0000-0000-000000000001", role: "host", full_name: "Quang Sơn (Host)", class_id: 1, email: "quangson.tutor@lingolms.edu.vn", updated_at: "2026-08-01T08:00:00Z" },
     { id: "00000000-0000-0000-0000-000000000002", role: "student", full_name: "Nguyễn Văn An", class_id: 1, email: "an.nguyen@student.edu.vn", streak: 12, completed_lessons: 8, avg_score: 92, updated_at: "2026-08-20T08:00:00Z" },
     { id: "00000000-0000-0000-0000-000000000003", role: "student", full_name: "Trần Thị Mai", class_id: 1, email: "mai.tran@student.edu.vn", streak: 9, completed_lessons: 7, avg_score: 88, updated_at: "2026-08-22T08:00:00Z" },
     { id: "00000000-0000-0000-0000-000000000004", role: "student", full_name: "Lê Hoàng Nam", class_id: 1, email: "nam.le@student.edu.vn", streak: 15, completed_lessons: 9, avg_score: 95, updated_at: "2026-08-25T08:00:00Z" },
@@ -1190,5 +1190,59 @@ export const SupabaseService = {
     }
     saveLocalData(local);
     return true;
+  },
+
+  /**
+   * Lấy cấu hình hệ thống dùng chung từ Database (Supabase Cloud)
+   */
+  async getSystemConfig(key = 'GEMINI_API_KEY') {
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { data, error } = await client
+          .from('app_users')
+          .select('password')
+          .eq('username', '__system_config__')
+          .maybeSingle();
+        if (!error && data && data.password) {
+          return data.password.trim();
+        }
+      } catch (err) {
+        console.warn("Lỗi lấy cấu hình từ Supabase:", err);
+      }
+    }
+    return "";
+  },
+
+  /**
+   * Cập nhật cấu hình hệ thống dùng chung lên Database (Supabase Cloud)
+   */
+  async updateSystemConfig(apiKey) {
+    const client = getSupabase();
+    const cleanKey = String(apiKey || "").trim();
+    if (client) {
+      try {
+        const { error } = await client
+          .from('app_users')
+          .update({ password: cleanKey })
+          .eq('username', '__system_config__');
+        if (error) {
+          // If row does not exist, upsert it
+          await client.from('app_users').upsert({
+            id: "cfg-00000000-0000-0000-0000-000000000001",
+            username: "__system_config__",
+            password: cleanKey,
+            full_name: "Hệ thống Cấu hình Chung",
+            role: "config",
+            email: "config@lingolms.internal"
+          });
+        }
+        return true;
+      } catch (err) {
+        console.error("Lỗi cập nhật cấu hình hệ thống lên Supabase:", err);
+        throw err;
+      }
+    }
+    return false;
   }
 };

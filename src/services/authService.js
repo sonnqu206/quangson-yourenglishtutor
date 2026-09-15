@@ -15,7 +15,7 @@ const INITIAL_USERS = [
     id: "00000000-0000-0000-0000-000000000001",
     username: "sonnqu206",
     password: "Son@04102006",
-    full_name: "Thầy Quang Sơn (Host)",
+    full_name: "Quang Sơn (Host)",
     role: "host", // 'host' | 'assistant_teacher' | 'student'
     class_id: null, // Host has access to all classes
     email: "quangson.tutor@lingolms.edu.vn",
@@ -135,10 +135,10 @@ function getStoredUsers() {
       if (Array.isArray(parsed) && parsed.length > 0) {
         let hasChanges = false;
 
-        // 0. Filter out any previously deleted users if they were stored
+        // 0. Filter out any previously deleted users or system config rows if they were stored
         const filtered = parsed.filter(u => 
-          u.role === 'host' || 
-          (!deletedKeys.includes(String(u.id).toLowerCase()) && !deletedKeys.includes(String(u.username).toLowerCase()))
+          u.role !== 'config' && u.username !== '__system_config__' &&
+          (u.role === 'host' || (!deletedKeys.includes(String(u.id).toLowerCase()) && !deletedKeys.includes(String(u.username).toLowerCase())))
         );
         if (filtered.length !== parsed.length) {
           parsed = filtered;
@@ -306,8 +306,11 @@ export const AuthService = {
           if (!isDel) mergedMap.set(u.username.toLowerCase(), u);
         });
 
-        // 2. Merge cloud users (filtering out any that were deleted by Host)
+        // 2. Merge cloud users (filtering out any that were deleted by Host or config rows)
         data.forEach(cloudUser => {
+          if (cloudUser.role === 'config' || cloudUser.username === '__system_config__') {
+            return; // Ignore system configuration records in user management
+          }
           const isDel = cloudUser.role !== 'host' && (deletedKeys.includes(String(cloudUser.id).toLowerCase()) || deletedKeys.includes(String(cloudUser.username).toLowerCase()));
           if (isDel) {
             // Clean up deleted user from Supabase Cloud as well
@@ -462,13 +465,18 @@ export const AuthService = {
       throw new Error("Mật khẩu phải có ít nhất 4 ký tự!");
     }
 
+    const enrolledClasses = Array.isArray(userData.enrolled_classes) && userData.enrolled_classes.length > 0
+      ? userData.enrolled_classes.map(Number)
+      : (userData.class_id ? [Number(userData.class_id)] : [1]);
+
     const newUser = {
       id: "usr-" + Math.random().toString(36).substring(2, 11),
       username: username,
       password: userData.password.trim(),
       full_name: userData.full_name.trim(),
       role: userData.role || "student", // 'assistant_teacher' | 'student'
-      class_id: userData.class_id ? Number(userData.class_id) : 1,
+      class_id: enrolledClasses[0] || (userData.class_id ? Number(userData.class_id) : 1),
+      enrolled_classes: enrolledClasses,
       email: userData.email?.trim() || `${username}@lingolms.edu.vn`,
       streak: 0,
       completed_lessons: 0,
@@ -492,6 +500,36 @@ export const AuthService = {
     }
 
     return newUser;
+  },
+
+  /**
+   * Cập nhật danh sách các lớp mà 1 học sinh được tham gia (Multi-class enrollment)
+   */
+  async assignStudentClasses(userId, classIds) {
+    const users = getStoredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId);
+    if (idx === -1) throw new Error("Không tìm thấy học sinh cần phân lớp!");
+    
+    const validIds = Array.isArray(classIds) ? classIds.map(Number).filter(n => !isNaN(n)) : [];
+    users[idx].enrolled_classes = validIds;
+    if (validIds.length > 0) {
+      users[idx].class_id = validIds[0];
+    }
+    saveStoredUsers(users);
+
+    try {
+      const client = getSupabase();
+      if (client) {
+        await client.from('app_users').update({ 
+          class_id: users[idx].class_id,
+          enrolled_classes: validIds 
+        }).eq('id', users[idx].id);
+      }
+    } catch (err) {
+      console.warn("Supabase assignStudentClasses error:", err);
+    }
+
+    return users[idx];
   },
 
   /**
