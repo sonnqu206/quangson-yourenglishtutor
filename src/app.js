@@ -198,12 +198,22 @@ window.App = {
     if (!user) return state.classes;
     if ((user.role === 'host' || user.role === 'teacher')) return state.classes;
     
-    // Đối với học sinh: Chỉ hiển thị các lớp học sinh được phân công (hỗ trợ 1 hoặc nhiều lớp)
+    // Đối với học sinh: Hiển thị các lớp học sinh được phân công VÀ các lớp con của lớp đó để học sinh vào học
     if (user.role === 'student') {
       const enrolledIds = Array.isArray(user.enrolled_classes) && user.enrolled_classes.length > 0
         ? user.enrolled_classes.map(Number)
         : (user.class_id ? [Number(user.class_id)] : []);
-      return state.classes.filter(c => enrolledIds.includes(Number(c.id)));
+      return state.classes.filter(c => {
+        const cId = Number(c.id);
+        const pId = Number(c.parent_id);
+        if (enrolledIds.includes(cId)) return true;
+        if (pId && enrolledIds.includes(pId)) return true;
+        // Nếu học sinh thuộc lớp HUST20261 (11), tự động được phép truy cập vào các lớp con HUST
+        if (enrolledIds.includes(11) && (c.category === 'HUST_CHILD' || pId === 11 || (c.name && c.name.toUpperCase().startsWith('HUST-')))) {
+          return true;
+        }
+        return false;
+      });
     }
 
     // Trợ giảng / Giáo viên phụ:
@@ -1663,6 +1673,10 @@ window.App = {
   },
 
   openCreateLessonModal(targetClassId = null) {
+    if (state.currentUser?.role === 'student') {
+      showToast("Học sinh không có quyền tạo bài học mới! Bạn có thể thêm từ vựng vào kho từ.", "warning");
+      return;
+    }
     try {
       const modal = document.getElementById('create-lesson-modal');
       if (!modal) {
@@ -1747,6 +1761,10 @@ window.App = {
   },
 
   async deleteLesson(id) {
+    if (state.currentUser?.role === 'student') {
+      showToast("Học sinh không có quyền xóa bài học!", "warning");
+      return;
+    }
     if (!confirm("Bạn có chắc chắn muốn xóa bài học này?")) return;
     try {
       await SupabaseService.deleteLesson(id);
@@ -3710,10 +3728,27 @@ window.App = {
     const targetClassId = Number(classId) || (isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1));
     const activeClass = state.classes.find(c => Number(c.id) === targetClassId) || state.classes[0] || { name: `Lớp #${targetClassId}`, class_code: "QS9A" };
 
-    const isHUSTHub = Boolean(targetClassId === 11 || activeClass.category === 'HUST' || activeClass.class_code === 'HUST20261' || (activeClass.name && activeClass.name.includes('HUST')));
-    const isHUSTChild = Boolean(activeClass.category === 'HUST_CHILD' || activeClass.parent_id === 11);
+    // Lớp cha HUST Hub: CHỈ xác nhận khi mã lớp là HUST20261 hoặc tên chứa HUST20261 (TUYỆT ĐỐI không để lớp thường như TA9_HƯƠNG+DUY bị dính)
+    const isHUSTHub = Boolean(
+      (activeClass.class_code && activeClass.class_code.toUpperCase() === 'HUST20261') || 
+      (activeClass.name && activeClass.name.toUpperCase().includes('HUST20261'))
+    );
+    
+    // Lớp con HUST: Không phải lớp cha và có parent_id = 11 hoặc tên bắt đầu bằng HUST- hoặc category = HUST_CHILD
+    const isHUSTChild = Boolean(
+      !isHUSTHub && (
+        Number(activeClass.parent_id) === 11 || 
+        activeClass.category === 'HUST_CHILD' || 
+        (activeClass.name && activeClass.name.toUpperCase().startsWith('HUST-'))
+      )
+    );
+    
     const isHUSTFamily = isHUSTHub || isHUSTChild;
-    const childClasses = state.classes.filter(c => c.parent_id === 11 || c.category === 'HUST_CHILD');
+    
+    // Lớp con: CHỈ lấy các lớp có parent_id trùng với lớp đang mở (hoặc nếu là HUST Hub thì lấy đúng các lớp con HUST)
+    const childClasses = isHUSTHub 
+      ? state.classes.filter(c => Number(c.parent_id) === 11 || c.category === 'HUST_CHILD' || (c.name && c.name.toUpperCase().startsWith('HUST-')))
+      : state.classes.filter(c => Number(c.parent_id) === targetClassId && Number(c.parent_id) !== 0);
 
     const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
     const classVocab = state.vocabulary.filter(v => Number(v.class_id) === targetClassId);
@@ -3721,7 +3756,14 @@ window.App = {
     const classStudySessions = (state.studySessions || []).filter(s => Number(s.class_id) === targetClassId);
     const classTestSessions = (state.testSessions || []).filter(s => Number(s.class_id) === targetClassId);
 
-    const currentTab = state.classDetailTab || 'units';
+    // Xử lý tab: Nếu là học sinh, tuyệt đối không vào tab accounts
+    let currentTab = state.classDetailTab;
+    if (isStudent && currentTab === 'accounts') {
+      currentTab = 'units';
+    }
+    if (!currentTab) {
+      currentTab = isHUSTHub ? 'subclasses' : 'units';
+    }
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
@@ -3819,9 +3861,11 @@ window.App = {
                 <p class="text-xs text-on-surface-variant">Luyện tập từ vựng, flashcard 3D và thi thử theo từng Unit của lớp.</p>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
-                <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
-                  <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
-                </button>
+                ${isTeacher ? `
+                  <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift">
+                    <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
+                  </button>
+                ` : ''}
                 <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
                   <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm 1 Từ
                 </button>
@@ -3864,9 +3908,13 @@ window.App = {
               }).join('') : `
                 <div class="col-span-full p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                   <p class="text-outline font-semibold">Chưa có bài học nào trong lớp này.</p>
-                  <button onclick="App.openCreateLessonModal(${targetClassId})" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold">
-                    + Tạo Bài Học Đầu Tiên
-                  </button>
+                  ${isTeacher ? `
+                    <button onclick="App.openCreateLessonModal(${targetClassId})" class="mt-3 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold">
+                      + Tạo Bài Học Đầu Tiên
+                    </button>
+                  ` : `
+                    <p class="text-xs text-on-surface-variant mt-2">Bạn có thể vào tab "Kho Từ Vựng" để học và bổ sung từ mới cho lớp nhé!</p>
+                  `}
                 </div>
               `}
             </div>
@@ -4311,8 +4359,8 @@ window.App = {
           <div class="flex flex-col gap-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 class="font-headline-md text-base font-bold text-on-surface">Các Lớp Nhỏ / Phân Nhánh Thuộc HUST20261-SƠN</h3>
-                <p class="text-xs text-on-surface-variant">Phân chia các môn học con, chuyên đề kỹ thuật điện để quản lý bài học và từ vựng riêng biệt.</p>
+                <h3 class="font-headline-md text-base font-bold text-on-surface">Các Lớp Nhỏ / Phân Nhánh Thuộc ${activeClass.name}</h3>
+                <p class="text-xs text-on-surface-variant">${isStudent ? 'Chọn môn học con hoặc chuyên đề để bắt đầu học, luyện flashcard và thêm từ vựng.' : 'Phân chia các môn học con, chuyên đề kỹ thuật điện để quản lý bài học và từ vựng riêng biệt.'}</p>
               </div>
               ${isTeacher ? `
                 <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-primary text-on-primary font-bold text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-sm hover-lift self-start sm:self-auto">
@@ -4342,10 +4390,10 @@ window.App = {
                     </div>
                     <div class="space-y-2 pt-3 border-t border-outline-variant/30">
                       <button onclick="App.openClassDetail(${child.id})" class="w-full bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1.5 shadow-sm">
-                        <span class="material-symbols-outlined text-base">login</span> Vào Quản Lý Lớp Nhỏ
+                        <span class="material-symbols-outlined text-base">${isStudent ? 'auto_stories' : 'login'}</span> ${isStudent ? 'Vào Học & Thêm Từ Vựng' : 'Vào Quản Lý Lớp Nhỏ'}
                       </button>
                       <button onclick="App.openClassDetail(${child.id}, 'vocabulary')" class="w-full bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
-                        <span class="material-symbols-outlined text-base">menu_book</span> Xem Từ Vựng (${childVocab.length} từ)
+                        <span class="material-symbols-outlined text-base">menu_book</span> ${isStudent ? 'Kho Từ Vựng' : 'Xem Từ Vựng'} (${childVocab.length} từ)
                       </button>
                     </div>
                   </div>
@@ -4397,9 +4445,11 @@ window.App = {
             <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Từ Vựng
             </button>
-            <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
-              <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
-            </button>
+            ${isTeacher ? `
+              <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
+                <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
+              </button>
+            ` : ''}
           </div>
         </div>
 
@@ -6008,9 +6058,11 @@ window.App = {
                   Lớp học này hiện chưa có thuật ngữ nào. Bạn có thể tự tạo các Bài học / Unit và tự nhập Thuật ngữ kèm Definition tiếng Anh để bắt đầu học flashcard 3D và làm bài tập gõ tay.
                 </p>
                 <div class="flex flex-wrap items-center justify-center gap-3">
-                  <button onclick="App.openCreateLessonModal(${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs flex items-center gap-2 transition-colors">
-                    <span class="material-symbols-outlined text-base text-primary">add</span> + Thêm Bài Học / Unit
-                  </button>
+                  ${authService.isTeacher() ? `
+                    <button onclick="App.openCreateLessonModal(${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs flex items-center gap-2 transition-colors">
+                      <span class="material-symbols-outlined text-base text-primary">add</span> + Thêm Bài Học / Unit
+                    </button>
+                  ` : ''}
                   <button onclick="App.openCreateVocabularyModal(null, ${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-black text-xs flex items-center gap-2 shadow-md btn-press">
                     <span class="material-symbols-outlined text-base">add_circle</span> + Thêm Thuật Ngữ Mới
                   </button>

@@ -302,8 +302,19 @@ function ensureHUSTClass(parsed) {
   parsed.vocabulary = parsed.vocabulary.filter(v => !(v.class_id === 11 && v.id >= 1000));
   parsed.lessons = parsed.lessons.filter(l => !(l.class_id === 11 && l.id >= 15 && l.id <= 24));
 
-  // Ensure special parent class HUST20261-SƠN exists
-  let hustClass = parsed.classes.find(c => c.id === 11 || (c.class_code && c.class_code.toUpperCase() === 'HUST20261'));
+  // Dọn dẹp triệt để: Các lớp thông thường (như TA9_HƯƠNG+DUY) TUYỆT ĐỐI không bị gán nhầm category HUST hay parent_id
+  parsed.classes.forEach(c => {
+    const isRealHust = (c.class_code && c.class_code.toUpperCase() === 'HUST20261') || (c.name && c.name.toUpperCase().includes('HUST20261'));
+    const isRealChild = (c.name && c.name.toUpperCase().startsWith('HUST-')) || Number(c.parent_id) === 11;
+    if (!isRealHust && !isRealChild) {
+      c.category = 'STANDARD';
+      c.parent_id = null;
+      c.is_hub = false;
+    }
+  });
+
+  // Đảm bảo lớp cha lớn HUST20261-SƠN tồn tại đúng chuẩn
+  let hustClass = parsed.classes.find(c => (c.class_code && c.class_code.toUpperCase() === 'HUST20261') || (c.name && c.name.toUpperCase().includes('HUST20261')));
   if (!hustClass) {
     hustClass = {
       id: 11,
@@ -317,6 +328,7 @@ function ensureHUSTClass(parsed) {
   } else {
     hustClass.category = "HUST";
     hustClass.is_hub = true;
+    hustClass.parent_id = null;
   }
 
   return parsed;
@@ -386,10 +398,28 @@ export const SupabaseService = {
     const supabaseIds = new Set(supabaseData.map(c => c.id));
     const supabaseCodes = new Set(supabaseData.map(c => (c.class_code || '').toUpperCase()));
 
-    // Merge metadata like creator_id or parent_id or category from local into supabaseData
+    // Merge metadata like creator_id or parent_id or category from local into supabaseData, bảo đảm tuyệt đối không gán nhầm HUST
     supabaseData = supabaseData.map(sc => {
-      const matchedLocal = local.classes.find(lc => lc.id === sc.id || lc.class_code === sc.class_code);
-      return matchedLocal ? { ...matchedLocal, ...sc } : sc;
+      const isRealHust = (sc.class_code && sc.class_code.toUpperCase() === 'HUST20261') || (sc.name && sc.name.toUpperCase().includes('HUST20261'));
+      const isRealChild = (sc.name && sc.name.toUpperCase().startsWith('HUST-')) || Number(sc.parent_id) === 11;
+
+      const matchedLocal = local.classes.find(lc => lc.id === sc.id || (lc.class_code && sc.class_code && lc.class_code.toUpperCase() === sc.class_code.toUpperCase()));
+      const merged = matchedLocal ? { ...matchedLocal, ...sc } : { ...sc };
+
+      if (!isRealHust && !isRealChild) {
+        merged.category = 'STANDARD';
+        merged.parent_id = null;
+        merged.is_hub = false;
+      } else if (isRealHust) {
+        merged.category = 'HUST';
+        merged.is_hub = true;
+        merged.parent_id = null;
+      } else if (isRealChild) {
+        merged.category = 'HUST_CHILD';
+        merged.parent_id = 11;
+        merged.is_hub = false;
+      }
+      return merged;
     });
 
     const mergedLocal = local.classes.filter(c => !supabaseIds.has(c.id) && !supabaseCodes.has((c.class_code || '').toUpperCase()));
