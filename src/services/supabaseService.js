@@ -4,7 +4,6 @@
  */
 
 import { CONFIG } from '../config.js';
-import { SEEE_DATA } from '../data/seeeData.js';
 
 let supabaseClient = null;
 
@@ -293,13 +292,17 @@ const SEED_DATA = {
 
 const LOCAL_STORAGE_KEY = "QUANG_SON_LMS_ISOLATED_DATA_V3";
 
-function ensureSEEEData(parsed) {
+function ensureHUSTClass(parsed) {
   if (!parsed.classes) parsed.classes = [];
   if (!parsed.lessons) parsed.lessons = [];
   if (!parsed.vocabulary) parsed.vocabulary = [];
   if (!parsed.study_sessions) parsed.study_sessions = [];
 
-  // Check if HUST class exists
+  // Remove any reference terms or lessons from the reference file
+  parsed.vocabulary = parsed.vocabulary.filter(v => !(v.class_id === 11 && v.id >= 1000));
+  parsed.lessons = parsed.lessons.filter(l => !(l.class_id === 11 && l.id >= 15 && l.id <= 24));
+
+  // Ensure special parent class HUST20261-SƠN exists
   let hustClass = parsed.classes.find(c => c.id === 11 || (c.class_code && c.class_code.toUpperCase() === 'HUST20261'));
   if (!hustClass) {
     hustClass = {
@@ -316,61 +319,6 @@ function ensureSEEEData(parsed) {
     hustClass.is_hub = true;
   }
 
-  // Check if SEEE lessons exist
-  const unitTitles = Object.keys(SEEE_DATA);
-  const lessonMap = {
-    "Unit 1: Electrons": 15,
-    "Unit 2: Electric Current": 16,
-    "Unit 3: Cells & Batteries": 17,
-    "Unit 4: Sources of Power": 18,
-    "Unit 5: Mains Electricity, Plugs & Fuses": 19,
-    "Unit 6: Electricity & Magnetism": 20,
-    "Unit 7: Resistors": 21,
-    "Unit 8: Capacitors": 22,
-    "Unit 9: Inductors": 23,
-    "Unit 10: Semiconductor & Diodes": 24
-  };
-
-  unitTitles.forEach(title => {
-    const lId = lessonMap[title];
-    if (!parsed.lessons.some(l => l.id === lId)) {
-      parsed.lessons.push({
-        id: lId,
-        class_id: 11,
-        title: title,
-        created_at: "2026-09-09T13:33:00.000Z"
-      });
-    }
-  });
-
-  // Check vocabulary
-  const existingWords = new Set(parsed.vocabulary.filter(v => v.class_id === 11).map(v => v.word.toLowerCase()));
-  let vocabIdBase = 1000;
-  unitTitles.forEach(title => {
-    const lId = lessonMap[title];
-    const terms = SEEE_DATA[title] || [];
-    terms.forEach(t => {
-      if (!existingWords.has(t.term.toLowerCase())) {
-        existingWords.add(t.term.toLowerCase());
-        parsed.vocabulary.push({
-          id: vocabIdBase + (t.id || 0),
-          class_id: 11,
-          lesson_id: lId,
-          word: t.term,
-          meaning: t.meaning,
-          meaning_vi_long: t.vi || "",
-          vi: t.vi || "",
-          ipa: t.phonetics || "",
-          example: t.en || "",
-          definition: t.en || "",
-          en: t.en || "",
-          is_grammar: false,
-          created_at: "2026-09-09T13:33:00.000Z"
-        });
-      }
-    });
-  });
-
   return parsed;
 }
 
@@ -382,7 +330,7 @@ function getLocalData() {
       const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        ensureSEEEData(parsed);
+        ensureHUSTClass(parsed);
         return parsed;
       }
     } catch (e) {
@@ -392,7 +340,7 @@ function getLocalData() {
     return inMemoryFallback;
   }
   const fresh = JSON.parse(JSON.stringify(SEED_DATA));
-  ensureSEEEData(fresh);
+  ensureHUSTClass(fresh);
   saveLocalData(fresh);
   return fresh;
 }
@@ -866,6 +814,12 @@ export const SupabaseService = {
     const client = getSupabase();
     if (client) {
       try {
+        if (payload.lesson_id) {
+          const { data: checkL } = await client.from('lessons').select('id').eq('id', payload.lesson_id).single();
+          if (!checkL) {
+            delete payload.lesson_id;
+          }
+        }
         const { data, error } = await client.from('vocabulary').update(payload).eq('id', id).select();
         if (!error && data && data[0]) {
           const local = getLocalData();
@@ -880,6 +834,9 @@ export const SupabaseService = {
             saveLocalData(local);
           }
           return { ...data[0], definition: payload.example, en: payload.example };
+        }
+        if (error) {
+          console.warn("Supabase updateVocabulary error:", error);
         }
       } catch (err) {
         console.warn("Supabase updateVocabulary fallback:", err);

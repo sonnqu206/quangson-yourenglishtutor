@@ -10,7 +10,6 @@ import { SupabaseService } from './services/supabaseService.js';
 import { GeminiService } from './services/geminiService.js';
 import { ExcelService } from './services/excelService.js';
 import { audioService } from './services/audioService.js';
-import { SEEE_DATA, SEEE_UNITS, ALL_SEEE_TERMS } from './data/seeeData.js';
 
 // Application State
 export const state = {
@@ -1184,6 +1183,16 @@ window.App = {
     }
   },
 
+  openCreateChildClassModal(parentId = 11) {
+    this.openCreateClassModal('HUST_CHILD');
+    const nameInput = document.getElementById('input-class-name');
+    if (nameInput) {
+      nameInput.placeholder = "Ví dụ: Lớp Nhỏ - Kỹ Thuật Điện Tử / Mạch Điện";
+      nameInput.value = "";
+      setTimeout(() => nameInput.focus(), 50);
+    }
+  },
+
   async handleCreateClass(e) {
     e.preventDefault();
     const name = document.getElementById('input-class-name')?.value.trim();
@@ -1426,8 +1435,30 @@ window.App = {
     if (ipaInput) ipaInput.value = '';
     const defInput = document.getElementById('input-vocab-definition');
     if (defInput) defInput.value = '';
+    const exInput = document.getElementById('input-vocab-example');
+    if (exInput) exInput.value = '';
     const grammarCheck = document.getElementById('input-vocab-is-grammar');
     if (grammarCheck) grammarCheck.checked = false;
+
+    // Toggle definition field ONLY for HUST and HUST_CHILD classes
+    const targetClass = state.classes.find(c => Number(c.id) === Number(targetClassId));
+    const isHUSTOrChild = Boolean(targetClass && (targetClass.category === 'HUST' || targetClass.category === 'HUST_CHILD' || targetClass.id === 11 || targetClass.parent_id === 11));
+    const wrapperDef = document.getElementById('wrapper-vocab-definition');
+    const wrapperEx = document.getElementById('wrapper-vocab-example');
+    if (wrapperDef) {
+      if (isHUSTOrChild) {
+        wrapperDef.classList.remove('hidden');
+      } else {
+        wrapperDef.classList.add('hidden');
+      }
+    }
+    if (wrapperEx) {
+      if (isHUSTOrChild) {
+        wrapperEx.classList.add('hidden');
+      } else {
+        wrapperEx.classList.remove('hidden');
+      }
+    }
 
     const modal = document.getElementById('create-vocabulary-modal');
     if (modal) modal.classList.remove('hidden');
@@ -1443,6 +1474,26 @@ window.App = {
         lessonSelect.innerHTML = classLessons.map(l => `<option value="${l.id}">${l.title}</option>`).join('');
       } else {
         lessonSelect.innerHTML = `<option value="1">Unit mặc định</option>`;
+      }
+    }
+
+    // Toggle definition vs example field
+    const targetClass = state.classes.find(c => Number(c.id) === Number(targetClassId));
+    const isHUSTOrChild = Boolean(targetClass && (targetClass.category === 'HUST' || targetClass.category === 'HUST_CHILD' || targetClass.id === 11 || targetClass.parent_id === 11));
+    const wrapperDef = document.getElementById(mode === 'create' ? 'wrapper-vocab-definition' : 'wrapper-edit-vocab-definition');
+    const wrapperEx = document.getElementById(mode === 'create' ? 'wrapper-vocab-example' : 'wrapper-edit-vocab-example');
+    if (wrapperDef) {
+      if (isHUSTOrChild) {
+        wrapperDef.classList.remove('hidden');
+      } else {
+        wrapperDef.classList.add('hidden');
+      }
+    }
+    if (wrapperEx) {
+      if (isHUSTOrChild) {
+        wrapperEx.classList.add('hidden');
+      } else {
+        wrapperEx.classList.remove('hidden');
       }
     }
   },
@@ -1472,6 +1523,10 @@ window.App = {
         const ipaInput = document.getElementById('input-vocab-ipa');
         if (ipaInput && result.ipa) {
           ipaInput.value = result.ipa;
+        }
+        const exInput = document.getElementById('input-vocab-example');
+        if (exInput && !exInput.value.trim() && result.example) {
+          exInput.value = result.example;
         }
         const grammarCheck = document.getElementById('input-vocab-is-grammar');
         if (grammarCheck && typeof result.is_grammar === 'boolean') {
@@ -1509,15 +1564,20 @@ window.App = {
     }
 
     try {
+      const targetClass = state.classes.find(c => Number(c.id) === Number(classId));
+      const isHUSTOrChild = Boolean(targetClass && (targetClass.category === 'HUST' || targetClass.category === 'HUST_CHILD' || targetClass.id === 11 || targetClass.parent_id === 11));
       const definition = document.getElementById('input-vocab-definition')?.value?.trim() || "";
+      const exVal = document.getElementById('input-vocab-example')?.value?.trim() || "";
+      const finalExample = isHUSTOrChild ? definition : exVal;
+
       const item = await SupabaseService.addVocabulary({
         class_id: classId,
         lesson_id: lessonId,
         word: word,
         meaning: meaning,
         ipa: ipa,
-        example: definition,
-        definition: definition,
+        example: finalExample,
+        definition: isHUSTOrChild ? definition : "",
         is_grammar: isGrammar
       });
 
@@ -1525,6 +1585,8 @@ window.App = {
       this.closeModal('create-vocabulary-modal');
       const defInput = document.getElementById('input-vocab-definition');
       if (defInput) defInput.value = '';
+      const exInput = document.getElementById('input-vocab-example');
+      if (exInput) exInput.value = '';
       const wordInput = document.getElementById('input-vocab-word');
       if (wordInput) wordInput.value = '';
       const meanInput = document.getElementById('input-vocab-meaning');
@@ -1544,14 +1606,15 @@ window.App = {
   },
 
   openEditVocabularyModal(vocabId) {
-    const item = state.vocabulary.find(v => v.id === Number(vocabId));
+    const item = state.vocabulary.find(v => Number(v.id) === Number(vocabId));
     if (!item) {
       showToast("Không tìm thấy từ vựng này!", "error");
       return;
     }
 
-    const itemClass = state.classes.find(c => c.id === item.class_id) || state.classes[0];
-    const classLessons = state.lessons.filter(l => l.class_id === item.class_id);
+    const itemClass = state.classes.find(c => Number(c.id) === Number(item.class_id)) || state.classes[0];
+    const isHUSTOrChild = Boolean(itemClass && (itemClass.category === 'HUST' || itemClass.category === 'HUST_CHILD' || itemClass.id === 11 || itemClass.parent_id === 11));
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === Number(item.class_id));
 
     const idInput = document.getElementById('input-edit-vocab-id');
     if (idInput) idInput.value = item.id;
@@ -1563,10 +1626,10 @@ window.App = {
     if (lessonSelect) {
       if (classLessons.length > 0) {
         lessonSelect.innerHTML = classLessons.map(l => 
-          `<option value="${l.id}" ${l.id === item.lesson_id ? 'selected' : ''}>${l.title}</option>`
+          `<option value="${l.id}" ${Number(l.id) === Number(item.lesson_id) ? 'selected' : ''}>${l.title}</option>`
         ).join('');
       } else {
-        lessonSelect.innerHTML = `<option value="${item.lesson_id}">Unit #${item.lesson_id}</option>`;
+        lessonSelect.innerHTML = `<option value="${item.lesson_id || ''}">Unit #${item.lesson_id || 1}</option>`;
       }
     }
 
@@ -1580,7 +1643,28 @@ window.App = {
     if (ipaInput) ipaInput.value = item.ipa || "";
     
     const defInput = document.getElementById('input-edit-vocab-definition');
-    if (defInput) defInput.value = item.definition || item.example || item.en || "";
+    if (defInput) defInput.value = isHUSTOrChild ? (item.definition || item.example || item.en || "") : "";
+
+    const exInput = document.getElementById('input-edit-vocab-example');
+    if (exInput) exInput.value = isHUSTOrChild ? "" : (item.example || "");
+
+    // Toggle definition vs example field
+    const wrapperEditDef = document.getElementById('wrapper-edit-vocab-definition');
+    const wrapperEditEx = document.getElementById('wrapper-edit-vocab-example');
+    if (wrapperEditDef) {
+      if (isHUSTOrChild) {
+        wrapperEditDef.classList.remove('hidden');
+      } else {
+        wrapperEditDef.classList.add('hidden');
+      }
+    }
+    if (wrapperEditEx) {
+      if (isHUSTOrChild) {
+        wrapperEditEx.classList.add('hidden');
+      } else {
+        wrapperEditEx.classList.remove('hidden');
+      }
+    }
 
     const grammarCheck = document.getElementById('input-edit-vocab-is-grammar');
     if (grammarCheck) grammarCheck.checked = Boolean(item.is_grammar);
@@ -1616,11 +1700,15 @@ window.App = {
       if (result) {
         const ipaInput = document.getElementById('input-edit-vocab-ipa');
         if (ipaInput && result.ipa) ipaInput.value = result.ipa;
+        const exInput = document.getElementById('input-edit-vocab-example');
+        if (exInput && !exInput.value.trim() && result.example) {
+          exInput.value = result.example;
+        }
         const grammarCheck = document.getElementById('input-edit-vocab-is-grammar');
         if (grammarCheck && typeof result.is_grammar === 'boolean') {
           grammarCheck.checked = result.is_grammar;
         }
-        showToast("Gemini AI đã cập nhật lại IPA! ✨", "success");
+        showToast("Gemini AI đã cập nhật lại IPA & ví dụ! ✨", "success");
       }
     } catch (err) {
       console.warn(err);
@@ -1636,11 +1724,13 @@ window.App = {
   async handleSaveEditVocabulary(e) {
     e.preventDefault();
     const id = Number(document.getElementById('input-edit-vocab-id')?.value);
-    const lessonId = Number(document.getElementById('input-edit-vocab-lesson')?.value);
+    const lessonVal = document.getElementById('input-edit-vocab-lesson')?.value;
+    const lessonId = (lessonVal && !isNaN(Number(lessonVal))) ? Number(lessonVal) : null;
     const word = document.getElementById('input-edit-vocab-word')?.value?.trim();
     const meaning = document.getElementById('input-edit-vocab-meaning')?.value?.trim();
     const ipa = document.getElementById('input-edit-vocab-ipa')?.value?.trim() || "";
     const definition = document.getElementById('input-edit-vocab-definition')?.value?.trim() || "";
+    const exVal = document.getElementById('input-edit-vocab-example')?.value?.trim();
     const isGrammar = Boolean(document.getElementById('input-edit-vocab-is-grammar')?.checked);
 
     if (!id || !word || !meaning) {
@@ -1648,31 +1738,42 @@ window.App = {
       return;
     }
 
-    const example = definition || "";
+    const currentItem = state.vocabulary.find(v => Number(v.id) === Number(id));
+    const targetClass = state.classes.find(c => Number(c.id) === Number(currentItem?.class_id));
+    const isHUSTOrChild = Boolean(targetClass && (targetClass.category === 'HUST' || targetClass.category === 'HUST_CHILD' || targetClass.id === 11 || targetClass.parent_id === 11));
+
+    // If HUST class, example is the definition. If normal class, use input-edit-vocab-example or retain existing!
+    const example = isHUSTOrChild 
+      ? (definition || currentItem?.example || "") 
+      : (exVal !== undefined && exVal !== "" ? exVal : (currentItem?.example || ""));
 
     try {
-      await SupabaseService.updateVocabulary(id, {
-        lesson_id: lessonId,
+      const payloadToUpdate = {
         word: word,
         meaning: meaning,
         ipa: ipa,
         example: example,
-        definition: definition,
+        definition: isHUSTOrChild ? definition : "",
         is_grammar: isGrammar
-      });
+      };
+      if (lessonId && !isNaN(lessonId)) {
+        payloadToUpdate.lesson_id = lessonId;
+      }
+
+      await SupabaseService.updateVocabulary(id, payloadToUpdate);
 
       // Update local state
-      const idx = state.vocabulary.findIndex(v => v.id === id);
+      const idx = state.vocabulary.findIndex(v => Number(v.id) === Number(id));
       if (idx !== -1) {
         state.vocabulary[idx] = {
           ...state.vocabulary[idx],
-          lesson_id: lessonId,
+          ...(lessonId ? { lesson_id: lessonId } : {}),
           word,
           meaning,
           ipa,
           example,
-          definition,
-          en: definition,
+          definition: isHUSTOrChild ? definition : (state.vocabulary[idx].definition || ""),
+          en: isHUSTOrChild ? definition : (state.vocabulary[idx].en || example),
           is_grammar: isGrammar
         };
       }
@@ -1682,7 +1783,8 @@ window.App = {
       this.closeModal('edit-vocabulary-modal');
       this.render();
     } catch (err) {
-      showToast("Lỗi khi lưu chỉnh sửa từ: " + err.message, "error");
+      console.error("Lỗi khi lưu chỉnh sửa từ:", err);
+      showToast("Lỗi khi lưu chỉnh sửa từ: " + (err.message || err), "error");
     }
   },
 
@@ -3125,15 +3227,20 @@ window.App = {
                   ${isHUST ? `
                     <div class="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-500 font-bold flex items-center justify-between">
                       <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">bolt</span> SEEE Terminology Hub</span>
-                      <span class="bg-amber-500 text-black px-1.5 py-0.5 rounded text-[10px] font-black">179 TERMS</span>
+                      <span class="bg-amber-500 text-black px-1.5 py-0.5 rounded text-[10px] font-black">${classVocab.length} TERMS</span>
                     </div>
                   ` : ''}
                 </div>
                 <div>
                   ${isHUST ? `
-                    <button onclick="App.openSEEEStudy(${c.id})" class="w-full mb-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1.5 shadow-md">
-                      <span class="material-symbols-outlined text-base">bolt</span> ⚡ Vào Học SEEE Terms (Definition ➔ Term)
-                    </button>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                      <button onclick="App.openSEEEStudy(${c.id})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1 shadow-md">
+                        <span class="material-symbols-outlined text-sm">bolt</span> Vào Học Terms
+                      </button>
+                      <button onclick="App.openCreateChildClassModal(${c.id})" class="bg-surface-container hover:bg-surface-container-high border border-amber-500/40 text-amber-500 font-bold text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Lớp Nhỏ
+                      </button>
+                    </div>
                   ` : ''}
                   <div class="flex items-center gap-2 pt-3 border-t border-outline-variant/30">
                     <button onclick="App.openClassDetail(${c.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift transition-colors text-center flex items-center justify-center gap-1">
@@ -3171,13 +3278,18 @@ window.App = {
     const isTeacher = !isStudent;
 
     const targetClassId = Number(classId) || (isStudent ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId || 1));
-    const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: `Lớp #${targetClassId}`, class_code: "QS9A" };
+    const activeClass = state.classes.find(c => Number(c.id) === targetClassId) || state.classes[0] || { name: `Lớp #${targetClassId}`, class_code: "QS9A" };
 
-    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
-    const classVocab = state.vocabulary.filter(v => v.class_id === targetClassId);
-    const classStudents = state.usersList.filter(u => u.role === 'student' && u.class_id === targetClassId);
-    const classStudySessions = (state.studySessions || []).filter(s => s.class_id === targetClassId);
-    const classTestSessions = (state.testSessions || []).filter(s => s.class_id === targetClassId);
+    const isHUSTHub = Boolean(targetClassId === 11 || activeClass.category === 'HUST' || activeClass.class_code === 'HUST20261' || (activeClass.name && activeClass.name.includes('HUST')));
+    const isHUSTChild = Boolean(activeClass.category === 'HUST_CHILD' || activeClass.parent_id === 11);
+    const isHUSTFamily = isHUSTHub || isHUSTChild;
+    const childClasses = state.classes.filter(c => c.parent_id === 11 || c.category === 'HUST_CHILD');
+
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
+    const classVocab = state.vocabulary.filter(v => Number(v.class_id) === targetClassId);
+    const classStudents = state.usersList.filter(u => u.role === 'student' && Number(u.class_id) === targetClassId);
+    const classStudySessions = (state.studySessions || []).filter(s => Number(s.class_id) === targetClassId);
+    const classTestSessions = (state.testSessions || []).filter(s => Number(s.class_id) === targetClassId);
 
     const currentTab = state.classDetailTab || 'units';
 
@@ -3193,12 +3305,14 @@ window.App = {
               </button>
             ` : ''}
             <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary flex items-center justify-center font-bold text-xl shadow-md shrink-0">
-              <span class="material-symbols-outlined text-2xl">school</span>
+              <span class="material-symbols-outlined text-2xl">${isHUSTFamily ? 'bolt' : 'school'}</span>
             </div>
             <div>
               <div class="flex items-center gap-2 flex-wrap">
                 <h2 class="font-display-lg text-xl sm:text-2xl font-bold text-on-surface">${activeClass.name}</h2>
-                <span class="px-2.5 py-0.5 rounded-full bg-primary-container/20 text-primary text-xs font-mono font-bold">Mã: ${activeClass.class_code}</span>
+                <span class="px-2.5 py-0.5 rounded-full ${isHUSTHub ? 'bg-amber-500 text-black font-black' : isHUSTChild ? 'bg-amber-500/20 text-amber-500 font-bold' : 'bg-primary-container/20 text-primary font-bold'} text-xs font-mono">
+                  ${isHUSTHub ? '⚡ HUST HUB' : isHUSTChild ? '⚡ LỚP CON HUST' : `Mã: ${activeClass.class_code}`}
+                </span>
               </div>
               <div class="flex items-center gap-3 text-xs text-on-surface-variant mt-1 flex-wrap">
                 <span>📖 <strong>${classLessons.length}</strong> bài học</span>
@@ -3206,14 +3320,24 @@ window.App = {
                 <span>📚 <strong>${classVocab.length}</strong> từ vựng</span>
                 <span>•</span>
                 <span>👥 <strong>${classStudents.length}</strong> học sinh</span>
+                ${isHUSTHub ? `<span>•</span> <span>⚡ <strong>${childClasses.length}</strong> lớp nhỏ</span>` : ''}
               </div>
             </div>
           </div>
 
           <!-- Fast Launcher Actions -->
           <div class="flex items-center gap-2 flex-wrap">
+            ${isHUSTHub ? `
+              <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-md hover-lift">
+                <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Lớp Nhỏ
+              </button>
+            ` : isHUSTChild ? `
+              <button onclick="App.openClassDetail(11)" class="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/30 px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift">
+                <span class="material-symbols-outlined text-sm">arrow_back</span> Về Lớp Cha (HUST)
+              </button>
+            ` : ''}
             <button onclick="App.startLessonFlashcard(null)" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
-              <span class="material-symbols-outlined text-sm">style</span> Luyện Flashcard Lớp
+              <span class="material-symbols-outlined text-sm">style</span> Luyện Flashcard
             </button>
             <button onclick="App.startRandomClassQuiz()" class="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-bold text-xs btn-press flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">quiz</span> Kiểm Tra Ngẫu Nhiên
@@ -3221,25 +3345,43 @@ window.App = {
           </div>
         </div>
 
-        ${(targetClassId === 11 || activeClass.class_code === 'HUST20261' || (activeClass.name && activeClass.name.includes('HUST'))) ? `
+        ${isHUSTFamily ? `
           <div class="p-5 md:p-6 rounded-3xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ambient-shadow">
             <div class="space-y-1">
               <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-black font-black text-xs">
-                <span class="material-symbols-outlined text-sm">bolt</span> SEEE MASTER STUDY • ENGLISH FOR ELECTRICITY
+                <span class="material-symbols-outlined text-sm">bolt</span> ${isHUSTChild ? '⚡ LỚP CON THUỘC HUST20261-SƠN' : 'SEEE MASTER STUDY • SPECIAL TERMINOLOGY HUB'}
               </div>
-              <h3 class="font-headline-md text-base md:text-lg font-black text-on-surface">Chương Trình Thuật Ngữ Kỹ Thuật Điện Chuyên Sâu (10 Units • 179 Terms)</h3>
+              <h3 class="font-headline-md text-base md:text-lg font-black text-on-surface">Chương Trình Thuật Ngữ Chuyên Ngành (${classLessons.length} Units • ${classVocab.length} Terms)</h3>
               <p class="text-xs text-on-surface-variant max-w-2xl">
-                Chế độ bài tập đặc biệt: Cho Đề bài là Định nghĩa tiếng Anh (Definition) và gõ tay Thuật ngữ (Term). Hỗ trợ kiểm tra theo từng Unit, tự chọn Unit, kiểm tra ngẫu nhiên và làm lại câu sai.
+                Chế độ bài tập đặc biệt: Cho Đề bài là Định nghĩa tiếng Anh (Definition) và gõ tay Thuật ngữ (Term). Hỗ trợ kiểm tra theo từng Unit, tự chọn Unit, kiểm tra ngẫu nhiên và Flashcard 3D.
               </p>
             </div>
-            <button onclick="App.openSEEEStudy(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs md:text-sm px-5 py-3 rounded-2xl flex items-center gap-2 hover-lift shadow-lg whitespace-nowrap">
-              <span class="material-symbols-outlined text-lg">bolt</span> Vào Học SEEE Terms Ngay
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+              ${isHUSTHub ? `
+                <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-surface-container-lowest border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 font-bold text-xs md:text-sm px-4 py-3 rounded-2xl flex items-center gap-1.5 hover-lift shadow">
+                  <span class="material-symbols-outlined text-lg">account_tree</span> + Thêm Lớp Nhỏ
+                </button>
+              ` : `
+                <button onclick="App.openClassDetail(11)" class="bg-surface-container-lowest border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 font-bold text-xs md:text-sm px-4 py-3 rounded-2xl flex items-center gap-1.5 hover-lift shadow">
+                  <span class="material-symbols-outlined text-lg">arrow_back</span> Về Lớp Cha
+                </button>
+              `}
+              <button onclick="App.openSEEEStudy(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs md:text-sm px-5 py-3 rounded-2xl flex items-center gap-2 hover-lift shadow-lg whitespace-nowrap">
+                <span class="material-symbols-outlined text-lg">bolt</span> Vào Học SEEE Terms (${classVocab.length} từ)
+              </button>
+            </div>
           </div>
         ` : ''}
 
-        <!-- Class Section Navigation Tabs (Always 4 Tabs) -->
+        <!-- Class Section Navigation Tabs -->
         <div class="flex items-center gap-2 border-b border-outline-variant/30 pb-2 overflow-x-auto">
+          ${isHUSTHub ? `
+            <button onclick="App.setClassDetailTab('subclasses')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'subclasses' ? 'bg-amber-500 text-black shadow-md' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+              <span class="material-symbols-outlined text-base">account_tree</span>
+              <span>Lớp Nhỏ / Phân Nhánh (${childClasses.length})</span>
+            </button>
+          ` : ''}
+
           <button onclick="App.setClassDetailTab('units')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'units' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
             <span class="material-symbols-outlined text-base">auto_stories</span>
             <span>1. Danh Sách Bài Học (${classLessons.length})</span>
@@ -3749,6 +3891,65 @@ window.App = {
                   </tbody>
                 </table>
               </div>
+        ` : ''}
+
+        <!-- TAB 0: SUBCLASSES / CHILD CLASSES (HUST20261-SƠN ONLY) -->
+        ${currentTab === 'subclasses' ? `
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="font-headline-md text-base font-bold text-on-surface">Các Lớp Nhỏ / Phân Nhánh Thuộc HUST20261-SƠN</h3>
+                <p class="text-xs text-on-surface-variant">Phân chia các môn học con, chuyên đề kỹ thuật điện để quản lý bài học và từ vựng riêng biệt.</p>
+              </div>
+              <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-md hover-lift self-start sm:self-auto">
+                <span class="material-symbols-outlined text-base">add_circle</span>
+                <span>+ Thêm Lớp Nhỏ Mới</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+              ${childClasses.length > 0 ? childClasses.map(child => {
+                const childLessons = state.lessons.filter(l => Number(l.class_id) === Number(child.id));
+                const childVocab = state.vocabulary.filter(v => Number(v.class_id) === Number(child.id));
+                return `
+                  <div class="bg-surface-container-lowest p-6 rounded-2xl ambient-shadow border border-amber-500/30 flex flex-col justify-between hover-lift">
+                    <div>
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-bold text-xs font-mono">⚡ LỚP CON</span>
+                        <span class="text-outline text-xs font-mono">Mã: ${child.class_code}</span>
+                      </div>
+                      <h4 class="font-headline-md text-base font-bold text-on-surface mb-2">${child.name}</h4>
+                      <div class="flex items-center gap-3 text-xs text-on-surface-variant mb-4">
+                        <span>📖 <strong>${childLessons.length}</strong> bài học</span>
+                        <span>•</span>
+                        <span>📚 <strong>${childVocab.length}</strong> từ vựng</span>
+                      </div>
+                    </div>
+                    <div class="space-y-2 pt-3 border-t border-outline-variant/30">
+                      <button onclick="App.openClassDetail(${child.id})" class="w-full bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl btn-press hover-lift flex items-center justify-center gap-1.5 shadow-sm">
+                        <span class="material-symbols-outlined text-base">login</span> Vào Quản Lý Lớp Nhỏ
+                      </button>
+                      <button onclick="App.openSEEEStudy(${child.id})" class="w-full bg-surface-container hover:bg-amber-500/20 text-amber-500 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
+                        <span class="material-symbols-outlined text-base">bolt</span> Vào Học SEEE Terms (${childVocab.length} từ)
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('') : `
+                <div class="col-span-full p-10 bg-surface-container-lowest rounded-3xl border border-dashed border-outline-variant/40 text-center flex flex-col items-center justify-center">
+                  <div class="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-3">
+                    <span class="material-symbols-outlined text-3xl">account_tree</span>
+                  </div>
+                  <h4 class="font-headline-md text-base font-bold text-on-surface mb-1">Chưa có lớp nhỏ nào trong HUST20261-SƠN</h4>
+                  <p class="text-xs text-on-surface-variant max-w-md mb-4 leading-relaxed">
+                    Bạn có thể tự tạo các lớp nhỏ (chuyên đề, môn học con) để phân loại từ vựng và bài kiểm tra riêng biệt theo từng môn học của bạn.
+                  </p>
+                  <button onclick="App.openCreateChildClassModal(${targetClassId})" class="bg-amber-500 hover:bg-amber-600 text-black font-black text-xs px-5 py-2.5 rounded-xl btn-press flex items-center gap-2 shadow-md hover-lift">
+                    <span class="material-symbols-outlined text-base">add_circle</span>
+                    <span>Tạo Lớp Nhỏ Đầu Tiên</span>
+                  </button>
+                </div>
+              `}
             </div>
           </div>
         ` : ''}
@@ -5015,16 +5216,24 @@ window.App = {
   },
 
   getHUSTLessonsAndTerms() {
-    const hustLessons = state.lessons.filter(l => l.class_id === 11 || (l.title && l.title.toLowerCase().startsWith('unit ')));
-    const hustVocab = state.vocabulary.filter(v => v.class_id === 11);
+    const targetClassId = Number(state.selectedClassId) || 11;
+    const targetClass = state.classes.find(c => Number(c.id) === targetClassId) || { id: 11, name: "HUST20261-SƠN" };
 
-    if (hustLessons.length >= 10 && hustVocab.length >= 100) {
-      const units = hustLessons.map((l, idx) => {
-        const terms = hustVocab.filter(v => v.lesson_id === l.id).map(v => ({
+    // Find all lessons for this class or its children if this is hub 11
+    const childClassIds = state.classes.filter(c => Number(c.parent_id) === targetClassId).map(c => Number(c.id));
+    const targetClassIds = [targetClassId, ...childClassIds];
+
+    const lessons = state.lessons.filter(l => targetClassIds.includes(Number(l.class_id)));
+    const vocabs = state.vocabulary.filter(v => targetClassIds.includes(Number(v.class_id)));
+
+    let units = [];
+    if (lessons.length > 0) {
+      units = lessons.map((l, idx) => {
+        const terms = vocabs.filter(v => Number(v.lesson_id) === Number(l.id)).map(v => ({
           id: v.id,
           term: v.word,
-          phonetics: v.phonetics || "",
-          en: v.example || v.definition || "",
+          phonetics: v.ipa || v.phonetics || "",
+          en: v.example || v.definition || v.en || "",
           vi: v.meaning || "",
           unitTitle: l.title,
           unitIdx: idx
@@ -5033,26 +5242,28 @@ window.App = {
           id: l.id,
           unitIdx: idx,
           title: l.title,
-          terms: terms.length > 0 ? terms : (SEEE_UNITS[idx]?.terms || [])
+          terms
         };
       });
-      const allTerms = units.flatMap(u => u.terms);
-      return { units, allTerms };
+    } else if (vocabs.length > 0) {
+      units = [{
+        id: 0,
+        unitIdx: 0,
+        title: "Chuyên Đề Chung",
+        terms: vocabs.map(v => ({
+          id: v.id,
+          term: v.word,
+          phonetics: v.ipa || v.phonetics || "",
+          en: v.example || v.definition || v.en || "",
+          vi: v.meaning || "",
+          unitTitle: "Chuyên Đề Chung",
+          unitIdx: 0
+        }))
+      }];
     }
 
-    // Fallback to official dataset
-    const units = SEEE_UNITS.map((u, idx) => ({
-      id: u.id,
-      unitIdx: idx,
-      title: u.title,
-      terms: u.terms.map(t => ({
-        ...t,
-        unitTitle: u.title,
-        unitIdx: idx
-      }))
-    }));
     const allTerms = units.flatMap(u => u.terms);
-    return { units, allTerms };
+    return { units, allTerms, targetClass };
   },
 
   openSEEEStudy(classId = 11) {
@@ -5129,7 +5340,11 @@ window.App = {
   },
 
   startSEEEFullQuiz() {
-    const { allTerms } = this.getHUSTLessonsAndTerms();
+    const { allTerms, units } = this.getHUSTLessonsAndTerms();
+    if (allTerms.length === 0) {
+      this.showToast('Lớp chưa có thuật ngữ nào để làm bài kiểm tra!', 'info');
+      return;
+    }
     state.seee.deck = this.shuffleArray([...allTerms]);
     state.seee.currentIndex = 0;
     state.seee.score = 0;
@@ -5137,7 +5352,7 @@ window.App = {
     state.seee.wrongTerms = [];
     state.seee.isAnswerChecked = false;
     state.seee.mode = 'QUIZ_ALL';
-    state.seee.quizTitle = `Kiểm Tra Toàn Bộ 10 Units (179 Thuật Ngữ)`;
+    state.seee.quizTitle = `Kiểm Tra Toàn Bộ (${units.length} Units • ${allTerms.length} Thuật Ngữ)`;
     this.render();
     setTimeout(() => {
       const input = document.getElementById('seee-quiz-input');
@@ -5176,8 +5391,9 @@ window.App = {
   },
 
   toggleSEEEAllUnits(selectAll) {
+    const { units } = this.getHUSTLessonsAndTerms();
     if (selectAll) {
-      state.seee.customSelectedUnits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+      state.seee.customSelectedUnits = units.map((_, idx) => idx);
     } else {
       state.seee.customSelectedUnits = [];
     }
@@ -5316,7 +5532,7 @@ window.App = {
 
   // Main SEEE Study View Renderer
   renderSEEEStudyView() {
-    const { units, allTerms } = this.getHUSTLessonsAndTerms();
+    const { units, allTerms, targetClass } = this.getHUSTLessonsAndTerms();
     const mode = state.seee?.mode || 'MENU';
     const deck = state.seee?.deck || [];
     const currentIndex = state.seee?.currentIndex || 0;
@@ -5334,10 +5550,10 @@ window.App = {
               <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-black font-black text-xs">
                 <span class="material-symbols-outlined text-xs">bolt</span> SEEE MASTER STUDY
               </span>
-              <span class="text-xs text-outline font-mono">HUST20261-SƠN</span>
+              <span class="text-xs text-outline font-mono">${targetClass.name}</span>
             </div>
             <h2 class="font-display-lg text-lg sm:text-2xl font-black text-on-surface mt-0.5">
-              English for Electricity • Thuật Ngữ Kỹ Thuật Điện
+              ${targetClass.name} • Thuật Ngữ & Định Nghĩa
             </h2>
           </div>
         </div>
@@ -5349,7 +5565,7 @@ window.App = {
             </button>
           ` : ''}
           <div class="px-3 py-1.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30 text-xs text-outline font-bold">
-            ⚡ 10 Units • ${allTerms.length} Terms
+            ⚡ ${units.length} Units • ${allTerms.length} Terms
           </div>
         </div>
       </div>
@@ -5357,6 +5573,37 @@ window.App = {
 
     // MODE 1: MENU
     if (mode === 'MENU') {
+      if (allTerms.length === 0) {
+        return `
+          <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+            ${headerHtml}
+
+            <!-- Empty State when no terms exist yet -->
+            <div class="bg-surface-container-lowest p-8 sm:p-14 rounded-3xl ambient-shadow border border-outline-variant/30 text-center flex flex-col items-center justify-center gap-4 my-auto">
+              <div class="w-16 h-16 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-3xl font-black shadow-inner">
+                <span class="material-symbols-outlined text-4xl">menu_book</span>
+              </div>
+              <div class="max-w-md">
+                <h3 class="font-headline-md text-lg sm:text-xl font-bold text-on-surface mb-2">
+                  Lớp chưa có Thuật ngữ & Định nghĩa nào
+                </h3>
+                <p class="text-xs sm:text-sm text-outline mb-6 leading-relaxed">
+                  Lớp học này hiện chưa có thuật ngữ nào. Bạn có thể tự tạo các Bài học / Unit và tự nhập Thuật ngữ kèm Definition tiếng Anh để bắt đầu học flashcard 3D và làm bài tập gõ tay.
+                </p>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                  <button onclick="App.openCreateLessonModal(${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-base text-primary">add</span> + Thêm Bài Học / Unit
+                  </button>
+                  <button onclick="App.openCreateVocabularyModal(null, ${targetClass.id})" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-black text-xs flex items-center gap-2 shadow-md btn-press">
+                    <span class="material-symbols-outlined text-base">add_circle</span> + Thêm Thuật Ngữ Mới
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
       return `
         <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
           ${headerHtml}
@@ -5371,14 +5618,14 @@ window.App = {
                   <span class="material-symbols-outlined text-2xl">bolt</span>
                 </div>
                 <h3 class="font-headline-md text-base font-black text-on-surface mb-1">
-                  Kiểm Tra Toàn Bộ 179 Thuật Ngữ
+                  Kiểm Tra Toàn Bộ (${allTerms.length} Thuật Ngữ)
                 </h3>
                 <p class="text-xs text-on-surface-variant mb-4">
-                  Đề bài cho Definition tiếng Anh ngẫu nhiên, gõ tay thuật ngữ bằng bàn phím. Thử thách cao nhất!
+                  Đề bài cho Definition tiếng Anh ngẫu nhiên, gõ tay thuật ngữ bằng bàn phím. Thử thách kiểm tra toàn diện!
                 </p>
               </div>
               <button onclick="App.startSEEEFullQuiz()" class="w-full bg-amber-500 hover:bg-amber-600 text-black font-black text-xs py-3 rounded-xl btn-press flex items-center justify-center gap-2 shadow-md">
-                <span class="material-symbols-outlined text-base">play_arrow</span> Bắt Đầu Full Quiz (179 Terms)
+                <span class="material-symbols-outlined text-base">play_arrow</span> Bắt Đầu Full Quiz (${allTerms.length} Terms)
               </button>
             </div>
 
@@ -5392,7 +5639,7 @@ window.App = {
                   Tự Chọn Các Unit Kiểm Tra
                 </h3>
                 <p class="text-xs text-on-surface-variant mb-4">
-                  Tự do chọn 1 hoặc nhiều Unit (ví dụ Unit 1 + 2 hoặc Unit 7 + 8) để kiểm tra theo trọng tâm.
+                  Tự do chọn 1 hoặc nhiều Unit để kiểm tra theo trọng tâm bạn muốn.
                 </p>
               </div>
               <button onclick="App.openSEEECustomSetup()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3 rounded-xl btn-press flex items-center justify-center gap-2 shadow-md">
@@ -5425,12 +5672,12 @@ window.App = {
 
           </div>
 
-          <!-- 10 Units Master Grid -->
+          <!-- Units Master Grid -->
           <div class="space-y-4">
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="font-headline-md text-base sm:text-lg font-bold text-on-surface">
-                  Danh Sách 10 Chuyên Đề Kỹ Thuật Điện (Units 1 – 10)
+                  Danh Sách Các Chuyên Đề & Bài Học (${units.length} Units)
                 </h3>
                 <p class="text-xs text-outline">Chọn Flashcards để học định nghĩa hoặc chọn Kiểm Tra Gõ Tay để làm bài tập.</p>
               </div>
@@ -5528,7 +5775,7 @@ window.App = {
 
             <div class="pt-4 border-t border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div class="text-xs text-on-surface-variant font-bold">
-                Đã chọn: <span class="text-amber-500 font-black">${selected.length} / 10 Units</span> (${totalSelectedTerms} thuật ngữ)
+                Đã chọn: <span class="text-amber-500 font-black">${selected.length} / ${units.length} Units</span> (${totalSelectedTerms} thuật ngữ)
               </div>
               <button onclick="App.startSEEECustomQuiz()" ${selected.length === 0 ? 'disabled' : ''} class="bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-black font-black text-xs sm:text-sm px-6 py-3 rounded-xl btn-press flex items-center justify-center gap-2 shadow-lg">
                 <span class="material-symbols-outlined text-lg">play_arrow</span> Bắt Đầu Kiểm Tra Gõ Tay Ngay
