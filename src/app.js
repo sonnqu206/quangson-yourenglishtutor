@@ -861,6 +861,104 @@ window.App = {
     }
   },
 
+  // Trích xuất trực tiếp file Excel không qua Gemini AI trong Modal
+  async handleDirectExcelExtractModal() {
+    const file = state.pendingImportFile;
+    if (!file) {
+      showToast("Vui lòng tải lên hoặc chọn file Excel trước!", "warning");
+      return;
+    }
+
+    const fileName = (file.name || "").toLowerCase();
+    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
+      showToast("Tính năng trích xuất trực tiếp chỉ áp dụng cho file Excel (.xlsx, .xls, .csv)!", "warning");
+      return;
+    }
+
+    if (typeof XLSX === 'undefined') {
+      showToast("Thư viện XLSX đang khởi tạo, vui lòng thử lại sau giây lát.", "error");
+      return;
+    }
+
+    const previewContainer = document.getElementById('import-ai-preview-container');
+    const saveBtn = document.getElementById('btn-save-ai-vocab-to-db');
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      if (!rawRows || rawRows.length === 0) {
+        showToast("File Excel không có dữ liệu!", "error");
+        return;
+      }
+
+      const terms = [];
+      rawRows.forEach((row, idx) => {
+        if (!row || !Array.isArray(row) || row.length === 0) return;
+        const col0 = String(row[0] !== undefined && row[0] !== null ? row[0] : '').trim();
+        const col1 = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
+        const col2 = String(row[2] !== undefined && row[2] !== null ? row[2] : '').trim();
+        const col3 = String(row[3] !== undefined && row[3] !== null ? row[3] : '').trim();
+
+        // Bỏ qua dòng tiêu đề
+        const lower0 = col0.toLowerCase();
+        if (idx === 0 && (lower0.includes('term') || lower0.includes('stt') || lower0.includes('từ vựng') || lower0.includes('word') || lower0 === '#')) {
+          return;
+        }
+
+        if (col0 && col1) {
+          terms.push({
+            id: terms.length + 1,
+            word: col0,
+            meaning: col1,
+            example: col2, // Definition (EN)
+            ipa: col3,     // Definition (VN)
+            definition_en: col2,
+            definition_vn: col3,
+            is_grammar: false
+          });
+        }
+      });
+
+      if (terms.length === 0) {
+        showToast("Không tìm thấy dòng từ vựng hợp lệ trong file Excel!", "warning");
+        return;
+      }
+
+      state.pendingImportExtractedTerms = terms;
+
+      const tbody = document.getElementById('import-ai-preview-tbody');
+      const countEl = document.getElementById('import-ai-count');
+      if (countEl) countEl.textContent = terms.length;
+
+      if (tbody) {
+        tbody.innerHTML = terms.map((t, idx) => `
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="p-2.5 text-center">
+              <input type="checkbox" data-idx="${idx}" checked class="import-ai-item-checkbox w-4 h-4 rounded text-primary" />
+            </td>
+            <td class="p-2.5 font-bold text-primary">${t.word}</td>
+            <td class="p-2.5 font-mono text-outline text-xs">${t.ipa || ''}</td>
+            <td class="p-2.5 font-medium text-on-surface">${t.meaning}</td>
+            <td class="p-2.5 text-xs text-on-surface-variant max-w-xs truncate" title="${t.example || ''}">
+              ${t.example || ''}
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      if (previewContainer) previewContainer.classList.remove('hidden');
+      if (saveBtn) saveBtn.disabled = false;
+      showToast(`📊 Đã trích xuất trực tiếp ${terms.length} thuật ngữ từ Excel (Không qua AI)! 🎉`, "success");
+    } catch (err) {
+      console.error("Lỗi trích xuất trực tiếp Excel:", err);
+      showToast("Lỗi đọc file Excel: " + err.message, "error");
+    }
+  },
+
   toggleSelectAllImportItems(selectAll) {
     const checkboxes = document.querySelectorAll('.import-ai-item-checkbox');
     checkboxes.forEach(cb => { cb.checked = selectAll; });
@@ -1230,6 +1328,23 @@ window.App = {
     this.render();
   },
 
+  isHUSTClass(classObjOrId) {
+    if (!classObjOrId) return false;
+    let c = typeof classObjOrId === 'object' ? classObjOrId : state.classes.find(cls => Number(cls.id) === Number(classObjOrId));
+    if (!c) {
+      if (Number(classObjOrId) === 11) return true;
+      return false;
+    }
+    const code = (c.class_code || '').toUpperCase();
+    const name = (c.name || '').toUpperCase();
+    const category = (c.category || '').toUpperCase();
+    const parentId = Number(c.parent_id);
+
+    if (c.id === 11 || code === 'HUST20261' || name.includes('HUST2026') || category === 'HUST') return true;
+    if (parentId === 11 || category === 'HUST_CHILD' || name.startsWith('HUST-') || name.includes('HUST')) return true;
+    return false;
+  },
+
   safeGoBack(fallback = 'dashboard') {
     if (state.currentTab === 'flashcards') {
       this.finishFlashcardSession();
@@ -1377,6 +1492,11 @@ window.App = {
     state.flashcardCardsViewed = 0;
     state.flashcardCardsMastered = 0;
     this.switchTab('flashcards');
+
+    const firstWord = state.studyList[0];
+    if (firstWord && firstWord.word) {
+      setTimeout(() => this.speakWord(firstWord.word), 300);
+    }
   },
 
   selectFlashcardLesson(lessonId) {
@@ -1385,6 +1505,11 @@ window.App = {
     state.flashcardIndex = 0;
     state.flashcardFlipped = false;
     this.render();
+
+    const firstWord = state.studyList[0];
+    if (firstWord && firstWord.word) {
+      setTimeout(() => this.speakWord(firstWord.word), 200);
+    }
   },
 
   selectTableInputLesson(lessonId) {
@@ -1428,7 +1553,15 @@ window.App = {
     let nextId = state.batchTableRows.length ? Math.max(...state.batchTableRows.map(r => r.id)) + 1 : 1;
     const startIdx = state.batchTableRows.length;
     for (let i = 0; i < num; i++) {
-      state.batchTableRows.push({ id: nextId++, word: "", meaning: "" });
+      state.batchTableRows.push({
+        id: nextId++,
+        word: "",
+        meaning: "",
+        definition_en: "",
+        definition_vn: "",
+        example: "",
+        ipa: ""
+      });
     }
     this.render();
     if (shouldFocus) {
@@ -1451,11 +1584,11 @@ window.App = {
   clearBatchTable() {
     if (confirm("Bạn có chắc muốn làm mới lại bảng (xóa trắng các dòng hiện tại)?")) {
       state.batchTableRows = [
-        { id: 1, word: "", meaning: "" },
-        { id: 2, word: "", meaning: "" },
-        { id: 3, word: "", meaning: "" },
-        { id: 4, word: "", meaning: "" },
-        { id: 5, word: "", meaning: "" }
+        { id: 1, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 2, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 3, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 4, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 5, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" }
       ];
       this.render();
       showToast("Đã làm mới bảng nhập từ!", "info");
@@ -1464,7 +1597,7 @@ window.App = {
 
   removeBatchTableRow(id) {
     if (state.batchTableRows.length <= 1) {
-      state.batchTableRows[0] = { id: 1, word: "", meaning: "" };
+      state.batchTableRows[0] = { id: 1, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" };
     } else {
       state.batchTableRows = state.batchTableRows.filter(r => r.id !== id);
     }
@@ -1475,13 +1608,20 @@ window.App = {
     const row = state.batchTableRows.find(r => r.id === id);
     if (row) {
       row[field] = value;
+      if (field === 'definition_en') row.example = value;
+      if (field === 'definition_vn') row.ipa = value;
     }
   },
 
   // Điều khiển bàn phím chuẩn Excel (Enter, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Tab)
   handleBatchTableKeyNav(e, rowIndex, colIndex) {
+    const isStudent = state.currentUser?.role === 'student';
+    const targetClassId = isStudent 
+      ? Number(state.currentUser.class_id || 1) 
+      : (Number(document.getElementById('table-input-class')?.value) || Number(state.selectedClassDetailId) || Number(state.selectedClassId) || 1);
+    const isHUST = this.isHUSTClass(targetClassId);
     const totalRows = state.batchTableRows.length;
-    const totalCols = 2; // 0: word, 1: meaning
+    const totalCols = isHUST ? 4 : 2;
 
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -1568,53 +1708,190 @@ window.App = {
 
   async pasteClipboardToTable() {
     try {
-      const text = await navigator.clipboard.readText();
-      if (!text || !text.trim()) {
-        showToast("Clipboard đang trống!", "error");
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          this.parseAndApplyPastedText(text);
+          return;
+        }
+      }
+      this.openClipboardPasteModal();
+    } catch (err) {
+      showToast("Trình duyệt đang chặn đọc tự động. Vui lòng bấm Cmd+V (Ctrl+V) để dán!", "info");
+      this.openClipboardPasteModal();
+    }
+  },
+
+  openClipboardPasteModal() {
+    const modal = document.getElementById('clipboard-paste-modal');
+    const textarea = document.getElementById('clipboard-paste-textarea');
+    if (modal) modal.classList.remove('hidden');
+    if (textarea) {
+      textarea.value = '';
+      setTimeout(() => textarea.focus(), 100);
+      textarea.onpaste = () => {
+        setTimeout(() => {
+          if (textarea.value && textarea.value.trim()) {
+            this.submitManualClipboardPaste();
+          }
+        }, 50);
+      };
+    }
+  },
+
+  closeClipboardPasteModal() {
+    const modal = document.getElementById('clipboard-paste-modal');
+    if (modal) modal.classList.add('hidden');
+  },
+
+  submitManualClipboardPaste() {
+    const textarea = document.getElementById('clipboard-paste-textarea');
+    const text = textarea?.value || '';
+    if (!text.trim()) {
+      showToast("Vui lòng dán nội dung vào ô trước khi xác nhận!", "warning");
+      return;
+    }
+    this.parseAndApplyPastedText(text);
+    this.closeClipboardPasteModal();
+  },
+
+  handleTableInputPaste(e, startIdx = 0) {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const text = clipboardData ? clipboardData.getData('text') : '';
+    if (text && (text.includes('\n') || text.includes('\t') || text.includes(' | '))) {
+      e.preventDefault();
+      this.parseAndApplyPastedText(text);
+    }
+  },
+
+  parseAndApplyPastedText(text) {
+    if (!text || !text.trim()) {
+      showToast("Dữ liệu dán đang trống!", "error");
+      return;
+    }
+
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    const parsedRows = [];
+
+    lines.forEach((line, index) => {
+      let word = "";
+      let meaning = "";
+      let def_en = "";
+      let def_vn = "";
+
+      if (line.includes("\t")) {
+        const parts = line.split("\t");
+        word = parts[0]?.trim() || "";
+        meaning = parts[1]?.trim() || "";
+        def_en = parts[2]?.trim() || "";
+        def_vn = parts[3]?.trim() || "";
+      } else if (line.includes(" | ")) {
+        const parts = line.split(" | ");
+        word = parts[0]?.trim() || "";
+        meaning = parts[1]?.trim() || "";
+        def_en = parts[2]?.trim() || "";
+        def_vn = parts[3]?.trim() || "";
+      } else if (line.includes(" - ")) {
+        const parts = line.split(" - ");
+        word = parts[0]?.trim() || "";
+        meaning = parts[1]?.trim() || "";
+      } else if (line.includes(":")) {
+        const parts = line.split(":");
+        word = parts[0]?.trim() || "";
+        meaning = parts.slice(1).join(":").trim() || "";
+      } else {
+        word = line.trim();
+      }
+
+      // Bỏ qua dòng tiêu đề nếu người dùng copy cả header
+      const lowerW = word.toLowerCase();
+      if (index === 0 && (lowerW === 'terms' || lowerW === 'term' || lowerW === 'từ vựng' || lowerW === 'stt' || lowerW === 'word')) {
         return;
       }
 
-      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (word) {
+        parsedRows.push({
+          id: index + 1,
+          word: word,
+          meaning: meaning,
+          definition_en: def_en,
+          definition_vn: def_vn,
+          example: def_en,
+          ipa: def_vn
+        });
+      }
+    });
+
+    if (parsedRows.length > 0) {
+      state.batchTableRows = parsedRows;
+      showToast(`Đã dán thành công ${parsedRows.length} dòng từ Clipboard! 🎉`, "success");
+      this.render();
+    } else {
+      showToast("Không tìm thấy dữ liệu từ vựng hợp lệ trong Clipboard.", "error");
+    }
+  },
+
+  // Nhập trực tiếp file Excel (.xlsx, .xls, .csv) không qua AI
+  async handleDirectExcelImportToTable(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (typeof XLSX === 'undefined') {
+      showToast("Thư viện XLSX đang khởi tạo, vui lòng thử lại sau giây lát.", "error");
+      return;
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      if (!rawRows || rawRows.length === 0) {
+        showToast("File Excel không có nội dung.", "error");
+        return;
+      }
+
       const parsedRows = [];
+      rawRows.forEach((row, idx) => {
+        if (!row || !Array.isArray(row) || row.length === 0) return;
+        const col0 = String(row[0] !== undefined && row[0] !== null ? row[0] : '').trim();
+        const col1 = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
+        const col2 = String(row[2] !== undefined && row[2] !== null ? row[2] : '').trim();
+        const col3 = String(row[3] !== undefined && row[3] !== null ? row[3] : '').trim();
 
-      lines.forEach((line, index) => {
-        let word = "";
-        let meaning = "";
-
-        if (line.includes("\t")) {
-          const parts = line.split("\t");
-          word = parts[0]?.trim() || "";
-          meaning = parts[1]?.trim() || "";
-        } else if (line.includes(" - ")) {
-          const parts = line.split(" - ");
-          word = parts[0]?.trim() || "";
-          meaning = parts[1]?.trim() || "";
-        } else if (line.includes(":")) {
-          const parts = line.split(":");
-          word = parts[0]?.trim() || "";
-          meaning = parts.slice(1).join(":").trim() || "";
-        } else {
-          word = line.trim();
+        // Bỏ qua dòng tiêu đề
+        const lower0 = col0.toLowerCase();
+        if (idx === 0 && (lower0.includes('term') || lower0.includes('stt') || lower0.includes('từ vựng') || lower0.includes('word') || lower0 === '#')) {
+          return;
         }
 
-        if (word) {
+        if (col0 || col1) {
           parsedRows.push({
-            id: index + 1,
-            word: word,
-            meaning: meaning
+            id: parsedRows.length + 1,
+            word: col0,
+            meaning: col1,
+            definition_en: col2,
+            definition_vn: col3,
+            example: col2,
+            ipa: col3
           });
         }
       });
 
-      if (parsedRows.length > 0) {
-        state.batchTableRows = parsedRows;
-        showToast(`Đã dán thành công ${parsedRows.length} dòng từ Clipboard!`, "success");
-        this.render();
-      } else {
-        showToast("Không tìm thấy dữ liệu từ vựng hợp lệ trong Clipboard.", "error");
+      if (parsedRows.length === 0) {
+        showToast("Không tìm thấy dòng từ vựng hợp lệ trong file Excel.", "error");
+        return;
       }
+
+      state.batchTableRows = parsedRows;
+      showToast(`Đã nạp trực tiếp ${parsedRows.length} dòng từ file Excel không qua AI! 🎉`, "success");
+      event.target.value = "";
+      this.render();
     } catch (err) {
-      showToast("Không thể đọc Clipboard. Vui lòng cho phép quyền truy cập!", "error");
+      console.error("Lỗi import Excel trực tiếp:", err);
+      showToast("Lỗi đọc file Excel: " + err.message, "error");
     }
   },
 
@@ -1632,6 +1909,57 @@ window.App = {
       return;
     }
 
+    const isHUST = this.isHUSTClass(classId);
+
+    // Đối với lớp HUST: Lưu trực tiếp 4 cột không cần qua Gemini AI
+    if (isHUST) {
+      state.isSavingBatchTable = true;
+      state.batchSaveProgressText = `Đang lưu trực tiếp ${validRows.length} thuật ngữ chuyên ngành vào Supabase...`;
+      this.render();
+
+      try {
+        const directRows = validRows.map(r => ({
+          word: (r.word || '').trim(),
+          meaning: (r.meaning || '').trim(),
+          example: (r.definition_en || r.example || '').trim(), // definition (en)
+          ipa: (r.definition_vn || r.ipa || '').trim(), // definition (vn)
+          is_grammar: false
+        }));
+
+        const inserted = await SupabaseService.bulkInsertVocabulary(directRows, classId, lessonId);
+
+        showToast(`Đã lưu thành công ${inserted.length} thuật ngữ chuyên ngành vào Lớp học! 🎉`, "success");
+        
+        state.batchTableRows = [
+          { id: 1, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+          { id: 2, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+          { id: 3, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+          { id: 4, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+          { id: 5, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" }
+        ];
+
+        if (inserted && inserted.length > 0 && inserted[0].lesson_id) {
+          state.selectedLessonId = inserted[0].lesson_id;
+        }
+
+        await this.loadAllData();
+        if (state.selectedClassDetailId) {
+          this.switchTab('class_detail');
+        } else {
+          this.switchTab('vocabulary');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("Lỗi khi lưu bảng thuật ngữ HUST: " + err.message, "error");
+      } finally {
+        state.isSavingBatchTable = false;
+        state.batchSaveProgressText = "";
+        this.render();
+      }
+      return;
+    }
+
+    // Các lớp thường: Dùng Gemini AI để tạo phiên âm IPA chuẩn và ví dụ
     state.isSavingBatchTable = true;
     state.batchSaveProgressText = `✨ Gemini AI đang tạo phiên âm IPA chuẩn & câu ví dụ cho ${validRows.length} từ...`;
     this.render();
@@ -1650,11 +1978,11 @@ window.App = {
       showToast(`Đã lưu thành công ${inserted.length} từ vựng mới vào Lớp học! 🎉`, "success");
       
       state.batchTableRows = [
-        { id: 1, word: "", meaning: "" },
-        { id: 2, word: "", meaning: "" },
-        { id: 3, word: "", meaning: "" },
-        { id: 4, word: "", meaning: "" },
-        { id: 5, word: "", meaning: "" }
+        { id: 1, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 2, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 3, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 4, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" },
+        { id: 5, word: "", meaning: "", definition_en: "", definition_vn: "", example: "", ipa: "" }
       ];
 
       if (inserted && inserted.length > 0 && inserted[0].lesson_id) {
@@ -1848,6 +2176,277 @@ window.App = {
     } catch (e) {
       showToast("Lỗi khi xóa bài học: " + e.message, "error");
     }
+  },
+
+  // =========================================================================
+  // XEM TOÀN BỘ TỪ VỰNG BÀI HỌC (YÊU CẦU 6 - TẤT CẢ CÁC LỚP)
+  // =========================================================================
+
+  openLessonVocabModal(lessonId) {
+    if (!lessonId) return;
+    const lesson = state.lessons.find(l => Number(l.id) === Number(lessonId));
+    if (!lesson) {
+      showToast("Không tìm thấy thông tin bài học!", "error");
+      return;
+    }
+
+    const words = state.vocabulary.filter(v => Number(v.lesson_id) === Number(lessonId));
+    const targetClassId = lesson.class_id || state.selectedClassDetailId || state.selectedClassId || 1;
+    const targetClass = state.classes.find(c => Number(c.id) === Number(targetClassId)) || {};
+    const isHust = this.isHUSTClass(targetClassId);
+
+    const modal = document.getElementById('lesson-vocab-modal');
+    const titleEl = document.getElementById('lesson-vocab-modal-title');
+    const subtitleEl = document.getElementById('lesson-vocab-modal-subtitle');
+    const contentEl = document.getElementById('lesson-vocab-modal-content');
+    const actionsEl = document.getElementById('lesson-vocab-modal-actions');
+
+    if (titleEl) titleEl.textContent = `Bài học: ${lesson.title}`;
+    if (subtitleEl) subtitleEl.textContent = `Lớp: ${targetClass.name || ''} • Tổng số ${words.length} từ vựng`;
+
+    if (actionsEl) {
+      actionsEl.innerHTML = `
+        <button onclick="App.closeLessonVocabModal(); App.startLessonFlashcard(${lesson.id});" class="bg-surface-container text-primary font-bold text-xs px-4 py-2 rounded-xl hover:bg-primary hover:text-on-primary transition-colors flex items-center gap-1.5 shadow-sm">
+          <span class="material-symbols-outlined text-sm">style</span> Luyện Flashcard
+        </button>
+        <button onclick="App.closeLessonVocabModal(); App.startNewQuiz(${lesson.id}, false);" class="bg-primary text-on-primary font-bold text-xs px-4 py-2 rounded-xl hover:bg-primary-container transition-colors flex items-center gap-1.5 btn-press shadow-sm">
+          <span class="material-symbols-outlined text-sm">quiz</span> Kiểm tra bài này
+        </button>
+      `;
+    }
+
+    if (contentEl) {
+      if (words.length === 0) {
+        contentEl.innerHTML = `
+          <div class="py-12 text-center text-outline">
+            <span class="material-symbols-outlined text-4xl mb-2 text-primary/40">menu_book</span>
+            <p class="font-bold text-sm text-on-surface">Bài học này chưa có từ vựng nào.</p>
+            <p class="text-xs text-on-surface-variant mt-1">Hãy thêm từ vựng hoặc nhập từ file Excel để bắt đầu học nhé!</p>
+          </div>
+        `;
+      } else {
+        if (isHust) {
+          // HUST 4 CỘT: Terms | Nghĩa tiếng Việt | Definition (EN) | Definition (VN)
+          contentEl.innerHTML = `
+            <div class="overflow-x-auto rounded-2xl border border-outline-variant/30 shadow-sm">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/30 uppercase tracking-wider text-[11px]">
+                    <th class="p-3.5 w-12 text-center">STT</th>
+                    <th class="p-3.5 w-44">Terms</th>
+                    <th class="p-3.5 w-48">Nghĩa tiếng Việt</th>
+                    <th class="p-3.5 min-w-[220px]">Definition (EN)</th>
+                    <th class="p-3.5 min-w-[180px]">Definition (VN)</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant/20 bg-surface-container-lowest">
+                  ${words.map((w, idx) => `
+                    <tr class="hover:bg-surface-container-low/50 transition-colors">
+                      <td class="p-3.5 text-center text-outline font-mono">${idx + 1}</td>
+                      <td class="p-3.5">
+                        <div class="flex items-center gap-2">
+                          <span class="font-bold text-primary text-sm">${w.word}</span>
+                          <button onclick="App.speakWord('${w.word}')" class="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white flex items-center justify-center transition-colors" title="Phát âm">
+                            <span class="material-symbols-outlined text-base">volume_up</span>
+                          </button>
+                        </div>
+                      </td>
+                      <td class="p-3.5 font-semibold text-on-surface">${w.meaning || ''}</td>
+                      <td class="p-3.5 text-on-surface-variant font-medium leading-relaxed">${w.example || ''}</td>
+                      <td class="p-3.5 text-on-surface-variant italic text-[11px] leading-relaxed">${w.ipa || ''}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        } else {
+          // CÁC LỚP KHÁC: Từ vựng | Phiên âm IPA | Nghĩa tiếng Việt | Ví dụ / Định nghĩa
+          contentEl.innerHTML = `
+            <div class="overflow-x-auto rounded-2xl border border-outline-variant/30 shadow-sm">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/30 uppercase tracking-wider text-[11px]">
+                    <th class="p-3.5 w-12 text-center">STT</th>
+                    <th class="p-3.5 w-40">Từ vựng</th>
+                    <th class="p-3.5 w-32 font-mono">Phiên âm IPA</th>
+                    <th class="p-3.5 w-48">Nghĩa tiếng Việt</th>
+                    <th class="p-3.5 min-w-[220px]">Ví dụ / Định nghĩa</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant/20 bg-surface-container-lowest">
+                  ${words.map((w, idx) => `
+                    <tr class="hover:bg-surface-container-low/50 transition-colors">
+                      <td class="p-3.5 text-center text-outline font-mono">${idx + 1}</td>
+                      <td class="p-3.5">
+                        <div class="flex items-center gap-2">
+                          <span class="font-bold text-primary text-sm">${w.word}</span>
+                          <button onclick="App.speakWord('${w.word}')" class="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white flex items-center justify-center transition-colors" title="Phát âm">
+                            <span class="material-symbols-outlined text-base">volume_up</span>
+                          </button>
+                        </div>
+                      </td>
+                      <td class="p-3.5 text-outline font-mono text-[11px]">${w.ipa || ''}</td>
+                      <td class="p-3.5 font-semibold text-on-surface">${w.meaning || ''}</td>
+                      <td class="p-3.5 text-on-surface-variant italic leading-relaxed">${w.example || ''}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      }
+    }
+
+    if (modal) modal.classList.remove('hidden');
+  },
+
+  closeLessonVocabModal() {
+    const modal = document.getElementById('lesson-vocab-modal');
+    if (modal) modal.classList.add('hidden');
+  },
+
+  // =========================================================================
+  // KIỂM TRA THEO NHIỀU BÀI HỌC (YÊU CẦU 7 - TẤT CẢ CÁC LỚP)
+  // =========================================================================
+
+  openMultiLessonQuizModal(classId = null) {
+    const targetClassId = classId 
+      ? Number(classId) 
+      : Number(state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || 1);
+    
+    const targetClass = state.classes.find(c => Number(c.id) === targetClassId) || {};
+    const lessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
+
+    if (lessons.length === 0) {
+      showToast("Lớp học này chưa có bài học nào để tạo bài kiểm tra!", "warning");
+      return;
+    }
+
+    const modal = document.getElementById('multi-lesson-quiz-modal');
+    const subtitleEl = document.getElementById('multi-quiz-modal-subtitle');
+    const listEl = document.getElementById('multi-quiz-lessons-list');
+
+    if (subtitleEl) {
+      subtitleEl.textContent = `Lớp: ${targetClass.name || ''} • Chọn các Unit để xáo trộn tổng hợp`;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = lessons.map(l => {
+        const count = state.vocabulary.filter(v => Number(v.lesson_id) === Number(l.id)).length;
+        return `
+          <label class="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 cursor-pointer transition-colors">
+            <div class="flex items-center gap-3">
+              <input type="checkbox" class="multi-quiz-lesson-cb w-4 h-4 rounded text-primary focus:ring-primary" value="${l.id}" data-words="${count}" data-title="${l.title.replace(/"/g, '&quot;')}" checked onchange="App.updateMultiQuizSummary()" />
+              <div class="flex flex-col">
+                <span class="font-bold text-xs text-on-surface">${l.title}</span>
+                <span class="text-[11px] text-outline">Mã bài: #${l.id}</span>
+              </div>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${count > 0 ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-outline'}">
+              ${count} từ
+            </span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    this.updateMultiQuizSummary();
+    if (modal) modal.classList.remove('hidden');
+  },
+
+  closeMultiLessonQuizModal() {
+    const modal = document.getElementById('multi-lesson-quiz-modal');
+    if (modal) modal.classList.add('hidden');
+  },
+
+  toggleAllMultiQuizLessons(selectAll) {
+    const checkboxes = document.querySelectorAll('.multi-quiz-lesson-cb');
+    checkboxes.forEach(cb => { cb.checked = Boolean(selectAll); });
+    this.updateMultiQuizSummary();
+  },
+
+  handleMultiQuizCountTypeChange() {
+    const radios = document.getElementsByName('multi-quiz-count-type');
+    let selected = 'all';
+    for (const r of radios) {
+      if (r.checked) { selected = r.value; break; }
+    }
+    const input = document.getElementById('multi-quiz-custom-count');
+    if (input) {
+      input.disabled = (selected !== 'custom');
+      if (!input.disabled) input.focus();
+    }
+  },
+
+  updateMultiQuizSummary() {
+    const checkboxes = document.querySelectorAll('.multi-quiz-lesson-cb:checked');
+    let totalWords = 0;
+    checkboxes.forEach(cb => {
+      totalWords += Number(cb.dataset.words || 0);
+    });
+
+    const unitsEl = document.getElementById('multi-quiz-summary-units');
+    const wordsEl = document.getElementById('multi-quiz-summary-words');
+    const customCountInput = document.getElementById('multi-quiz-custom-count');
+
+    if (unitsEl) unitsEl.textContent = `${checkboxes.length} bài`;
+    if (wordsEl) wordsEl.textContent = `${totalWords} từ`;
+    if (customCountInput) {
+      customCountInput.max = totalWords || 200;
+      if (Number(customCountInput.value) > totalWords && totalWords > 0) {
+        customCountInput.value = totalWords;
+      }
+    }
+  },
+
+  async submitStartMultiLessonQuiz() {
+    const checkedBoxes = Array.from(document.querySelectorAll('.multi-quiz-lesson-cb:checked'));
+    if (checkedBoxes.length === 0) {
+      showToast("Vui lòng chọn ít nhất 1 bài học để làm kiểm tra!", "warning");
+      return;
+    }
+
+    const selectedLessonIds = checkedBoxes.map(cb => Number(cb.value));
+    const selectedLessonTitles = checkedBoxes.map(cb => cb.dataset.title || `Bài #${cb.value}`);
+
+    // Lấy toàn bộ từ vựng thuộc các bài học đã chọn
+    let combinedVocab = state.vocabulary.filter(v => selectedLessonIds.includes(Number(v.lesson_id)));
+    
+    if (combinedVocab.length === 0) {
+      showToast("Các bài học được chọn chưa có từ vựng nào!", "error");
+      return;
+    }
+
+    // Xáo trộn toàn bộ từ vựng (Fisher-Yates Shuffle)
+    for (let i = combinedVocab.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [combinedVocab[i], combinedVocab[j]] = [combinedVocab[j], combinedVocab[i]];
+    }
+
+    // Xác định số lượng câu hỏi
+    const radios = document.getElementsByName('multi-quiz-count-type');
+    let countType = 'all';
+    for (const r of radios) {
+      if (r.checked) { countType = r.value; break; }
+    }
+
+    let requestedCount = combinedVocab.length;
+    if (countType === 'custom') {
+      const input = document.getElementById('multi-quiz-custom-count');
+      const val = parseInt(input?.value || '20', 10);
+      requestedCount = Math.min(combinedVocab.length, Math.max(5, val));
+    }
+
+    // Tạo mã phiên thi session_code: KIỂM TRA TỔNG HỢP: [Danh sách bài học]
+    const lessonsLabel = selectedLessonTitles.join(' + ');
+    const sessionCode = `KIỂM TRA TỔNG HỢP: ${lessonsLabel}`;
+
+    this.closeMultiLessonQuizModal();
+
+    // Khởi tạo bài thi với từ vựng xáo trộn và mã phiên thi
+    await this.startNewQuiz(null, true, requestedCount, combinedVocab, sessionCode);
   },
 
   // =========================================================================
@@ -2418,6 +3017,14 @@ window.App = {
       state.flashcardIndex = 0;
     }
     this.render();
+
+    // Tự động phát âm thanh khi chuyển thẻ (Áp dụng cho tất cả các lớp)
+    const newWord = state.studyList[state.flashcardIndex];
+    if (newWord && newWord.word) {
+      setTimeout(() => {
+        this.speakWord(newWord.word);
+      }, 50);
+    }
   },
 
   prevFlashcard() {
@@ -2425,6 +3032,14 @@ window.App = {
       state.flashcardFlipped = false;
       state.flashcardIndex -= 1;
       this.render();
+
+      // Tự động phát âm thanh khi lướt về thẻ trước (Áp dụng cho tất cả các lớp)
+      const newWord = state.studyList[state.flashcardIndex];
+      if (newWord && newWord.word) {
+        setTimeout(() => {
+          this.speakWord(newWord.word);
+        }, 50);
+      }
     }
   },
 
@@ -2448,36 +3063,39 @@ window.App = {
     this.startNewQuiz(null, true, num);
   },
 
-  async startNewQuiz(lessonId = null, isRandom = false, requestedNumQuestions = null) {
-    if (isRandom && !requestedNumQuestions) {
+  async startNewQuiz(lessonId = null, isRandom = false, requestedNumQuestions = null, customVocabList = null, customSessionCode = null) {
+    if (isRandom && !requestedNumQuestions && !customVocabList) {
       this.startRandomClassQuiz();
       return;
     }
 
-    const classVocab = state.vocabulary.filter(v => v.class_id === Number(state.selectedClassId));
+    const targetClassId = Number(state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || 1);
+    const classVocab = state.vocabulary.filter(v => Number(v.class_id) === targetClassId);
     
-    if (classVocab.length === 0) {
+    let targetVocab = customVocabList ? [...customVocabList] : classVocab;
+    if (targetVocab.length === 0) {
       showToast("Lớp học này chưa có từ vựng để tạo bài thi!", "error");
       return;
     }
 
     // Thiết lập trạng thái bài thi vào state
-    state.quizLessonId = (lessonId && !isRandom) ? Number(lessonId) : null;
-    state.quizIsRandom = Boolean(isRandom) || !lessonId;
+    state.quizLessonId = (lessonId && !isRandom && !customVocabList) ? Number(lessonId) : null;
+    state.quizIsRandom = Boolean(isRandom) || (!lessonId && !customVocabList);
     state.quizRequestedCount = requestedNumQuestions ? Number(requestedNumQuestions) : null;
 
-    let targetVocab = classVocab;
-    let sessionCode = "";
+    let sessionCode = customSessionCode || "";
 
-    if (state.quizLessonId && !state.quizIsRandom) {
-      targetVocab = classVocab.filter(v => Number(v.lesson_id) === Number(state.quizLessonId));
-      if (targetVocab.length === 0) targetVocab = classVocab;
-      const lesson = (state.lessons || []).find(l => Number(l.id) === Number(state.quizLessonId));
-      const lessonTitle = lesson ? lesson.title : `Bài học #${state.quizLessonId}`;
-      sessionCode = lessonTitle;
-    } else {
-      const numQuestions = requestedNumQuestions && requestedNumQuestions > 0 ? requestedNumQuestions : Math.min(targetVocab.length, 10);
-      sessionCode = `KIỂM TRA NGẪU NHIÊN ${numQuestions} TỪ`;
+    if (!sessionCode) {
+      if (state.quizLessonId && !state.quizIsRandom) {
+        targetVocab = classVocab.filter(v => Number(v.lesson_id) === Number(state.quizLessonId));
+        if (targetVocab.length === 0) targetVocab = classVocab;
+        const lesson = (state.lessons || []).find(l => Number(l.id) === Number(state.quizLessonId));
+        const lessonTitle = lesson ? lesson.title : `Bài học #${state.quizLessonId}`;
+        sessionCode = lessonTitle;
+      } else {
+        const numQuestions = requestedNumQuestions && requestedNumQuestions > 0 ? requestedNumQuestions : Math.min(targetVocab.length, 10);
+        sessionCode = `KIỂM TRA NGẪU NHIÊN ${numQuestions} TỪ`;
+      }
     }
 
     state.quizSessionCode = sessionCode;
@@ -2485,10 +3103,39 @@ window.App = {
     const testTypeLabel = sessionCode;
     showToast(`Đang tạo bài kiểm tra: ${testTypeLabel}...`, "info");
     
-    let numQuestions = state.quizIsRandom 
-      ? (requestedNumQuestions && requestedNumQuestions > 0 ? Math.min(targetVocab.length, requestedNumQuestions) : Math.min(targetVocab.length, 10)) 
-      : targetVocab.length;
-    const questions = await GeminiService.generateMultiFormatQuiz(targetVocab, numQuestions);
+    const isHust = this.isHUSTClass(targetClassId);
+    let questions = [];
+
+    if (isHust) {
+      // YÊU CẦU 5: HUST2026_SƠN kiểm tra bài học: Hiện Definition (EN), học sinh nhập chính xác Terms.
+      let vocabToTest = [...targetVocab];
+      // Xáo trộn từ vựng (Fisher-Yates)
+      for (let i = vocabToTest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [vocabToTest[i], vocabToTest[j]] = [vocabToTest[j], vocabToTest[i]];
+      }
+
+      if (requestedNumQuestions && requestedNumQuestions > 0 && requestedNumQuestions < vocabToTest.length) {
+        vocabToTest = vocabToTest.slice(0, requestedNumQuestions);
+      }
+
+      questions = vocabToTest.map(v => ({
+        type: 'hust_def_to_term',
+        word: v.word,
+        meaning: v.meaning,
+        definition_en: v.example || '',
+        definition_vn: v.ipa || '',
+        question: v.example || (v.meaning ? `Định nghĩa: ${v.meaning}` : `Thuật ngữ: ${v.word}`),
+        correct_answer: (v.word || '').trim(),
+        word_id: v.id,
+        explanation: `${v.word}: ${v.meaning || ''} | ${v.example || ''}`
+      }));
+    } else {
+      let numQuestions = state.quizIsRandom 
+        ? (requestedNumQuestions && requestedNumQuestions > 0 ? Math.min(targetVocab.length, requestedNumQuestions) : Math.min(targetVocab.length, 10)) 
+        : targetVocab.length;
+      questions = await GeminiService.generateMultiFormatQuiz(targetVocab, numQuestions);
+    }
     
     state.currentQuiz = questions.map(q => ({
       ...q,
@@ -2535,7 +3182,11 @@ window.App = {
 
     let isCorrect = false;
 
-    if (currentQ.type === 'type_en') {
+    if (currentQ.type === 'hust_def_to_term') {
+      const userText = cleanString(currentQ.user_answer || '').trim().toLowerCase();
+      const expectedText = cleanString(currentQ.correct_answer || currentQ.word || '').trim().toLowerCase();
+      isCorrect = userText.length > 0 && userText === expectedText;
+    } else if (currentQ.type === 'type_en') {
       const userText = cleanString(currentQ.user_answer);
       const expectedText = cleanString(currentQ.word);
       isCorrect = userText.length > 0 && userText === expectedText;
@@ -2627,7 +3278,9 @@ window.App = {
 
     let finalSessionCode = state.quizSessionCode;
     let lessonTitle = "";
-    if (state.quizLessonId && !state.quizIsRandom) {
+    if (state.quizSessionCode && state.quizSessionCode.startsWith('KIỂM TRA TỔNG HỢP')) {
+      finalSessionCode = state.quizSessionCode;
+    } else if (state.quizLessonId && !state.quizIsRandom) {
       const lesson = (state.lessons || []).find(l => Number(l.id) === Number(state.quizLessonId));
       lessonTitle = lesson ? lesson.title : `Bài học #${state.quizLessonId}`;
       finalSessionCode = lessonTitle;
@@ -2774,6 +3427,9 @@ window.App = {
 
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
       if (e.key === 'Escape') {
+        this.closeClipboardPasteModal();
+        this.closeLessonVocabModal();
+        this.closeMultiLessonQuizModal();
         App.safeGoBack();
         return;
       }
@@ -3569,6 +4225,7 @@ window.App = {
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
     const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
     const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
+    const isHUST = this.isHUSTClass(targetClassId);
     const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
 
     // Nếu chưa chọn bài học hoặc bài học đã chọn không thuộc lớp này, mặc định chọn bài học mới nhất của lớp
@@ -3588,13 +4245,17 @@ window.App = {
             <span class="material-symbols-outlined text-base">arrow_back</span>
             <span>← Quay lại Lớp học</span>
           </button>
-          <span class="text-xs font-bold text-primary uppercase">Thêm từ vựng nhiều dòng • ${activeClass.name}</span>
+          <span class="text-xs font-bold text-primary uppercase">Thêm từ vựng nhiều dòng • ${activeClass.name} ${isHUST ? '(Cấu trúc 4 cột HUST)' : ''}</span>
         </div>
 
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="font-display-lg text-headline-lg md:text-display-lg text-on-surface">Bảng Nhập Từ Vựng Hàng Loạt</h2>
-            <p class="font-body-md text-sm text-on-surface-variant">Nhập từ vựng nhanh với phím điều hướng Excel, hỗ trợ dán Clipboard và tự động tạo IPA + Ví dụ bằng AI.</p>
+            <p class="font-body-md text-sm text-on-surface-variant">
+              ${isHUST 
+                ? 'Nhập thuật ngữ chuyên ngành HUST với 4 cột chuẩn: Terms, Nghĩa tiếng Việt, Definition (EN), Definition (VN). Hỗ trợ nhập trực tiếp file Excel không qua AI!' 
+                : 'Nhập từ vựng nhanh với phím điều hướng Excel, hỗ trợ dán Clipboard, nạp file Excel trực tiếp và tự động tạo IPA + Ví dụ bằng AI.'}
+            </p>
           </div>
         </div>
 
@@ -3622,6 +4283,23 @@ window.App = {
 
           <!-- Quantity Controls & Actions -->
           <div class="flex items-center gap-2 flex-wrap w-full lg:w-auto justify-start lg:justify-end">
+            <!-- Direct Excel Import Button (No AI) -->
+            <input 
+              type="file" 
+              id="table-import-excel-file" 
+              accept=".xlsx, .xls, .csv" 
+              class="hidden" 
+              onchange="App.handleDirectExcelImportToTable(event)" 
+            />
+            <button 
+              type="button" 
+              onclick="document.getElementById('table-import-excel-file').click()" 
+              class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm"
+              title="Nhập file Excel trực tiếp không cần qua Gemini AI"
+            >
+              <span class="material-symbols-outlined text-sm">upload_file</span> Nhập File Excel Trực Tiếp
+            </button>
+
             <button onclick="App.pasteClipboardToTable()" class="bg-secondary-container text-on-secondary-container px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">content_paste</span> Dán Clipboard
             </button>
@@ -3660,57 +4338,140 @@ window.App = {
         <!-- Table -->
         <div class="bg-surface-container-lowest rounded-2xl ambient-shadow border border-outline-variant/30 overflow-hidden">
           <div class="overflow-x-auto max-h-[500px]">
-            <table class="w-full text-left text-sm border-collapse">
-              <thead class="bg-surface-container-low text-on-surface uppercase text-xs font-bold border-b border-outline-variant/30 sticky top-0 z-10">
-                <tr>
-                  <th class="p-4 w-16 text-center text-outline">STT</th>
-                  <th class="p-4 w-1/2">Từ vựng tiếng Anh (Word / Phrase) (*)</th>
-                  <th class="p-4 w-1/2">Ý nghĩa tiếng Việt (Meaning) (*)</th>
-                  <th class="p-4 w-20 text-center text-outline">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-outline-variant/20 bg-surface-container-lowest">
-                ${state.batchTableRows.map((row, idx) => `
-                  <tr class="hover:bg-surface-container-low/40 transition-colors">
-                    <td class="p-4 text-center font-bold text-xs text-outline">${idx + 1}</td>
-                    <td class="p-2.5">
-                      <input 
-                        type="text" 
-                        data-row-idx="${idx}"
-                        data-col="0"
-                        value="${row.word.replace(/"/g, '&quot;')}"
-                        placeholder="Nhập từ vựng (ví dụ: ubiquitous, breakthrough...)"
-                        oninput="App.updateBatchTableCell(${row.id}, 'word', this.value)"
-                        onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 0)"
-                        class="w-full px-3.5 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-sm font-semibold text-primary focus:outline-none focus:border-primary focus:bg-white transition-all"
-                      />
-                    </td>
-                    <td class="p-2.5">
-                      <input 
-                        type="text" 
-                        data-row-idx="${idx}"
-                        data-col="1"
-                        value="${row.meaning.replace(/"/g, '&quot;')}"
-                        placeholder="Nhập ý nghĩa tiếng Việt..."
-                        oninput="App.updateBatchTableCell(${row.id}, 'meaning', this.value)"
-                        onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 1)"
-                        class="w-full px-3.5 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-sm text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
-                      />
-                    </td>
-                    <td class="p-2.5 text-center">
-                      <button onclick="App.removeBatchTableRow(${row.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa dòng này">
-                        <span class="material-symbols-outlined text-lg">delete</span>
-                      </button>
-                    </td>
+            <table onpaste="App.handleTableInputPaste(event)" class="w-full text-left text-sm border-collapse">
+              ${isHUST ? `
+                <!-- 4 Cột Cho Lớp HUST: Terms, Nghĩa tiếng Việt, Definition (EN), Definition (VN) -->
+                <thead class="bg-surface-container-low text-on-surface uppercase text-xs font-bold border-b border-outline-variant/30 sticky top-0 z-10">
+                  <tr>
+                    <th class="p-3.5 w-12 text-center text-outline">STT</th>
+                    <th class="p-3.5 w-1/4 text-primary">Terms (*)</th>
+                    <th class="p-3.5 w-1/4">Nghĩa tiếng Việt (*)</th>
+                    <th class="p-3.5 w-1/4 text-secondary">Definition (EN)</th>
+                    <th class="p-3.5 w-1/4 text-outline">Definition (VN)</th>
+                    <th class="p-3.5 w-16 text-center text-outline">Thao tác</th>
                   </tr>
-                `).join('')}
-              </tbody>
+                </thead>
+                <tbody class="divide-y divide-outline-variant/20 bg-surface-container-lowest">
+                  ${state.batchTableRows.map((row, idx) => `
+                    <tr class="hover:bg-surface-container-low/40 transition-colors">
+                      <td class="p-3 text-center font-bold text-xs text-outline">${idx + 1}</td>
+                      <td class="p-2">
+                        <input 
+                          type="text" 
+                          data-row-idx="${idx}"
+                          data-col="0"
+                          value="${(row.word || '').replace(/"/g, '&quot;')}"
+                          placeholder="Terms (ví dụ: algorithm, circuit...)"
+                          oninput="App.updateBatchTableCell(${row.id}, 'word', this.value)"
+                          onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 0)"
+                          onpaste="App.handleTableInputPaste(event, ${idx})"
+                          class="w-full px-3 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm font-bold text-primary focus:outline-none focus:border-primary focus:bg-white transition-all"
+                        />
+                      </td>
+                      <td class="p-2">
+                        <input 
+                          type="text" 
+                          data-row-idx="${idx}"
+                          data-col="1"
+                          value="${(row.meaning || '').replace(/"/g, '&quot;')}"
+                          placeholder="Nghĩa tiếng Việt..."
+                          oninput="App.updateBatchTableCell(${row.id}, 'meaning', this.value)"
+                          onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 1)"
+                          onpaste="App.handleTableInputPaste(event, ${idx})"
+                          class="w-full px-3 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
+                        />
+                      </td>
+                      <td class="p-2">
+                        <input 
+                          type="text" 
+                          data-row-idx="${idx}"
+                          data-col="2"
+                          value="${(row.definition_en || row.example || '').replace(/"/g, '&quot;')}"
+                          placeholder="Definition bằng Tiếng Anh..."
+                          oninput="App.updateBatchTableCell(${row.id}, 'definition_en', this.value)"
+                          onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 2)"
+                          onpaste="App.handleTableInputPaste(event, ${idx})"
+                          class="w-full px-3 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
+                        />
+                      </td>
+                      <td class="p-2">
+                        <input 
+                          type="text" 
+                          data-row-idx="${idx}"
+                          data-col="3"
+                          value="${(row.definition_vn || row.ipa || '').replace(/"/g, '&quot;')}"
+                          placeholder="Definition bằng Tiếng Việt..."
+                          oninput="App.updateBatchTableCell(${row.id}, 'definition_vn', this.value)"
+                          onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 3)"
+                          onpaste="App.handleTableInputPaste(event, ${idx})"
+                          class="w-full px-3 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm text-on-surface-variant focus:outline-none focus:border-primary focus:bg-white transition-all"
+                        />
+                      </td>
+                      <td class="p-2 text-center">
+                        <button onclick="App.removeBatchTableRow(${row.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa dòng này">
+                          <span class="material-symbols-outlined text-lg">delete</span>
+                        </button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              ` : `
+                <!-- Bảng 2 Cột Chuẩn Cho Các Lớp Thường -->
+                <thead class="bg-surface-container-low text-on-surface uppercase text-xs font-bold border-b border-outline-variant/30 sticky top-0 z-10">
+                  <tr>
+                    <th class="p-4 w-16 text-center text-outline">STT</th>
+                    <th class="p-4 w-1/2">Từ vựng tiếng Anh (Word / Phrase) (*)</th>
+                    <th class="p-4 w-1/2">Ý nghĩa tiếng Việt (Meaning) (*)</th>
+                    <th class="p-4 w-20 text-center text-outline">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant/20 bg-surface-container-lowest">
+                  ${state.batchTableRows.map((row, idx) => `
+                    <tr class="hover:bg-surface-container-low/40 transition-colors">
+                      <td class="p-4 text-center font-bold text-xs text-outline">${idx + 1}</td>
+                      <td class="p-2.5">
+                        <input 
+                          type="text" 
+                          data-row-idx="${idx}"
+                          data-col="0"
+                          value="${row.word.replace(/"/g, '&quot;')}"
+                          placeholder="Nhập từ vựng (ví dụ: ubiquitous, breakthrough...)"
+                          oninput="App.updateBatchTableCell(${row.id}, 'word', this.value)"
+                          onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 0)"
+                          onpaste="App.handleTableInputPaste(event, ${idx})"
+                          class="w-full px-3.5 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-sm font-semibold text-primary focus:outline-none focus:border-primary focus:bg-white transition-all"
+                        />
+                      </td>
+                      <td class="p-2.5">
+                        <input 
+                          type="text" 
+                          data-row-idx="${idx}"
+                          data-col="1"
+                          value="${row.meaning.replace(/"/g, '&quot;')}"
+                          placeholder="Nhập ý nghĩa tiếng Việt..."
+                          oninput="App.updateBatchTableCell(${row.id}, 'meaning', this.value)"
+                          onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 1)"
+                          onpaste="App.handleTableInputPaste(event, ${idx})"
+                          class="w-full px-3.5 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-sm text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
+                        />
+                      </td>
+                      <td class="p-2.5 text-center">
+                        <button onclick="App.removeBatchTableRow(${row.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa dòng này">
+                          <span class="material-symbols-outlined text-lg">delete</span>
+                        </button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              `}
             </table>
           </div>
 
           <div class="p-5 bg-surface-container-low border-t border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="text-xs text-on-surface-variant">
-              💡 <strong>Mẹo AI:</strong> Chỉ cần gõ <em>Từ vựng</em> và <em>Nghĩa</em>, <strong>Gemini AI</strong> sẽ tự động tạo <strong>Phiên âm chuẩn IPA</strong> khi lưu!
+              ${isHUST 
+                ? '💡 <strong>Chế độ HUST:</strong> 4 cột chuyên biệt <em>Terms</em>, <em>Nghĩa tiếng Việt</em>, <em>Definition (EN)</em>, <em>Definition (VN)</em>. Lưu trực tiếp vào Database không qua AI!' 
+                : '💡 <strong>Mẹo AI:</strong> Chỉ cần gõ <em>Từ vựng</em> và <em>Nghĩa</em>, <strong>Gemini AI</strong> sẽ tự động tạo <strong>Phiên âm chuẩn IPA</strong> khi lưu!'}
             </div>
 
             <div class="flex items-center gap-3">
@@ -3724,10 +4485,10 @@ window.App = {
               >
                 ${state.isSavingBatchTable ? `
                   <span class="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                  <span>Đang xử lý AI & Lưu...</span>
+                  <span>Đang xử lý & Lưu...</span>
                 ` : `
-                  <span class="material-symbols-outlined text-base">auto_awesome</span>
-                  <span>Lưu Toàn Bộ Từ Vựng Vào Supabase</span>
+                  <span class="material-symbols-outlined text-base">cloud_upload</span>
+                  <span>${isHUST ? 'Lưu Thuật Ngữ Vào Supabase' : 'Lưu Toàn Bộ Từ Vựng Vào Supabase'}</span>
                 `}
               </button>
             </div>
@@ -3940,6 +4701,9 @@ window.App = {
             <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary font-bold text-xs px-4 py-2.5 rounded-xl btn-press flex items-center gap-1.5 shadow-sm hover-lift">
               <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học
             </button>
+            <button onclick="App.openMultiLessonQuizModal(${targetClassId})" class="bg-gradient-to-r from-secondary to-secondary-container text-on-secondary px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">checklist</span> 🎯 Thi Nhiều Bài Học
+            </button>
             <button onclick="App.openImportVocabAIModal(${targetClassId})" class="bg-primary-container text-on-primary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">smart_toy</span> Nhập File AI (PDF/Excel)
             </button>
@@ -3993,6 +4757,9 @@ window.App = {
                 <p class="text-xs text-on-surface-variant">Luyện tập từ vựng, flashcard 3D và thi thử theo từng Unit của lớp.</p>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="App.openMultiLessonQuizModal(${targetClassId})" class="bg-gradient-to-r from-secondary to-secondary-container text-on-secondary px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+                  <span class="material-symbols-outlined text-sm">checklist</span> 🎯 Thi Nhiều Unit
+                </button>
                 <button onclick="App.openCreateLessonModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 btn-press hover-lift shadow-sm">
                   <span class="material-symbols-outlined text-sm">add</span> + Thêm Bài Học Mới
                 </button>
@@ -4015,26 +4782,35 @@ window.App = {
                         <span class="px-2.5 py-0.5 bg-surface-container-high rounded-full text-xs font-bold text-primary">Unit #${l.id}</span>
                         <span class="text-xs text-outline">${count} từ vựng</span>
                       </div>
-                      <h4 class="font-headline-md text-base font-bold text-on-surface mb-3">${l.title}</h4>
+                      <h4 onclick="App.openLessonVocabModal(${l.id})" class="font-headline-md text-base font-bold text-on-surface mb-3 cursor-pointer hover:text-primary transition-colors flex items-center justify-between group" title="Xem toàn bộ từ vựng bài học này">
+                        <span>${l.title}</span>
+                        <span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 text-primary transition-opacity">visibility</span>
+                      </h4>
                     </div>
-                    <div class="flex items-center gap-1.5 pt-3 border-t border-outline-variant/30 flex-wrap">
-                      <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm 1 từ vào Unit này">
-                        <span class="material-symbols-outlined text-sm">add</span>
+                    <div>
+                      <button onclick="App.openLessonVocabModal(${l.id})" class="w-full mb-2 py-1.5 px-3 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-outline-variant/30" title="Xem toàn bộ từ vựng của bài học này">
+                        <span class="material-symbols-outlined text-sm">visibility</span>
+                        <span>Xem toàn bộ từ vựng (${count})</span>
                       </button>
-                      <button onclick="App.openBatchTableModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Nhập bảng nhiều từ vào Unit này">
-                        <span class="material-symbols-outlined text-sm">table_rows</span>
-                      </button>
-                      <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
-                        <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
-                      </button>
-                      <button onclick="App.startNewQuiz(${l.id}, false)" class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-bold text-xs hover:bg-primary-container transition-colors text-center flex items-center justify-center gap-1">
-                        <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
-                      </button>
-                      ${isTeacher ? `
-                        <button onclick="App.deleteLesson(${l.id})" class="p-2 text-outline hover:text-error rounded-lg hover:bg-error-container/20 transition-colors" title="Xóa bài học">
-                          <span class="material-symbols-outlined text-sm">delete</span>
+                      <div class="flex items-center gap-1.5 pt-2 border-t border-outline-variant/30 flex-wrap">
+                        <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm 1 từ vào Unit này">
+                          <span class="material-symbols-outlined text-sm">add</span>
                         </button>
-                      ` : ''}
+                        <button onclick="App.openBatchTableModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Nhập bảng nhiều từ vào Unit này">
+                          <span class="material-symbols-outlined text-sm">table_rows</span>
+                        </button>
+                        <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
+                          <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
+                        </button>
+                        <button onclick="App.startNewQuiz(${l.id}, false)" class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-bold text-xs hover:bg-primary-container transition-colors text-center flex items-center justify-center gap-1">
+                          <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
+                        </button>
+                        ${isTeacher ? `
+                          <button onclick="App.deleteLesson(${l.id})" class="p-2 text-outline hover:text-error rounded-lg hover:bg-error-container/20 transition-colors" title="Xóa bài học">
+                            <span class="material-symbols-outlined text-sm">delete</span>
+                          </button>
+                        ` : ''}
+                      </div>
                     </div>
                   </div>
                 `;
@@ -4579,6 +5355,9 @@ window.App = {
             <p class="font-body-md text-sm text-on-surface-variant">Danh mục chuyên đề & bài học cho ${activeClass.name}.</p>
           </div>
           <div class="flex items-center gap-3 flex-wrap">
+            <button onclick="App.openMultiLessonQuizModal(${targetClassId})" class="bg-gradient-to-r from-secondary to-secondary-container text-on-secondary px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
+              <span class="material-symbols-outlined text-sm">checklist</span> 🎯 Thi Nhiều Bài Học
+            </button>
             <button onclick="App.openCreateVocabularyModal(null, ${targetClassId})" class="bg-secondary-container text-on-secondary-container px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 hover-lift shadow-sm">
               <span class="material-symbols-outlined text-sm">add_circle</span> + Thêm Từ Vựng
             </button>
@@ -4598,24 +5377,33 @@ window.App = {
                     <span class="px-3 py-1 bg-primary-container/20 text-primary font-bold text-xs rounded-full">Unit #${l.id}</span>
                     <span class="text-xs text-outline">${vocab.length} từ vựng</span>
                   </div>
-                  <h3 class="font-headline-md text-base font-bold text-on-surface mb-2">${l.title}</h3>
+                  <h3 onclick="App.openLessonVocabModal(${l.id})" class="font-headline-md text-base font-bold text-on-surface mb-2 cursor-pointer hover:text-primary transition-colors flex items-center justify-between group" title="Xem toàn bộ từ vựng bài học này">
+                    <span>${l.title}</span>
+                    <span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 text-primary transition-opacity">visibility</span>
+                  </h3>
                 </div>
-                <div class="flex items-center gap-1.5 pt-4 border-t border-outline-variant/30 flex-wrap">
-                  <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary font-bold text-xs rounded-xl hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
-                    <span class="material-symbols-outlined text-base">add</span>
+                <div>
+                  <button onclick="App.openLessonVocabModal(${l.id})" class="w-full mb-2 py-1.5 px-3 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-outline-variant/30" title="Xem toàn bộ từ vựng của bài học này">
+                    <span class="material-symbols-outlined text-sm">visibility</span>
+                    <span>Xem toàn bộ từ vựng (${vocab.length})</span>
                   </button>
-                  <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
-                    <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
-                  </button>
-                  <button onclick="App.state.selectedLessonId = ${l.id}; App.switchTab('vocabulary');" class="flex-1 bg-surface-container-low text-on-surface font-bold text-xs py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-center">
-                    Kho từ
-                  </button>
-                  <button onclick="App.startNewQuiz(${l.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary-container transition-colors text-center">
-                    Thi thử
-                  </button>
-                  <button onclick="App.deleteLesson(${l.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa bài học">
-                    <span class="material-symbols-outlined text-base">delete</span>
-                  </button>
+                  <div class="flex items-center gap-1.5 pt-2 border-t border-outline-variant/30 flex-wrap">
+                    <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary font-bold text-xs rounded-xl hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
+                      <span class="material-symbols-outlined text-base">add</span>
+                    </button>
+                    <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
+                      <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
+                    </button>
+                    <button onclick="App.state.selectedLessonId = ${l.id}; App.switchTab('vocabulary');" class="flex-1 bg-surface-container-low text-on-surface font-bold text-xs py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-center">
+                      Kho từ
+                    </button>
+                    <button onclick="App.startNewQuiz(${l.id})" class="flex-1 bg-primary text-on-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary-container transition-colors text-center">
+                      Thi thử
+                    </button>
+                    <button onclick="App.deleteLesson(${l.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa bài học">
+                      <span class="material-symbols-outlined text-base">delete</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             `;
@@ -4829,9 +5617,10 @@ window.App = {
 
     const currentWord = list[state.flashcardIndex] || list[0];
     const progressPct = Math.round(((state.flashcardIndex + 1) / list.length) * 100);
+    const isHUST = this.isHUSTClass(targetClassId);
 
     return `
-      <div class="flex-1 flex flex-col items-center max-w-2xl mx-auto w-full gap-stack-md">
+      <div class="flex-1 flex flex-col items-center max-w-3xl md:max-w-4xl mx-auto w-full gap-stack-md">
         <!-- Top Navigation Bar & Lesson Selector -->
         <div class="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface-container-lowest p-4 rounded-2xl ambient-shadow border border-outline-variant/30">
           <div class="flex items-center gap-2">
@@ -4879,47 +5668,87 @@ window.App = {
           <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${progressPct}%;"></div>
         </div>
 
-        <!-- 3D Card -->
+        <!-- 3D Card (Thiết kế rộng rãi, hiển thị đầy đủ thông tin chuyên ngành) -->
         <div class="w-full perspective-1000 my-2">
           <div 
             id="main-flashcard" 
             onclick="App.flipFlashcard()" 
-            class="flashcard w-full h-[350px] relative cursor-pointer transform-style-3d transition-transform duration-500 rounded-3xl"
+            class="flashcard w-full min-h-[380px] h-auto md:h-[420px] relative cursor-pointer transform-style-3d transition-transform duration-500 rounded-3xl"
           >
             <!-- Front -->
-            <div class="flashcard-inner absolute inset-0 bg-surface-container-lowest rounded-3xl p-8 ambient-shadow border-2 border-primary/20 flex flex-col justify-between backface-hidden">
+            <div class="flashcard-inner absolute inset-0 bg-surface-container-lowest rounded-3xl p-6 sm:p-8 ambient-shadow border-2 border-primary/20 flex flex-col justify-between backface-hidden">
               <div class="flex justify-between items-center text-xs text-outline">
                 <span class="font-bold text-primary uppercase flex items-center gap-1">
                   <span class="material-symbols-outlined text-sm">touch_app</span> Mặt trước (Bấm để lật)
                 </span>
-                <span class="px-2.5 py-0.5 rounded-full bg-surface-container font-semibold">${currentWord.is_grammar ? 'Ngữ pháp' : 'Từ vựng'}</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-surface-container font-semibold">
+                  ${isHUST ? 'Thuật ngữ HUST' : (currentWord.is_grammar ? 'Ngữ pháp' : 'Từ vựng')}
+                </span>
               </div>
-              <div class="text-center my-auto">
-                <h1 class="font-display-lg text-4xl font-bold text-primary tracking-tight mb-2">${currentWord.word}</h1>
-                <p class="font-mono text-base text-outline mb-4">${currentWord.ipa || ''}</p>
+              <div class="text-center my-auto px-4">
+                <h1 class="font-display-lg text-3xl sm:text-5xl font-black text-primary tracking-tight mb-3">
+                  ${currentWord.word}
+                </h1>
+                ${!isHUST ? `
+                  <p class="font-mono text-base text-outline mb-4">${currentWord.ipa || ''}</p>
+                ` : ''}
                 <button onclick="event.stopPropagation(); App.speakWord('${currentWord.word}')" class="w-12 h-12 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-all shadow-sm mx-auto" title="Nghe phát âm">
                   <span class="material-symbols-outlined text-2xl">volume_up</span>
                 </button>
               </div>
               <div class="text-center text-xs text-outline">
-                Nhấn Space hoặc bấm vào thẻ để xem nghĩa
+                Nhấn Space hoặc bấm vào thẻ để xem nghĩa chi tiết
               </div>
             </div>
 
             <!-- Back -->
-            <div class="flashcard-inner absolute inset-0 bg-gradient-to-br from-surface-container-low to-surface-container-lowest rounded-3xl p-8 ambient-shadow border-2 border-secondary/40 flex flex-col justify-between backface-hidden rotate-y-180">
-              <div class="flex justify-between items-center text-xs text-outline">
+            <div class="flashcard-inner absolute inset-0 bg-gradient-to-br from-surface-container-low to-surface-container-lowest rounded-3xl p-6 sm:p-8 ambient-shadow border-2 border-secondary/40 flex flex-col justify-between backface-hidden rotate-y-180 overflow-y-auto">
+              <div class="flex justify-between items-center text-xs text-outline shrink-0 mb-2">
                 <span class="font-bold text-secondary uppercase flex items-center gap-1">
-                  <span class="material-symbols-outlined text-sm">visibility</span> Mặt sau (Giải nghĩa)
+                  <span class="material-symbols-outlined text-sm">visibility</span> ${isHUST ? 'Mặt sau (Giải nghĩa chuyên ngành)' : 'Mặt sau (Giải nghĩa)'}
                 </span>
                 <button onclick="event.stopPropagation(); App.speakWord('${currentWord.word}')" class="text-primary hover:underline font-bold flex items-center gap-1">
                   <span class="material-symbols-outlined text-sm">volume_up</span> Nghe lại
                 </button>
               </div>
-              <div class="my-auto text-center">
-                <h3 class="font-headline-md text-2xl font-bold text-on-surface mb-3">${currentWord.meaning}</h3>
-              </div>
-              <div class="text-center text-xs text-outline">
+
+              ${isHUST ? `
+                <!-- Mặt Sau Riêng Cho Lớp HUST: Term, Nghĩa tiếng Việt, Definition (EN), Definition (VN) nhỏ bên dưới -->
+                <div class="my-auto flex flex-col justify-center space-y-2.5">
+                  <div class="text-center">
+                    <h2 class="font-display-lg text-2xl sm:text-3xl font-black text-primary mb-1">${currentWord.word}</h2>
+                    <h3 class="font-headline-md text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-400">🇻🇳 ${currentWord.meaning}</h3>
+                  </div>
+
+                  <!-- Definition (EN) -->
+                  <div class="p-3.5 rounded-2xl bg-surface-container-lowest border border-primary/25 text-left shadow-sm">
+                    <span class="text-[10px] font-bold text-primary uppercase tracking-wider block mb-1">Definition (English)</span>
+                    <p class="text-sm sm:text-base font-semibold text-on-surface leading-relaxed">
+                      ${currentWord.example || '(Chưa có định nghĩa tiếng Anh)'}
+                    </p>
+                  </div>
+
+                  <!-- Definition (VN) nhỏ nhỏ bên dưới -->
+                  <div class="p-2.5 rounded-xl bg-surface-container/60 border border-outline-variant/30 text-left">
+                    <span class="text-[10px] font-bold text-outline uppercase tracking-wider block mb-0.5">Định nghĩa tiếng Việt</span>
+                    <p class="text-xs sm:text-sm text-on-surface-variant leading-normal">
+                      ${currentWord.ipa || '(Chưa có định nghĩa tiếng Việt)'}
+                    </p>
+                  </div>
+                </div>
+              ` : `
+                <!-- Mặt Sau Chuẩn Cho Các Lớp Thường -->
+                <div class="my-auto text-center space-y-3">
+                  <h3 class="font-headline-md text-2xl font-bold text-on-surface mb-2">${currentWord.meaning}</h3>
+                  ${currentWord.example ? `
+                    <div class="p-3 rounded-xl bg-surface-container/60 border border-outline-variant/30 text-xs italic text-on-surface-variant max-w-md mx-auto">
+                      "${currentWord.example}"
+                    </div>
+                  ` : ''}
+                </div>
+              `}
+
+              <div class="text-center text-xs text-outline shrink-0 mt-2">
                 Nhấn lần nữa để lật lại mặt trước
               </div>
             </div>
@@ -4928,18 +5757,18 @@ window.App = {
 
         <!-- Controls & Hotkey Hints -->
         <div class="w-full flex items-center justify-between gap-4">
-          <button onclick="App.prevFlashcard()" ${state.flashcardIndex === 0 ? 'disabled' : ''} class="px-5 py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs disabled:opacity-30 flex items-center gap-1">
+          <button onclick="App.prevFlashcard()" ${state.flashcardIndex === 0 ? 'disabled' : ''} class="px-5 py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs disabled:opacity-30 flex items-center gap-1 hover-lift">
             <span class="material-symbols-outlined text-sm">arrow_back</span> Trước
           </button>
           <div class="flex items-center gap-2">
             <button onclick="App.nextFlashcard(false)" class="px-5 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs hover-lift">
               Cần ôn lại
             </button>
-            <button onclick="App.nextFlashcard(true)" class="px-6 py-2.5 rounded-xl bg-green-600 text-white font-bold text-xs btn-press hover-lift">
+            <button onclick="App.nextFlashcard(true)" class="px-6 py-2.5 rounded-xl bg-green-600 text-white font-bold text-xs btn-press hover-lift shadow-sm">
               ✓ Đã thuộc
             </button>
           </div>
-          <button onclick="App.nextFlashcard(false)" class="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs btn-press flex items-center gap-1">
+          <button onclick="App.nextFlashcard(false)" class="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs btn-press flex items-center gap-1 hover-lift shadow-sm">
             Tiếp <span class="material-symbols-outlined text-sm">arrow_forward</span>
           </button>
         </div>
@@ -5009,12 +5838,14 @@ window.App = {
               </button>
 
               <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                currentQ.type === 'hust_def_to_term' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                 currentQ.type === 'type_en' ? 'bg-blue-100 text-blue-800' :
                 currentQ.type === 'type_vi' ? 'bg-purple-100 text-purple-800' :
                 currentQ.type === 'multiple_choice_word' ? 'bg-teal-100 text-teal-800' :
                 currentQ.is_grammar ? 'bg-amber-100 text-amber-900' : 'bg-green-100 text-green-800'
               }">
                 ${
+                  currentQ.type === 'hust_def_to_term' ? '🎓 HUST2026: Nhập Term từ Definition (EN)' :
                   currentQ.type === 'type_en' ? '✍️ Tự luận: Điền từ Tiếng Anh' :
                   currentQ.type === 'type_vi' ? '🇻🇳 Tự luận: Điền nghĩa Tiếng Việt' :
                   currentQ.type === 'multiple_choice_word' ? '🔤 Trắc nghiệm: Chọn từ Tiếng Anh' :
@@ -5024,17 +5855,58 @@ window.App = {
             </div>
 
             <!-- Only show Audio button if it won't spoil the answer (or when answered) -->
-            ${((currentQ.type !== 'type_en' && currentQ.type !== 'multiple_choice_word') || currentQ.is_checked) ? `
+            ${((currentQ.type !== 'type_en' && currentQ.type !== 'multiple_choice_word' && currentQ.type !== 'hust_def_to_term') || currentQ.is_checked) ? `
               <button onclick="App.speakWord('${currentQ.word}')" class="w-9 h-9 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors" title="Phát âm từ vựng">
                 <span class="material-symbols-outlined text-lg">volume_up</span>
               </button>
             ` : ''}
           </div>
 
-          <!-- Question Prompt (Clean without hint text) -->
-          <h3 class="font-headline-md text-lg md:text-xl font-bold text-on-surface leading-relaxed">
-            ${currentQ.question}
-          </h3>
+          <!-- Question Prompt -->
+          ${currentQ.type === 'hust_def_to_term' ? `
+            <div class="bg-gradient-to-br from-primary/5 via-surface-container-low to-primary/10 p-5 rounded-2xl border border-primary/20 space-y-1.5">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full bg-primary/15 text-primary font-black text-[10px] uppercase tracking-wider">Definition (English)</span>
+                <span class="text-xs text-outline italic">Hãy nhập chính xác Term tương ứng:</span>
+              </div>
+              <p class="font-headline-md text-lg md:text-xl font-bold text-on-surface leading-relaxed pt-1">
+                ${currentQ.definition_en || currentQ.question}
+              </p>
+            </div>
+          ` : `
+            <h3 class="font-headline-md text-lg md:text-xl font-bold text-on-surface leading-relaxed">
+              ${currentQ.question}
+            </h3>
+          `}
+
+          <!-- DẠNG HUST: ĐIỀN TERM TỪ DEFINITION EN (YÊU CẦU 5) -->
+          ${currentQ.type === 'hust_def_to_term' ? `
+            <div class="space-y-3">
+              <div class="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  id="quiz-text-input"
+                  autofocus
+                  autocomplete="off"
+                  spellcheck="false"
+                  ${currentQ.is_checked ? 'readonly' : ''}
+                  value="${currentQ.user_answer || ''}"
+                  placeholder="Gõ chính xác Term tiếng Anh vào đây..."
+                  oninput="App.updateQuizTextInput(this.value)"
+                  onkeydown="if(event.key==='Enter') { if(!App.state.currentQuiz[App.state.quizIndex].is_checked) { App.checkCurrentQuestion(); } else { App.nextQuizQuestion(); } }"
+                  class="flex-1 px-4 py-3 text-base font-bold rounded-xl border-2 transition-all focus:outline-none ${
+                    !currentQ.is_checked ? 'bg-surface-container-low border-outline-variant/40 focus:border-primary focus:bg-white text-primary' :
+                    currentQ.is_correct ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-error text-error'
+                  }"
+                />
+                ${!currentQ.is_checked ? `
+                  <button onclick="App.checkCurrentQuestion()" class="bg-primary text-on-primary px-6 py-3 rounded-xl font-bold text-sm btn-press shadow-sm hover-lift">
+                    Kiểm tra
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
 
           <!-- DẠNG 1: ĐIỀN TỪ TIẾNG ANH (type_en - NO HINTS) -->
           ${currentQ.type === 'type_en' ? `
@@ -5134,32 +6006,68 @@ window.App = {
             </div>
           ` : ''}
 
-          <!-- Instant Result & Explanation Card -->
-          ${currentQ.is_checked ? `
-            <div class="p-4 rounded-xl border ${currentQ.is_correct ? 'border-green-300 bg-green-50/70' : 'border-error/30 bg-red-50/70'} transition-all">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-bold text-sm ${currentQ.is_correct ? 'text-green-800' : 'text-error'} flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-lg">${currentQ.is_correct ? 'check_circle' : 'error'}</span>
-                  ${currentQ.is_correct ? 'CHÍNH XÁC! (+10 ĐIỂM)' : 'CHƯA ĐÚNG!'}
-                </span>
-                <button onclick="App.speakWord('${currentQ.word}')" class="text-primary text-xs font-bold flex items-center gap-1 hover:underline">
-                  <span class="material-symbols-outlined text-sm">volume_up</span> Nghe lại
-                </button>
+          <!-- Instant Result & Explanation Card (Chi tiết như mặt sau thẻ flashcard đối với HUST) -->
+          ${currentQ.is_checked ? (
+            currentQ.type === 'hust_def_to_term' ? `
+              <div class="p-5 rounded-2xl border-2 ${currentQ.is_correct ? 'border-green-400 bg-green-50/90' : 'border-error/40 bg-red-50/90'} shadow-sm flex flex-col gap-3 transition-all">
+                <div class="flex items-center justify-between border-b pb-2 ${currentQ.is_correct ? 'border-green-200' : 'border-red-200'}">
+                  <span class="font-black text-sm ${currentQ.is_correct ? 'text-green-800' : 'text-error'} flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-xl">${currentQ.is_correct ? 'check_circle' : 'cancel'}</span>
+                    ${currentQ.is_correct ? 'CHÍNH XÁC! (+10 ĐIỂM)' : 'CHƯA CHÍNH XÁC!'}
+                  </span>
+                  <button onclick="App.speakWord('${currentQ.word}')" class="px-3 py-1 rounded-full bg-primary/10 hover:bg-primary hover:text-white text-primary text-xs font-bold flex items-center gap-1.5 transition-all">
+                    <span class="material-symbols-outlined text-sm">volume_up</span> Nghe phát âm
+                  </button>
+                </div>
+
+                <!-- Giống mặt sau của thẻ Flashcard HUST -->
+                <div class="bg-white/90 rounded-xl p-4 border border-outline-variant/30 flex flex-col gap-2.5 shadow-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[11px] text-outline uppercase font-bold w-24 shrink-0">Term:</span>
+                    <span class="text-xl font-black text-primary">${currentQ.word}</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span class="text-[11px] text-outline uppercase font-bold w-24 shrink-0 mt-0.5">Tiếng Việt:</span>
+                    <span class="text-sm font-bold text-on-surface">${currentQ.meaning || 'Chưa cập nhật'}</span>
+                  </div>
+                  <div class="flex flex-col gap-1 bg-surface-container-low p-3 rounded-lg border border-outline-variant/20">
+                    <span class="text-[10px] text-primary font-bold uppercase tracking-wider">Definition (EN):</span>
+                    <span class="text-xs font-medium text-on-surface leading-relaxed">${currentQ.definition_en || currentQ.question || 'Chưa cập nhật'}</span>
+                  </div>
+                  ${(currentQ.definition_vn || currentQ.ipa) ? `
+                    <div class="flex flex-col gap-0.5 px-2 text-on-surface-variant italic">
+                      <span class="text-[10px] text-outline font-semibold uppercase not-italic">Definition (VN):</span>
+                      <span class="text-xs text-on-surface-variant leading-relaxed">${currentQ.definition_vn || currentQ.ipa}</span>
+                    </div>
+                  ` : ''}
+                </div>
               </div>
+            ` : `
+              <div class="p-4 rounded-xl border ${currentQ.is_correct ? 'border-green-300 bg-green-50/70' : 'border-error/30 bg-red-50/70'} transition-all">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-sm ${currentQ.is_correct ? 'text-green-800' : 'text-error'} flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-lg">${currentQ.is_correct ? 'check_circle' : 'error'}</span>
+                    ${currentQ.is_correct ? 'CHÍNH XÁC! (+10 ĐIỂM)' : 'CHƯA ĐÚNG!'}
+                  </span>
+                  <button onclick="App.speakWord('${currentQ.word}')" class="text-primary text-xs font-bold flex items-center gap-1 hover:underline">
+                    <span class="material-symbols-outlined text-sm">volume_up</span> Nghe lại
+                  </button>
+                </div>
 
-              ${!currentQ.is_correct ? `
-                <p class="text-xs text-on-surface mb-1">
-                  <strong>Đáp án chuẩn:</strong> <span class="text-green-800 font-bold">${currentQ.correct_answer || currentQ.word}</span>
-                </p>
-              ` : ''}
+                ${!currentQ.is_correct ? `
+                  <p class="text-xs text-on-surface mb-1">
+                    <strong>Đáp án chuẩn:</strong> <span class="text-green-800 font-bold">${currentQ.correct_answer || currentQ.word}</span>
+                  </p>
+                ` : ''}
 
-              ${currentQ.explanation ? `
-                <p class="text-xs text-on-surface-variant italic mt-1 bg-white/70 p-2.5 rounded-lg border border-outline-variant/20">
-                  💡 <strong>Giải thích & Ví dụ:</strong> ${currentQ.explanation}
-                </p>
-              ` : ''}
-            </div>
-          ` : ''}
+                ${currentQ.explanation ? `
+                  <p class="text-xs text-on-surface-variant italic mt-1 bg-white/70 p-2.5 rounded-lg border border-outline-variant/20">
+                    💡 <strong>Giải thích & Ví dụ:</strong> ${currentQ.explanation}
+                  </p>
+                ` : ''}
+              </div>
+            `
+          ) : ''}
         </div>
 
         <!-- Navigation Controls -->
