@@ -61,6 +61,10 @@ export const state = {
   quizTimerInterval: null,
   lastQuizResult: null,
   pendingTargetTab: null,
+  quizLessonId: null,
+  quizIsRandom: false,
+  quizRequestedCount: null,
+  quizSessionCode: "",
 
   // Tutor Chat state
   isTutorTyping: false,
@@ -1055,7 +1059,7 @@ window.App = {
       container.innerHTML = `
         <div class="mb-4 pb-3 border-b border-outline-variant/30 flex items-center justify-between">
           <div>
-            <h4 class="font-bold text-sm text-on-surface">Phiên thi #${session.id} - ${student.full_name}</h4>
+            <h4 class="font-bold text-sm text-on-surface">${this.formatSessionCode(session)} - ${student.full_name}</h4>
             <p class="text-[11px] text-outline">${new Date(session.created_at).toLocaleString('vi-VN')} • Thời lượng: ${session.duration_seconds}s</p>
           </div>
           <div class="text-right">
@@ -1140,6 +1144,39 @@ window.App = {
     }
 
     return false;
+  },
+
+  /**
+   * Định dạng mã phiên thi chuẩn theo yêu cầu:
+   * 1. Nếu là bài học theo ngày (ví dụ 16.9) -> Tên bài học (ví dụ: "16.9")
+   * 2. Nếu là kiểm tra ngẫu nhiên -> "KIỂM TRA NGẪU NHIÊN [SỐ TỪ HỌC SINH CHỌN] TỪ"
+   */
+  formatSessionCode(s) {
+    if (!s) return "Bài kiểm tra";
+
+    // 1. Mã đã lưu trực tiếp trong test_scope
+    if (s.test_scope?.session_code) {
+      return s.test_scope.session_code;
+    }
+
+    // 2. Tên bài học đã lưu trong test_scope
+    if (s.test_scope?.lesson_title) {
+      return s.test_scope.lesson_title;
+    }
+
+    // 3. Nếu có lesson_id và không phải kiểm tra ngẫu nhiên
+    const lessonId = s.test_scope?.lesson_id || (!s.test_scope?.is_random && s.session_type === 'lesson_based' ? s.lesson_id : null);
+    if (lessonId && !s.test_scope?.is_random) {
+      const lesson = (state.lessons || []).find(l => Number(l.id) === Number(lessonId));
+      if (lesson && lesson.title) {
+        return lesson.title;
+      }
+      return `Bài học #${lessonId}`;
+    }
+
+    // 4. Nếu là bài kiểm tra ngẫu nhiên
+    const count = s.test_scope?.num_words || s.test_scope?.selected_count || s.total_questions || 10;
+    return `KIỂM TRA NGẪU NHIÊN ${count} TỪ`;
   },
 
   exportCurrentStudentExcel(studentId) {
@@ -2287,8 +2324,12 @@ window.App = {
       content.innerHTML = `
         <div class="p-2 space-y-4">
           ${session ? `
-            <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/30 flex items-center justify-between text-xs">
+            <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-bold text-primary text-sm">${this.formatSessionCode(session)}</span>
+                  <span class="text-[10px] text-outline font-mono bg-surface-container px-2 py-0.5 rounded">#TEST-${session.id}</span>
+                </div>
                 <span class="font-bold text-on-surface">Điểm số: <strong class="text-primary">${session.score_percentage}%</strong></span>
                 <span class="mx-2 text-outline">•</span>
                 <span class="text-green-700 font-bold">${session.correct_count} đúng</span> / <span class="text-error font-medium">${session.wrong_count} sai</span>
@@ -2408,6 +2449,11 @@ window.App = {
   },
 
   async startNewQuiz(lessonId = null, isRandom = false, requestedNumQuestions = null) {
+    if (isRandom && !requestedNumQuestions) {
+      this.startRandomClassQuiz();
+      return;
+    }
+
     const classVocab = state.vocabulary.filter(v => v.class_id === Number(state.selectedClassId));
     
     if (classVocab.length === 0) {
@@ -2415,19 +2461,33 @@ window.App = {
       return;
     }
 
+    // Thiết lập trạng thái bài thi vào state
+    state.quizLessonId = (lessonId && !isRandom) ? Number(lessonId) : null;
+    state.quizIsRandom = Boolean(isRandom) || !lessonId;
+    state.quizRequestedCount = requestedNumQuestions ? Number(requestedNumQuestions) : null;
+
     let targetVocab = classVocab;
-    if (lessonId && !isRandom) {
-      targetVocab = classVocab.filter(v => v.lesson_id === Number(lessonId));
+    let sessionCode = "";
+
+    if (state.quizLessonId && !state.quizIsRandom) {
+      targetVocab = classVocab.filter(v => Number(v.lesson_id) === Number(state.quizLessonId));
       if (targetVocab.length === 0) targetVocab = classVocab;
+      const lesson = (state.lessons || []).find(l => Number(l.id) === Number(state.quizLessonId));
+      const lessonTitle = lesson ? lesson.title : `Bài học #${state.quizLessonId}`;
+      sessionCode = lessonTitle;
+    } else {
+      const numQuestions = requestedNumQuestions && requestedNumQuestions > 0 ? requestedNumQuestions : Math.min(targetVocab.length, 10);
+      sessionCode = `KIỂM TRA NGẪU NHIÊN ${numQuestions} TỪ`;
     }
 
-    const testTypeLabel = isRandom ? "Kiểm Tra Ngẫu Nhiên" : (lessonId ? `Bài học Unit #${lessonId}` : "Tổng Hợp Lớp");
-    showToast(`Đang tạo bài kiểm tra ${testTypeLabel} (3 dạng bài)...`, "info");
+    state.quizSessionCode = sessionCode;
+
+    const testTypeLabel = sessionCode;
+    showToast(`Đang tạo bài kiểm tra: ${testTypeLabel}...`, "info");
     
-    let numQuestions = isRandom ? Math.min(targetVocab.length, 10) : targetVocab.length;
-    if (requestedNumQuestions && requestedNumQuestions > 0) {
-      numQuestions = Math.min(targetVocab.length, requestedNumQuestions);
-    }
+    let numQuestions = state.quizIsRandom 
+      ? (requestedNumQuestions && requestedNumQuestions > 0 ? Math.min(targetVocab.length, requestedNumQuestions) : Math.min(targetVocab.length, 10)) 
+      : targetVocab.length;
     const questions = await GeminiService.generateMultiFormatQuiz(targetVocab, numQuestions);
     
     state.currentQuiz = questions.map(q => ({
@@ -2564,13 +2624,29 @@ window.App = {
     const targetClassId = Number(state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || 1);
     const studentName = state.currentUser?.full_name || state.currentUser?.name || '';
     const studentId = state.currentUser?.id || null;
+
+    let finalSessionCode = state.quizSessionCode;
+    let lessonTitle = "";
+    if (state.quizLessonId && !state.quizIsRandom) {
+      const lesson = (state.lessons || []).find(l => Number(l.id) === Number(state.quizLessonId));
+      lessonTitle = lesson ? lesson.title : `Bài học #${state.quizLessonId}`;
+      finalSessionCode = lessonTitle;
+    } else {
+      const wordCount = state.quizRequestedCount || total;
+      finalSessionCode = `KIỂM TRA NGẪU NHIÊN ${wordCount} TỪ`;
+    }
+
     const sessionRecord = {
       user_id: studentId,
       student_name: studentName,
       class_id: targetClassId,
-      session_type: 'multi_format',
+      session_type: state.quizIsRandom ? 'random' : 'lesson_based',
       test_scope: {
-        lesson_id: state.selectedLessonId ? Number(state.selectedLessonId) : null,
+        lesson_id: state.quizIsRandom ? null : state.quizLessonId,
+        lesson_title: lessonTitle,
+        session_code: finalSessionCode,
+        is_random: Boolean(state.quizIsRandom),
+        num_words: state.quizRequestedCount || total,
         student_id: studentId,
         student_name: studentName
       },
@@ -2589,7 +2665,7 @@ window.App = {
           user_id: state.currentUser?.id || "guest",
           user_name: state.currentUser?.name || state.currentUser?.full_name || 'Học sinh',
           class_id: targetClassId,
-          lesson_id: state.selectedLessonId ? Number(state.selectedLessonId) : null,
+          lesson_id: state.quizIsRandom ? null : state.quizLessonId,
           activity_type: 'quiz',
           duration_seconds: state.quizTimer || 0,
           cards_viewed: total,
@@ -3252,7 +3328,7 @@ window.App = {
                         <button onclick="App.selectClass(${c.id}); App.startLessonFlashcard(null);" class="px-3 py-1.5 bg-surface-container text-primary hover:bg-primary hover:text-on-primary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
                           <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
                         </button>
-                        <button onclick="App.selectClass(${c.id}); App.startNewQuiz(null, true);" class="px-3 py-1.5 bg-surface-container text-on-surface hover:bg-secondary hover:text-on-secondary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
+                        <button onclick="App.selectClass(${c.id}); App.startRandomClassQuiz();" class="px-3 py-1.5 bg-surface-container text-on-surface hover:bg-secondary hover:text-on-secondary rounded-lg font-bold text-xs transition-colors flex items-center gap-1">
                           <span class="material-symbols-outlined text-sm">quiz</span> Thi thử
                         </button>
                       </div>
@@ -4888,7 +4964,7 @@ window.App = {
             <span class="material-symbols-outlined text-base">arrow_back</span> Về Kho Từ Vựng
           </button>
           <p class="font-bold">Chưa có bài thi nào đang chạy.</p>
-          <button onclick="App.startNewQuiz(null, true)" class="mt-4 bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold text-xs btn-press">
+          <button onclick="App.startRandomClassQuiz()" class="mt-4 bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold text-xs btn-press">
             Bắt đầu Kiểm Tra Ngẫu Nhiên (3 Dạng)
           </button>
         </div>
@@ -5163,7 +5239,7 @@ window.App = {
           </div>
 
           <div class="flex items-center justify-center gap-3 mt-6">
-            <button onclick="App.startNewQuiz(null, true)" class="bg-secondary-container text-on-secondary-container px-5 py-2.5 rounded-xl font-bold text-xs hover-lift">
+            <button onclick="App.startRandomClassQuiz()" class="bg-secondary-container text-on-secondary-container px-5 py-2.5 rounded-xl font-bold text-xs hover-lift">
               Thi Ngẫu Nhiên Lại (3 Dạng)
             </button>
             <button onclick="App.switchTab('flashcards')" class="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold text-xs btn-press">
@@ -5461,9 +5537,16 @@ window.App = {
                   ${sList.length > 0 ? sList.map((s, idx) => `
                     <tr class="hover:bg-surface-container-low/50 transition-colors">
                       <td class="p-4 text-center font-bold text-outline">${idx + 1}</td>
-                      <td class="p-4 font-mono font-bold text-primary">#TEST-${s.id}</td>
+                      <td class="p-4">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${s.session_type === 'lesson_based' || (s.test_scope?.lesson_id && !s.test_scope?.is_random) ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-secondary/10 text-secondary border border-secondary/20'}">
+                          <span class="material-symbols-outlined text-xs">${s.session_type === 'lesson_based' || (s.test_scope?.lesson_id && !s.test_scope?.is_random) ? 'menu_book' : 'shuffle'}</span>
+                          ${this.formatSessionCode(s)}
+                        </span>
+                      </td>
                       <td class="p-4 text-on-surface font-medium">
-                        ${s.session_type === 'lesson_based' ? `Chuyên đề Unit #${s.test_scope?.lesson_id || 1}` : 'Kiểm tra 3 dạng ngẫu nhiên'}
+                        ${s.session_type === 'lesson_based' || (s.test_scope?.lesson_id && !s.test_scope?.is_random) 
+                          ? `<span class="text-primary font-bold">Theo bài học: ${this.formatSessionCode(s)}</span>` 
+                          : `<span class="text-secondary font-bold">Kiểm tra ngẫu nhiên (${s.total_questions} từ)</span>`}
                       </td>
                       <td class="p-4">
                         <span class="text-green-700 font-bold">${s.correct_count} đúng</span> / <span class="text-error font-medium">${s.wrong_count} sai</span>

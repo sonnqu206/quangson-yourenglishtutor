@@ -176,17 +176,23 @@ export const ExcelService = {
     const XLSX = window.XLSX;
     if (!XLSX) return;
 
-    const exportRows = resultsList.map((r, idx) => ({
-      "STT": idx + 1,
-      "Mã phiên thi": `#TEST-${r.id}`,
-      "Loại bài thi": r.session_type === 'lesson_based' ? 'Theo bài học' : 'Luyện tập tổng hợp',
-      "Tổng số câu": r.total_questions,
-      "Số câu đúng": r.correct_count,
-      "Số câu sai": r.wrong_count,
-      "Điểm số (%)": `${r.score_percentage}%`,
-      "Thời gian (giây)": r.duration_seconds,
-      "Thời điểm làm bài": new Date(r.created_at).toLocaleString('vi-VN')
-    }));
+    const exportRows = resultsList.map((r, idx) => {
+      const sessionCode = r.test_scope?.session_code || 
+        r.test_scope?.lesson_title || 
+        (r.test_scope?.lesson_id && !r.test_scope?.is_random ? `Bài học #${r.test_scope.lesson_id}` : `KIỂM TRA NGẪU NHIÊN ${r.test_scope?.num_words || r.total_questions || 10} TỪ`);
+
+      return {
+        "STT": idx + 1,
+        "Mã phiên thi": sessionCode,
+        "Loại bài thi": r.session_type === 'lesson_based' || (r.test_scope?.lesson_id && !r.test_scope?.is_random) ? 'Theo bài học' : 'Luyện tập ngẫu nhiên',
+        "Tổng số câu": r.total_questions,
+        "Số câu đúng": r.correct_count,
+        "Số câu sai": r.wrong_count,
+        "Điểm số (%)": `${r.score_percentage}%`,
+        "Thời gian (giây)": r.duration_seconds,
+        "Thời điểm làm bài": new Date(r.created_at).toLocaleString('vi-VN')
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();
@@ -201,20 +207,26 @@ export const ExcelService = {
     const XLSX = window.XLSX;
     if (!XLSX) return;
 
-    const exportRows = sessions.map((r, idx) => ({
-      "STT": idx + 1,
-      "Học sinh": student.full_name,
-      "Tên đăng nhập": `@${student.username}`,
-      "Lớp": className,
-      "Mã bài thi": `#TEST-${r.id}`,
-      "Loại bài thi": r.session_type === 'lesson_based' ? 'Theo Unit' : 'Ngẫu nhiên 3 dạng',
-      "Tổng số câu": r.total_questions,
-      "Số câu đúng": r.correct_count,
-      "Số câu sai": r.wrong_count,
-      "Điểm số (%)": `${r.score_percentage}%`,
-      "Thời gian hoàn thành": `${r.duration_seconds}s`,
-      "Thời điểm nộp bài": new Date(r.created_at).toLocaleString('vi-VN')
-    }));
+    const exportRows = sessions.map((r, idx) => {
+      const sessionCode = r.test_scope?.session_code || 
+        r.test_scope?.lesson_title || 
+        (r.test_scope?.lesson_id && !r.test_scope?.is_random ? `Bài học #${r.test_scope.lesson_id}` : `KIỂM TRA NGẪU NHIÊN ${r.test_scope?.num_words || r.total_questions || 10} TỪ`);
+
+      return {
+        "STT": idx + 1,
+        "Học sinh": student.full_name,
+        "Tên đăng nhập": `@${student.username}`,
+        "Lớp": className,
+        "Mã bài thi": sessionCode,
+        "Loại bài thi": r.session_type === 'lesson_based' || (r.test_scope?.lesson_id && !r.test_scope?.is_random) ? 'Theo bài học' : 'Luyện tập ngẫu nhiên',
+        "Tổng số câu": r.total_questions,
+        "Số câu đúng": r.correct_count,
+        "Số câu sai": r.wrong_count,
+        "Điểm số (%)": `${r.score_percentage}%`,
+        "Thời gian hoàn thành": `${r.duration_seconds}s`,
+        "Thời điểm nộp bài": new Date(r.created_at).toLocaleString('vi-VN')
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     worksheet['!cols'] = [
