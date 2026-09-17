@@ -29,7 +29,8 @@ export const state = {
   // Active Class Scoping & Drilldown
   selectedClassId: 1,
   selectedClassDetailId: null, // If set, renders the class detail view
-  classDetailTab: 'units', // 'units' | 'vocabulary' | 'reports'
+  classDetailTab: 'units', // 'units' | 'vocabulary' | 'accounts' | 'reports'
+  classMemberRoleFilter: 'all', // 'all' | 'student' | 'assistant'
   selectedLessonId: null,
   searchQuery: '',
   filterGrammar: 'all',
@@ -222,13 +223,22 @@ window.App = {
 
     // Trợ giảng / Giáo viên phụ:
     const userAssigned = Number(user.class_id);
+    const enrolledIds = Array.isArray(user.enrolled_classes) && user.enrolled_classes.length > 0
+      ? user.enrolled_classes.map(Number)
+      : (user.class_id ? [Number(user.class_id)] : []);
     const managedList = Array.isArray(user.managed_classes) ? user.managed_classes.map(Number) : [];
-    return state.classes.filter(c => 
-      c.id === userAssigned || 
-      managedList.includes(c.id) || 
-      c.creator_id === user.id || 
-      c.created_by === user.id
-    );
+    const allAllowedIds = new Set([userAssigned, ...enrolledIds, ...managedList]);
+
+    return state.classes.filter(c => {
+      const cId = Number(c.id);
+      const pId = Number(c.parent_id);
+      if (allAllowedIds.has(cId)) return true;
+      if (pId && allAllowedIds.has(pId)) return true;
+      if (allAllowedIds.has(11) && (c.category === 'HUST_CHILD' || pId === 11 || (c.name && c.name.toUpperCase().startsWith('HUST-')))) {
+        return true;
+      }
+      return c.creator_id === user.id || c.created_by === user.id;
+    });
   },
 
   /**
@@ -423,13 +433,13 @@ window.App = {
       if (isAssistant) {
         const managedClasses = this.getManagedClasses(state.currentUser);
         classSelect.innerHTML = managedClasses.map(c => 
-          `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
+          `<option value="${c.id}" ${Number(c.id) === targetClassId ? 'selected' : ''}>${c.name}</option>`
         ).join('');
         classSelect.disabled = false;
       } else {
         classSelect.disabled = false;
         classSelect.innerHTML = state.classes.map(c => 
-          `<option value="${c.id}" ${c.id === targetClassId ? 'selected' : ''}>${c.name}</option>`
+          `<option value="${c.id}" ${Number(c.id) === targetClassId ? 'selected' : ''}>${c.name}</option>`
         ).join('');
       }
     }
@@ -444,6 +454,7 @@ window.App = {
         roleSelect.innerHTML = `
           <option value="student" selected>🎓 Học sinh</option>
           <option value="assistant_teacher">👩‍🏫 Giáo viên phụ (Trợ giảng)</option>
+          <option value="teacher">👨‍🏫 Giáo viên chính (Teacher)</option>
         `;
       }
     }
@@ -516,6 +527,56 @@ window.App = {
     } catch (e) {
       showToast(e.message, "error");
     }
+  },
+
+  async changeUserRole(userId, newRole) {
+    if (state.currentUser?.role !== 'host') {
+      showToast("Chỉ có Quản trị viên (Host) mới có quyền thay đổi vai trò thành viên!", "error");
+      return;
+    }
+
+    const user = (state.usersList || []).find(u => String(u.id) === String(userId) || u.username === String(userId));
+    if (!user) {
+      showToast("Không tìm thấy tài khoản người dùng!", "error");
+      return;
+    }
+
+    if (user.role === 'host' && newRole !== 'host') {
+      showToast("Không thể thay đổi vai trò của Quản trị viên (Host) cấp cao nhất!", "warning");
+      this.render();
+      return;
+    }
+
+    const roleLabels = {
+      student: '🎓 Học sinh',
+      assistant_teacher: '👩‍🏫 Giáo viên phụ (Trợ giảng)',
+      teacher: '👨‍🏫 Giáo viên chính',
+      host: '👑 Host (Quản trị viên)'
+    };
+
+    if (!confirm(`Bạn có chắc chắn muốn chuyển vai trò của "${user.full_name}" thành "${roleLabels[newRole] || newRole}"?`)) {
+      this.render();
+      return;
+    }
+
+    try {
+      await AuthService.updateUserRole(userId, newRole);
+      user.role = newRole;
+      if (state.currentUser && (state.currentUser.id === userId || state.currentUser.username === userId)) {
+        state.currentUser.role = newRole;
+      }
+      showToast(`Đã chuyển vai trò của "${user.full_name}" thành "${roleLabels[newRole] || newRole}" thành công!`, "success");
+      await this.loadAllData();
+      this.render();
+    } catch (e) {
+      showToast("Lỗi khi cập nhật vai trò: " + e.message, "error");
+      this.render();
+    }
+  },
+
+  setClassMemberRoleFilter(filter) {
+    state.classMemberRoleFilter = filter;
+    this.render();
   },
 
   // =========================================================================
@@ -4301,12 +4362,20 @@ window.App = {
                         <span class="bg-surface-container px-2 py-1 rounded">${u.password || '••••••••'}</span>
                       </td>
                       <td class="p-4">
-                        <span class="px-2.5 py-1 rounded-full font-bold text-[11px] ${
-                          isUserHost ? 'bg-amber-100 text-amber-900' :
-                          u.role === 'assistant_teacher' ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'
-                        }">
-                          ${isUserHost ? 'Quản trị viên (Host)' : u.role === 'assistant_teacher' ? 'Giáo viên phụ' : 'Học sinh'}
-                        </span>
+                        ${(state.currentUser?.role === 'host' && u.role !== 'host') ? `
+                          <select onchange="App.changeUserRole('${u.id}', this.value)" class="bg-surface-container border border-outline-variant/60 rounded-lg px-2.5 py-1 text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer hover:border-primary transition-colors">
+                            <option value="student" ${u.role === 'student' ? 'selected' : ''}>🎓 Học sinh</option>
+                            <option value="assistant_teacher" ${u.role === 'assistant_teacher' ? 'selected' : ''}>👩‍🏫 Giáo viên phụ (Trợ giảng)</option>
+                            <option value="teacher" ${u.role === 'teacher' ? 'selected' : ''}>👨‍🏫 Giáo viên chính</option>
+                          </select>
+                        ` : `
+                          <span class="px-2.5 py-1 rounded-full font-bold text-[11px] ${
+                            isUserHost ? 'bg-amber-100 text-amber-900' :
+                            u.role === 'assistant_teacher' ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'
+                          }">
+                            ${isUserHost ? 'Quản trị viên (Host)' : u.role === 'assistant_teacher' ? 'Giáo viên phụ' : 'Học sinh'}
+                          </span>
+                        `}
                       </td>
                       <td class="p-4 text-on-surface">
                         ${isUserHost ? '<span class="text-primary font-bold">Toàn bộ các lớp</span>' : (() => {
@@ -4773,9 +4842,25 @@ window.App = {
 
     const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
     const classVocab = state.vocabulary.filter(v => Number(v.class_id) === targetClassId);
-    const classStudents = state.usersList.filter(u => u.role === 'student' && (Number(u.class_id) === targetClassId || (Array.isArray(u.enrolled_classes) && u.enrolled_classes.map(Number).includes(targetClassId))));
-    const classStudySessions = (state.studySessions || []).filter(s => Number(s.class_id) === targetClassId);
-    const classTestSessions = (state.testSessions || []).filter(s => Number(s.class_id) === targetClassId);
+
+    // Xác định tập hợp ID lớp liên quan (nếu xem lớp cha HUST Hub thì bao gồm cả lớp cha 11 và các lớp con HUST)
+    const relatedClassIds = isHUSTHub 
+      ? [targetClassId, ...childClasses.map(c => Number(c.id))]
+      : [targetClassId];
+
+    const isMemberOfThisClass = (u) => {
+      const directId = Number(u.class_id);
+      const enrolled = Array.isArray(u.enrolled_classes) ? u.enrolled_classes.map(Number) : [];
+      return relatedClassIds.includes(directId) || enrolled.some(cid => relatedClassIds.includes(cid));
+    };
+
+    // Toàn bộ thành viên lớp (Học sinh + Trợ giảng + Giáo viên, trừ Host chính)
+    const classMembers = state.usersList.filter(u => u.role !== 'host' && isMemberOfThisClass(u));
+    const classStudents = classMembers.filter(u => u.role === 'student');
+    const classAssistants = classMembers.filter(u => u.role === 'assistant_teacher' || u.role === 'teacher');
+
+    const classStudySessions = (state.studySessions || []).filter(s => relatedClassIds.includes(Number(s.class_id)));
+    const classTestSessions = (state.testSessions || []).filter(s => relatedClassIds.includes(Number(s.class_id)));
 
     // Xử lý tab: Nếu là học sinh, tuyệt đối không vào tab accounts
     let currentTab = state.classDetailTab;
@@ -4812,7 +4897,7 @@ window.App = {
                 <span>•</span>
                 <span>📚 <strong>${classVocab.length}</strong> từ vựng</span>
                 <span>•</span>
-                <span>👥 <strong>${classStudents.length}</strong> học sinh</span>
+                <span>👥 <strong>${classMembers.length}</strong> thành viên ${classAssistants.length > 0 ? `(${classStudents.length} học sinh, ${classAssistants.length} trợ giảng)` : 'học sinh'}</span>
                 ${isHUSTHub ? `<span>•</span> <span>⚡ <strong>${childClasses.length}</strong> lớp nhỏ</span>` : ''}
               </div>
             </div>
@@ -4869,7 +4954,7 @@ window.App = {
           ${isTeacher ? `
             <button onclick="App.setClassDetailTab('accounts')" class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shrink-0 ${currentTab === 'accounts' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
               <span class="material-symbols-outlined text-base">manage_accounts</span>
-              <span>3. Học Sinh & Cấp Tài Khoản (${classStudents.length})</span>
+              <span>3. Thành Viên & Phân Quyền (${classMembers.length})</span>
             </button>
           ` : ''}
 
@@ -5069,16 +5154,16 @@ window.App = {
           </div>
         ` : ''}
 
-        <!-- TAB 3: CLASS ACCOUNTS & STUDENT PROVISIONING (ACCESSIBLE TO ALL USERS) -->
+        <!-- TAB 3: CLASS MEMBERS & ROLE ASSIGNMENT -->
         ${currentTab === 'accounts' ? `
           <div class="flex flex-col gap-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 class="font-headline-md text-base font-bold text-on-surface">${isTeacher ? 'Quản Lý & Cấp Tài Khoản Học Sinh' : 'Danh Sách Học Sinh Cùng Lớp'}</h3>
+                <h3 class="font-headline-md text-base font-bold text-on-surface">${isTeacher ? 'Quản Lý & Phân Quyền Thành Viên' : 'Danh Sách Thành Viên Cùng Lớp'}</h3>
                 <p class="text-xs text-on-surface-variant">
                   ${isTeacher 
-                    ? `Danh sách học sinh thuộc lớp <strong>${activeClass.name}</strong>, cấp tài khoản và quản lý mật khẩu.` 
-                    : `Danh sách các bạn học sinh trong lớp <strong>${activeClass.name}</strong> cùng chuỗi ngày học.`
+                    ? `Danh sách thành viên (Học sinh, Trợ giảng, Giáo viên) thuộc lớp <strong>${activeClass.name}</strong>, cấp tài khoản, đổi mật khẩu và đổi vai trò.` 
+                    : `Danh sách các thành viên trong lớp <strong>${activeClass.name}</strong> cùng thời gian học tập.`
                   }
                 </p>
               </div>
@@ -5091,14 +5176,14 @@ window.App = {
               ` : ''}
             </div>
 
-            <!-- Student Search & Filter Bar -->
+            <!-- Member Search & Role Filter Bar -->
             <div class="bg-surface-container-lowest p-4 rounded-2xl ambient-shadow border border-outline-variant/30 flex items-center justify-between gap-3 flex-wrap">
               <div class="flex items-center gap-2 flex-1 min-w-[240px]">
                 <span class="material-symbols-outlined text-outline text-lg">search</span>
                 <input 
                   type="text" 
                   id="class-student-search" 
-                  placeholder="Tìm kiếm học sinh theo tên hoặc username..." 
+                  placeholder="Tìm kiếm theo tên hoặc username..." 
                   oninput="App.state.studentSearchQuery = this.value; App.render();"
                   value="${state.studentSearchQuery || ''}"
                   class="bg-transparent text-xs text-on-surface focus:outline-none w-full font-medium"
@@ -5109,12 +5194,22 @@ window.App = {
                   </button>
                 ` : ''}
               </div>
-              <span class="text-xs text-outline font-bold">
-                Tổng số: ${classStudents.length} học sinh
-              </span>
+
+              <!-- Role filter chips -->
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button onclick="App.setClassMemberRoleFilter('all')" class="px-3 py-1.5 rounded-xl font-bold text-xs transition-colors ${(state.classMemberRoleFilter || 'all') === 'all' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+                  Tất cả (${classMembers.length})
+                </button>
+                <button onclick="App.setClassMemberRoleFilter('student')" class="px-3 py-1.5 rounded-xl font-bold text-xs transition-colors ${state.classMemberRoleFilter === 'student' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+                  🎓 Học sinh (${classStudents.length})
+                </button>
+                <button onclick="App.setClassMemberRoleFilter('assistant')" class="px-3 py-1.5 rounded-xl font-bold text-xs transition-colors ${state.classMemberRoleFilter === 'assistant' ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}">
+                  👩‍🏫 Trợ giảng / GV (${classAssistants.length})
+                </button>
+              </div>
             </div>
 
-            <!-- Class Students Table -->
+            <!-- Class Members Table -->
             <div class="bg-surface-container-lowest rounded-2xl ambient-shadow border border-outline-variant/30 overflow-hidden">
               <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs border-collapse">
@@ -5124,25 +5219,29 @@ window.App = {
                       <th class="p-3.5">Họ và Tên</th>
                       <th class="p-3.5">Tên Đăng Nhập</th>
                       <th class="p-3.5">Mật Khẩu</th>
-                      <th class="p-3.5 text-center">Chuỗi Streak</th>
-                      <th class="p-3.5 text-center">Tiến Độ Học</th>
+                      <th class="p-3.5 text-center">Vai Trò</th>
+                      <th class="p-3.5">Lớp Phân Bổ</th>
+                      <th class="p-3.5 text-center">Chuỗi / Tiến Độ</th>
                       <th class="p-3.5 text-center">Thao Tác</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-outline-variant/20">
                     ${(() => {
-                      const filteredStudents = classStudents.filter(u => {
+                      const filteredMembers = classMembers.filter(u => {
+                        if (state.classMemberRoleFilter === 'student' && u.role !== 'student') return false;
+                        if (state.classMemberRoleFilter === 'assistant' && u.role !== 'assistant_teacher' && u.role !== 'teacher') return false;
+
                         if (!state.studentSearchQuery) return true;
                         const q = state.studentSearchQuery.toLowerCase();
                         return (u.full_name || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q);
                       });
 
-                      if (filteredStudents.length === 0) {
+                      if (filteredMembers.length === 0) {
                         return `
                           <tr>
-                            <td colspan="7" class="p-8 text-center text-outline">
+                            <td colspan="8" class="p-8 text-center text-outline">
                               <span class="material-symbols-outlined text-4xl block mb-2 text-outline/60">person_off</span>
-                              ${state.studentSearchQuery ? 'Không tìm thấy học sinh nào khớp với từ khóa tìm kiếm.' : 'Chưa có học sinh nào trong lớp này.'}
+                              ${state.studentSearchQuery ? 'Không tìm thấy thành viên nào khớp với từ khóa tìm kiếm.' : 'Chưa có thành viên nào trong danh mục này.'}
                               <div class="mt-3">
                                 <button onclick="App.openCreateUserModal(${targetClassId})" class="bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 hover-lift">
                                   <span class="material-symbols-outlined text-sm">person_add</span> Cấp Tài Khoản Ngay
@@ -5153,7 +5252,8 @@ window.App = {
                         `;
                       }
 
-                      return filteredStudents.map((u, idx) => {
+                      return filteredMembers.map((u, idx) => {
+                        const isUserStudent = u.role === 'student';
                         const studentStreak = this.getStudentRealtimeStreak(u);
                         const userFlashcards = classStudySessions.filter(s => this.isSessionOfStudent(s, u));
                         const userQuizzes = classTestSessions.filter(s => this.isSessionOfStudent(s, u));
@@ -5161,13 +5261,22 @@ window.App = {
                         const quizSecs = userQuizzes.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
                         const totalMins = Math.max(0, Math.round((fcSecs + quizSecs) / 60));
 
+                        // Assigned class label
+                        const uClass = state.classes.find(c => Number(c.id) === Number(u.class_id));
+                        const enrolledNames = Array.isArray(u.enrolled_classes) && u.enrolled_classes.length > 0
+                          ? u.enrolled_classes.map(cid => state.classes.find(c => Number(c.id) === Number(cid))?.name).filter(Boolean)
+                          : [];
+                        const classDisplayText = enrolledNames.length > 0
+                          ? enrolledNames.join(', ')
+                          : (uClass ? uClass.name : 'Chưa gán');
+
                         return `
                           <tr class="hover:bg-surface-container-low/50 transition-colors">
                             <td class="p-3.5 text-center font-bold text-outline">${idx + 1}</td>
                             <td class="p-3.5 font-bold text-on-surface">
                               <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
-                                  ${u.full_name.charAt(0).toUpperCase()}
+                                <div class="w-8 h-8 rounded-xl ${u.role === 'teacher' ? 'bg-purple-100 text-purple-900' : u.role === 'assistant_teacher' ? 'bg-blue-100 text-blue-900' : 'bg-primary/10 text-primary'} flex items-center justify-center font-bold text-xs">
+                                  ${u.role === 'teacher' ? '👨‍🏫' : u.role === 'assistant_teacher' ? '👩‍🏫' : '🎓'}
                                 </div>
                                 <div>
                                   <p class="font-bold text-on-surface">${u.full_name}</p>
@@ -5177,18 +5286,42 @@ window.App = {
                             </td>
                             <td class="p-3.5 font-mono font-bold text-primary">@${u.username}</td>
                             <td class="p-3.5 font-mono text-outline">
-                              <span class="bg-surface-container px-2.5 py-1 rounded-md font-bold text-on-surface">${u.password || '123456'}</span>
+                              <span class="bg-surface-container px-2.5 py-1 rounded-md font-bold text-on-surface font-mono">${u.password || '123456'}</span>
                             </td>
                             <td class="p-3.5 text-center">
-                              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-xs bg-amber-100 text-amber-900">
-                                🔥 ${studentStreak} ngày
+                              ${state.currentUser?.role === 'host' ? `
+                                <select onchange="App.changeUserRole('${u.id}', this.value)" class="bg-surface-container border border-outline-variant/60 rounded-lg px-2 py-1 text-xs font-bold text-on-surface focus:outline-none focus:border-primary cursor-pointer hover:border-primary transition-colors">
+                                  <option value="student" ${u.role === 'student' ? 'selected' : ''}>🎓 Học sinh</option>
+                                  <option value="assistant_teacher" ${u.role === 'assistant_teacher' ? 'selected' : ''}>👩‍🏫 Trợ giảng</option>
+                                  <option value="teacher" ${u.role === 'teacher' ? 'selected' : ''}>👨‍🏫 Giáo viên</option>
+                                </select>
+                              ` : `
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold text-xs ${
+                                  u.role === 'assistant_teacher' ? 'bg-blue-100 text-blue-900' :
+                                  u.role === 'teacher' ? 'bg-purple-100 text-purple-900' : 'bg-green-100 text-green-900'
+                                }">
+                                  ${u.role === 'assistant_teacher' ? '👩‍🏫 Trợ giảng' : u.role === 'teacher' ? '👨‍🏫 Giáo viên' : '🎓 Học sinh'}
+                                </span>
+                              `}
+                            </td>
+                            <td class="p-3.5 text-on-surface">
+                              <span class="px-2 py-0.5 rounded bg-surface-container font-medium text-[11px] text-on-surface line-clamp-1" title="${classDisplayText}">
+                                ${classDisplayText}
                               </span>
                             </td>
-                            <td class="p-3.5 text-center text-on-surface">
-                              <div class="flex flex-col items-center">
-                                <span class="font-bold text-xs text-primary">${userQuizzes.length} bài thi • ${userFlashcards.length} lượt thẻ</span>
-                                <span class="text-[10px] text-outline">⏱️ ${totalMins} phút học</span>
-                              </div>
+                            <td class="p-3.5 text-center">
+                              ${isUserStudent ? `
+                                <div class="flex flex-col items-center">
+                                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-xs bg-amber-100 text-amber-900 mb-0.5">
+                                    🔥 ${studentStreak} ngày
+                                  </span>
+                                  <span class="text-[10px] text-outline">${userQuizzes.length} bài thi • ⏱️ ${totalMins}p</span>
+                                </div>
+                              ` : `
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-xs bg-blue-50 text-blue-800">
+                                  ⚡ Quản trị viên
+                                </span>
+                              `}
                             </td>
                             <td class="p-3.5 text-center">
                               <div class="flex items-center justify-center gap-1.5">
@@ -5198,9 +5331,11 @@ window.App = {
                                 <button onclick="App.handleChangePassword('${u.id}', '${u.full_name}')" class="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-[11px] transition-colors" title="Đổi mật khẩu">
                                   Đổi Pass
                                 </button>
-                                <button onclick="App.selectReportStudent('${u.id}'); App.setClassDetailTab('reports');" class="px-2.5 py-1 rounded-lg bg-primary-container/30 hover:bg-primary-container text-primary font-bold text-[11px] transition-colors" title="Xem báo cáo chi tiết">
-                                  Báo Cáo
-                                </button>
+                                ${isUserStudent ? `
+                                  <button onclick="App.selectReportStudent('${u.id}'); App.setClassDetailTab('reports');" class="px-2.5 py-1 rounded-lg bg-primary-container/30 hover:bg-primary-container text-primary font-bold text-[11px] transition-colors" title="Xem báo cáo chi tiết">
+                                    Báo Cáo
+                                  </button>
+                                ` : ''}
                                 <button onclick="App.handleDeleteUser('${u.id}', '${u.full_name}')" class="p-1.5 text-outline hover:text-error rounded-lg hover:bg-error-container/20 transition-colors" title="Xóa tài khoản">
                                   <span class="material-symbols-outlined text-base">delete</span>
                                 </button>

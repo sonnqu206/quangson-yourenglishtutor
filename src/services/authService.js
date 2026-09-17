@@ -4,6 +4,7 @@
  */
 
 import { getSupabase } from './supabaseService.js';
+import { CONFIG } from '../config.js';
 
 const COOKIE_NAME = "QUANG_SON_AUTH_SESSION_V1";
 const STORAGE_USERS_KEY = "QUANG_SON_LMS_USERS_V4";
@@ -293,9 +294,30 @@ export const AuthService = {
     const deletedKeys = getDeletedUserKeys();
     try {
       const client = getSupabase();
-      if (!client) return getStoredUsers();
-      
-      const { data, error } = await client.from('app_users').select('*');
+      let data = null;
+      let error = null;
+
+      if (client) {
+        const res = await client.from('app_users').select('*');
+        data = res.data;
+        error = res.error;
+      } else if (typeof fetch !== "undefined") {
+        try {
+          const res = await fetch(`${CONFIG.SUPABASE.URL}/rest/v1/app_users?select=*`, {
+            headers: {
+              'apikey': CONFIG.SUPABASE.ANON_KEY,
+              'Authorization': `Bearer ${CONFIG.SUPABASE.ANON_KEY}`
+            }
+          });
+          if (res.ok) {
+            data = await res.json();
+          }
+        } catch (fetchErr) {
+          error = fetchErr;
+        }
+      }
+
+      if (!client && !data) return getStoredUsers();
       if (!error && data && data.length > 0) {
         const local = getStoredUsers();
         const mergedMap = new Map();
@@ -318,6 +340,14 @@ export const AuthService = {
             return;
           }
           const key = cloudUser.username.toLowerCase();
+          // Decode enrolled_classes from alt_password if encoded as CLASSES:
+          if (cloudUser.alt_password && typeof cloudUser.alt_password === 'string' && cloudUser.alt_password.startsWith('CLASSES:')) {
+            const ids = cloudUser.alt_password.replace('CLASSES:', '').split(',').map(Number).filter(n => !isNaN(n));
+            cloudUser.enrolled_classes = ids;
+            cloudUser.alt_password = null;
+          } else if (!cloudUser.enrolled_classes && cloudUser.class_id) {
+            cloudUser.enrolled_classes = [Number(cloudUser.class_id)];
+          }
           const existing = mergedMap.get(key);
           mergedMap.set(key, { ...existing, ...cloudUser });
         });
@@ -493,7 +523,24 @@ export const AuthService = {
     try {
       const client = getSupabase();
       if (client) {
-        await client.from('app_users').upsert(newUser);
+        const cloudPayload = {
+          id: newUser.id,
+          username: newUser.username,
+          password: newUser.password,
+          alt_password: enrolledClasses.length > 0 ? `CLASSES:${enrolledClasses.join(',')}` : null,
+          full_name: newUser.full_name,
+          role: newUser.role,
+          class_id: Number(newUser.class_id) || 1,
+          email: newUser.email,
+          streak: newUser.streak || 0,
+          completed_lessons: newUser.completed_lessons || 0,
+          avg_score: newUser.avg_score || 0,
+          created_at: newUser.created_at
+        };
+        const { error } = await client.from('app_users').upsert(cloudPayload);
+        if (error) {
+          console.warn("Supabase app_users upsert warning:", error);
+        }
       }
     } catch (err) {
       console.warn("Lưu tài khoản lên Supabase dự phòng:", err);
@@ -522,11 +569,61 @@ export const AuthService = {
       if (client) {
         await client.from('app_users').update({ 
           class_id: users[idx].class_id,
-          enrolled_classes: validIds 
+          alt_password: validIds.length > 0 ? `CLASSES:${validIds.join(',')}` : null
         }).eq('id', users[idx].id);
       }
     } catch (err) {
       console.warn("Supabase assignStudentClasses error:", err);
+    }
+
+    return users[idx];
+  },
+
+  /**
+   * Cập nhật vai trò người dùng bởi Host (Học sinh <-> Trợ giảng <-> Giáo viên)
+   */
+  async updateUserRole(userId, newRole) {
+    const validRoles = ['student', 'assistant_teacher', 'teacher', 'host'];
+    if (!validRoles.includes(newRole)) {
+      throw new Error(`Vai trò không hợp lệ: ${newRole}`);
+    }
+
+    const users = getStoredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId);
+    if (idx === -1) {
+      throw new Error("Không tìm thấy tài khoản người dùng!");
+    }
+
+    // Không cho phép hạ quyền tài khoản Host chính
+    if (users[idx].role === 'host' && newRole !== 'host') {
+      throw new Error("Không thể thay đổi vai trò của Quản trị viên (Host) cấp cao nhất!");
+    }
+
+    users[idx].role = newRole;
+    saveStoredUsers(users);
+
+    // Đồng bộ Supabase Cloud
+    try {
+      const client = getSupabase();
+      if (client) {
+        const { error } = await client.from('app_users').update({ role: newRole }).eq('id', users[idx].id);
+        if (error) {
+          console.warn("Supabase updateUserRole error:", error);
+        }
+      } else if (typeof fetch !== "undefined") {
+        await fetch(`${CONFIG.SUPABASE.URL}/rest/v1/app_users?id=eq.${encodeURIComponent(users[idx].id)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': CONFIG.SUPABASE.ANON_KEY,
+            'Authorization': `Bearer ${CONFIG.SUPABASE.ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({ role: newRole })
+        });
+      }
+    } catch (err) {
+      console.warn("Supabase updateUserRole fallback:", err);
     }
 
     return users[idx];
