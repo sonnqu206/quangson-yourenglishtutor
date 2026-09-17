@@ -657,14 +657,15 @@ export const SupabaseService = {
   },
 
   /**
-   * Đảm bảo lớp học luôn có ít nhất 1 bài học (Unit) để chứa từ vựng
+   * Đảm bảo lớp học luôn có ít nhất 1 bài học (Unit) để chứa từ vựng (Ưu tiên bài học mới nhất)
    */
   async ensureClassLesson(classId) {
     const targetClassId = Number(classId) || 1;
     const client = getSupabase();
     if (client) {
       try {
-        const { data: sbLessons } = await client.from('lessons').select('*').eq('class_id', targetClassId).order('id', { ascending: true });
+        // Sắp xếp theo ID giảm dần để lấy bài học mới nhất của lớp học
+        const { data: sbLessons } = await client.from('lessons').select('*').eq('class_id', targetClassId).order('id', { ascending: false });
         if (sbLessons && sbLessons.length > 0) {
           const local = getLocalData();
           if (!local.lessons) local.lessons = [];
@@ -680,7 +681,8 @@ export const SupabaseService = {
     }
     const lessons = await this.getLessons(targetClassId);
     if (lessons && lessons.length > 0) {
-      return lessons[0].id;
+      const sorted = [...lessons].sort((a, b) => Number(b.id) - Number(a.id));
+      return sorted[0].id;
     }
     const allCls = await this.getClasses();
     const targetClass = allCls.find(c => c.id === targetClassId);
@@ -700,7 +702,7 @@ export const SupabaseService = {
       lesson_id = await this.ensureClassLesson(class_id);
     } else {
       const currentLessons = await this.getLessons(class_id);
-      if (!currentLessons.some(l => l.id === lesson_id)) {
+      if (!currentLessons.some(l => Number(l.id) === Number(lesson_id))) {
         lesson_id = await this.ensureClassLesson(class_id);
       }
     }
@@ -763,7 +765,7 @@ export const SupabaseService = {
       targetLessonId = await this.ensureClassLesson(targetClassId);
     } else {
       const currentLessons = await this.getLessons(targetClassId);
-      if (!currentLessons.some(l => l.id === targetLessonId)) {
+      if (!currentLessons.some(l => Number(l.id) === Number(targetLessonId))) {
         targetLessonId = await this.ensureClassLesson(targetClassId);
       }
     }
@@ -1048,7 +1050,7 @@ export const SupabaseService = {
   },
 
   /**
-   * Lấy lịch sử làm bài kiểm tra theo lớp
+   * Lấy lịch sử làm bài kiểm tra theo lớp (Tự động chuẩn hóa user_id và user_name)
    */
   async getTestSessions(classId = null) {
     let supabaseData = [];
@@ -1058,15 +1060,29 @@ export const SupabaseService = {
         let query = client.from('test_sessions').select('*').order('id', { ascending: false });
         if (classId) query = query.eq('class_id', Number(classId));
         const { data, error } = await query;
-        if (!error && data) supabaseData = data;
+        if (!error && data) {
+          supabaseData = data.map(s => {
+            const resolvedUserId = s.user_id || s.test_scope?.student_id || null;
+            const resolvedUserName = s.test_scope?.student_name || s.user_name || '';
+            return {
+              ...s,
+              user_id: resolvedUserId,
+              user_name: resolvedUserName
+            };
+          });
+        }
       } catch (err) {
         console.warn("Supabase test_sessions query fallback:", err);
       }
     }
     const local = getLocalData();
-    let localSessions = local.test_sessions || [];
+    let localSessions = (local.test_sessions || []).map(s => ({
+      ...s,
+      user_id: s.user_id || s.test_scope?.student_id || null,
+      user_name: s.test_scope?.student_name || s.user_name || ''
+    }));
     if (classId) {
-      localSessions = localSessions.filter(s => s.class_id === Number(classId));
+      localSessions = localSessions.filter(s => Number(s.class_id) === Number(classId));
     }
     const supabaseIds = new Set(supabaseData.map(s => s.id));
     const mergedLocal = localSessions.filter(s => !supabaseIds.has(s.id));

@@ -607,6 +607,16 @@ window.App = {
     if (!modal) return;
 
     const targetClassId = Number(prefilledClassId || state.selectedClassDetailId || state.selectedClassId || 1);
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
+
+    // Ưu tiên chọn: prefilledLessonId -> state.selectedLessonId đang chọn -> Bài học mới nhất của lớp
+    let effectiveLessonId = prefilledLessonId ? Number(prefilledLessonId) : null;
+    if (!effectiveLessonId && state.selectedLessonId && classLessons.some(l => Number(l.id) === Number(state.selectedLessonId))) {
+      effectiveLessonId = Number(state.selectedLessonId);
+    }
+    if (!effectiveLessonId && classLessons.length > 0) {
+      effectiveLessonId = classLessons[classLessons.length - 1].id;
+    }
 
     const classSelect = document.getElementById('import-ai-target-class');
     if (classSelect) {
@@ -615,7 +625,7 @@ window.App = {
       ).join('');
     }
 
-    this.handleImportClassChange(targetClassId, prefilledLessonId);
+    this.handleImportClassChange(targetClassId, effectiveLessonId);
 
     // Reset file and state
     state.pendingImportRawText = "";
@@ -671,15 +681,28 @@ window.App = {
     const lessonSelect = document.getElementById('import-ai-target-lesson');
     if (!lessonSelect) return;
 
-    const classLessons = state.lessons.filter(l => Number(l.class_id) === Number(classId));
-    const targetLessonId = prefilledLessonId ? Number(prefilledLessonId) : (classLessons[0]?.id || null);
+    const targetClassId = Number(classId);
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
+    let targetLessonId = prefilledLessonId ? Number(prefilledLessonId) : null;
+    if (!targetLessonId && state.selectedLessonId && classLessons.some(l => Number(l.id) === Number(state.selectedLessonId))) {
+      targetLessonId = Number(state.selectedLessonId);
+    }
+    if (!targetLessonId && classLessons.length > 0) {
+      targetLessonId = classLessons[classLessons.length - 1].id;
+    }
 
-    lessonSelect.innerHTML = `
-      <option value="">-- Tự động tạo / Gán Unit mặc định --</option>
-      ${classLessons.map(l => 
-        `<option value="${l.id}" ${Number(l.id) === targetLessonId ? 'selected' : ''}>${l.title}</option>`
-      ).join('')}
-    `;
+    if (classLessons.length > 0) {
+      lessonSelect.innerHTML = `
+        ${classLessons.map(l => 
+          `<option value="${l.id}" ${Number(l.id) === Number(targetLessonId) ? 'selected' : ''}>${l.title}</option>`
+        ).join('')}
+        <option value="">-- Tự động tạo Unit mới --</option>
+      `;
+    } else {
+      lessonSelect.innerHTML = `
+        <option value="">-- Tự động tạo Unit mới --</option>
+      `;
+    }
   },
 
   async handleImportFileSelected(event) {
@@ -906,12 +929,8 @@ window.App = {
     const stUsername = studentUser.username;
 
     // Lấy toàn bộ các phiên học flashcard và bài thi của học sinh này
-    const studySessions = (state.studySessions || []).filter(s => 
-      s.user_id === stId || (stUsername === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
-    );
-    const testSessions = (state.testSessions || []).filter(s => 
-      s.user_id === stId || (stUsername === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
-    );
+    const studySessions = (state.studySessions || []).filter(s => this.isSessionOfStudent(s, studentUser));
+    const testSessions = (state.testSessions || []).filter(s => this.isSessionOfStudent(s, studentUser));
 
     const activeDates = new Set();
 
@@ -1094,11 +1113,40 @@ window.App = {
     }
   },
 
+  /**
+   * Phương thức đối chiếu phiên học/kiểm tra với thông tin học sinh (Khớp ID, test_scope, tên hoặc username)
+   */
+  isSessionOfStudent(s, st) {
+    if (!s || !st) return false;
+    const studentId = String(st.id || '');
+    const studentUsername = String(st.username || '').trim().toLowerCase();
+    const studentFullName = String(st.full_name || st.name || '').trim().toLowerCase();
+
+    // 1. Khớp ID người dùng (user_id hoặc student_id trong test_scope)
+    if (s.user_id && String(s.user_id) === studentId) return true;
+    if (s.test_scope?.student_id && String(s.test_scope.student_id) === studentId) return true;
+    if (studentUsername === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002') return true;
+
+    // 2. Khớp tên đầy đủ (full_name / user_name / test_scope student_name)
+    if (studentFullName) {
+      if (s.user_name && String(s.user_name).trim().toLowerCase() === studentFullName) return true;
+      if (s.test_scope?.student_name && String(s.test_scope.student_name).trim().toLowerCase() === studentFullName) return true;
+    }
+
+    // 3. Khớp Username
+    if (studentUsername) {
+      if (s.user_name && String(s.user_name).trim().toLowerCase() === studentUsername) return true;
+      if (s.test_scope?.student_name && String(s.test_scope.student_name).trim().toLowerCase() === studentUsername) return true;
+    }
+
+    return false;
+  },
+
   exportCurrentStudentExcel(studentId) {
     const student = state.usersList.find(u => u.id === studentId);
     if (!student) return;
-    const studentSessions = state.testSessions.filter(s => s.user_id === student.id || (student.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
-    const activeClass = state.classes.find(c => c.id === student.class_id) || { name: "Lớp 9A" };
+    const studentSessions = state.testSessions.filter(s => this.isSessionOfStudent(s, student));
+    const activeClass = state.classes.find(c => c.id === student.class_id) || { name: "Lớp học" };
     ExcelService.exportStudentDetailedReport(student, studentSessions, activeClass.name);
     showToast(`Đã xuất file Excel báo cáo học tập cho học sinh "${student.full_name}"!`, "success");
   },
@@ -1302,6 +1350,10 @@ window.App = {
     this.render();
   },
 
+  selectTableInputLesson(lessonId) {
+    state.selectedLessonId = lessonId ? Number(lessonId) : null;
+  },
+
   openBatchTableModal(lessonId = null, classId = null) {
     if (state.currentUser?.role === 'student') {
       state.selectedClassId = Number(state.currentUser.class_id) || 1;
@@ -1310,9 +1362,19 @@ window.App = {
     } else if (state.selectedClassDetailId) {
       state.selectedClassId = Number(state.selectedClassDetailId);
     }
+
+    const currentClassId = Number(state.selectedClassId || 1);
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === currentClassId);
+
     if (lessonId) {
       state.selectedLessonId = Number(lessonId);
+    } else if (state.selectedLessonId && classLessons.some(l => Number(l.id) === Number(state.selectedLessonId))) {
+      // Giữ nguyên bài học đang chọn
+    } else if (classLessons.length > 0) {
+      // Mặc định chọn bài học mới nhất của lớp
+      state.selectedLessonId = classLessons[classLessons.length - 1].id;
     }
+
     this.switchTab('table_input');
   },
 
@@ -1775,7 +1837,7 @@ window.App = {
       targetClassId = Number(state.currentUser?.class_id || targetClassId);
     }
 
-    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === Number(targetClassId));
 
     const classSelect = document.getElementById('input-vocab-class');
     if (classSelect) {
@@ -1805,9 +1867,9 @@ window.App = {
     const lessonSelect = document.getElementById('input-vocab-lesson');
     if (lessonSelect) {
       if (classLessons.length > 0) {
-        const activeLessonId = preselectedLessonId || (classLessons.some(l => l.id === state.selectedLessonId) ? state.selectedLessonId : classLessons[0].id);
+        const activeLessonId = preselectedLessonId || (classLessons.some(l => Number(l.id) === Number(state.selectedLessonId)) ? state.selectedLessonId : (classLessons[classLessons.length - 1]?.id || classLessons[0].id));
         lessonSelect.innerHTML = classLessons.map(l => 
-          `<option value="${l.id}" ${l.id === Number(activeLessonId) ? 'selected' : ''}>${l.title}</option>`
+          `<option value="${l.id}" ${Number(l.id) === Number(activeLessonId) ? 'selected' : ''}>${l.title}</option>`
         ).join('');
       } else {
         lessonSelect.innerHTML = `<option value="">(Chưa có Unit - Hệ thống sẽ tự tạo)</option>`;
@@ -2500,11 +2562,18 @@ window.App = {
     const scorePct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
     const targetClassId = Number(state.selectedClassDetailId || state.selectedClassId || state.currentUser?.class_id || 1);
+    const studentName = state.currentUser?.full_name || state.currentUser?.name || '';
+    const studentId = state.currentUser?.id || null;
     const sessionRecord = {
-      user_id: state.currentUser?.id || "00000000-0000-0000-0000-000000000002",
-      student_name: state.currentUser?.name || state.currentUser?.full_name || '',
+      user_id: studentId,
+      student_name: studentName,
       class_id: targetClassId,
       session_type: 'multi_format',
+      test_scope: {
+        lesson_id: state.selectedLessonId ? Number(state.selectedLessonId) : null,
+        student_id: studentId,
+        student_name: studentName
+      },
       total_questions: total,
       correct_count: correct,
       wrong_count: wrong,
@@ -3003,8 +3072,8 @@ window.App = {
     const activeClass = state.classes.find(c => c.id === targetClassId) || visibleClasses[0] || state.classes[0] || { name: "Lớp học", class_code: "QS9A" };
 
     // Compute personal learning time & test stats for this user
-    const userStudySessions = (state.studySessions || []).filter(s => s.user_id === user.id || (user.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
-    const userTestSessions = (state.testSessions || []).filter(s => s.user_id === user.id || (user.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+    const userStudySessions = (state.studySessions || []).filter(s => this.isSessionOfStudent(s, user));
+    const userTestSessions = (state.testSessions || []).filter(s => this.isSessionOfStudent(s, user));
 
     const flashcardSeconds = userStudySessions.filter(s => s.activity_type === 'flashcard').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
     const quizSeconds = userTestSessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
@@ -3424,7 +3493,16 @@ window.App = {
     const isAssistant = state.currentUser?.role === 'assistant_teacher';
     const targetClassId = (isStudent || isAssistant) ? Number(state.currentUser.class_id || 1) : Number(state.selectedClassId);
     const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
-    const classLessons = state.lessons.filter(l => l.class_id === targetClassId);
+    const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
+
+    // Nếu chưa chọn bài học hoặc bài học đã chọn không thuộc lớp này, mặc định chọn bài học mới nhất của lớp
+    if (classLessons.length > 0) {
+      if (!state.selectedLessonId || !classLessons.some(l => Number(l.id) === Number(state.selectedLessonId))) {
+        state.selectedLessonId = classLessons[classLessons.length - 1].id;
+      }
+    } else {
+      state.selectedLessonId = null;
+    }
 
     return `
       <div class="flex-1 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
@@ -3460,8 +3538,8 @@ window.App = {
             </div>
             <div>
               <label class="block text-xs font-bold text-outline uppercase mb-1">Bài học đích (*)</label>
-              <select id="table-input-lesson" class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-sm font-semibold focus:outline-none">
-                ${classLessons.length > 0 ? classLessons.map(l => `<option value="${l.id}" ${l.id === state.selectedLessonId ? 'selected' : ''}>${l.title}</option>`).join('') : '<option value="1">Unit mặc định</option>'}
+              <select id="table-input-lesson" onchange="App.selectTableInputLesson(this.value)" class="py-2.5 px-3.5 bg-surface-container-low border border-outline-variant/40 rounded-xl text-sm font-semibold focus:outline-none">
+                ${classLessons.length > 0 ? classLessons.map(l => `<option value="${l.id}" ${Number(l.id) === Number(state.selectedLessonId) ? 'selected' : ''}>${l.title}</option>`).join('') : '<option value="">(Chưa có Unit - Hệ thống sẽ tự tạo)</option>'}
               </select>
             </div>
           </div>
@@ -3727,7 +3805,7 @@ window.App = {
 
     const classLessons = state.lessons.filter(l => Number(l.class_id) === targetClassId);
     const classVocab = state.vocabulary.filter(v => Number(v.class_id) === targetClassId);
-    const classStudents = state.usersList.filter(u => u.role === 'student' && Number(u.class_id) === targetClassId);
+    const classStudents = state.usersList.filter(u => u.role === 'student' && (Number(u.class_id) === targetClassId || (Array.isArray(u.enrolled_classes) && u.enrolled_classes.map(Number).includes(targetClassId))));
     const classStudySessions = (state.studySessions || []).filter(s => Number(s.class_id) === targetClassId);
     const classTestSessions = (state.testSessions || []).filter(s => Number(s.class_id) === targetClassId);
 
@@ -3864,8 +3942,11 @@ window.App = {
                       <h4 class="font-headline-md text-base font-bold text-on-surface mb-3">${l.title}</h4>
                     </div>
                     <div class="flex items-center gap-1.5 pt-3 border-t border-outline-variant/30 flex-wrap">
-                      <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm từ vào Unit này">
+                      <button onclick="App.openCreateVocabularyModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Thêm 1 từ vào Unit này">
                         <span class="material-symbols-outlined text-sm">add</span>
+                      </button>
+                      <button onclick="App.openBatchTableModal(${l.id}, ${targetClassId})" class="p-2 bg-surface-container text-primary rounded-lg font-bold text-xs hover:bg-primary hover:text-on-primary transition-colors" title="Nhập bảng nhiều từ vào Unit này">
+                        <span class="material-symbols-outlined text-sm">table_rows</span>
                       </button>
                       <button onclick="App.startLessonFlashcard(${l.id})" class="flex-1 bg-surface-container-lowest text-primary py-2 rounded-lg font-bold text-xs border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors text-center flex items-center justify-center gap-1">
                         <span class="material-symbols-outlined text-sm">style</span> Luyện thẻ
@@ -4091,8 +4172,8 @@ window.App = {
 
                       return filteredStudents.map((u, idx) => {
                         const studentStreak = this.getStudentRealtimeStreak(u);
-                        const userFlashcards = classStudySessions.filter(s => s.user_id === u.id || s.user_name === u.full_name);
-                        const userQuizzes = classTestSessions.filter(s => s.user_id === u.id || s.user_name === u.full_name);
+                        const userFlashcards = classStudySessions.filter(s => this.isSessionOfStudent(s, u));
+                        const userQuizzes = classTestSessions.filter(s => this.isSessionOfStudent(s, u));
                         const fcSecs = userFlashcards.filter(s => s.activity_type === 'flashcard').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
                         const quizSecs = userQuizzes.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
                         const totalMins = Math.max(0, Math.round((fcSecs + quizSecs) / 60));
@@ -4242,8 +4323,8 @@ window.App = {
                   </thead>
                   <tbody class="divide-y divide-outline-variant/20 bg-surface-container-lowest">
                     ${classStudents.map((st, idx) => {
-                      const stStudy = classStudySessions.filter(s => s.user_id === st.id || (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
-                      const stTests = classTestSessions.filter(s => s.user_id === st.id || (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+                      const stStudy = classStudySessions.filter(s => this.isSessionOfStudent(s, st));
+                      const stTests = classTestSessions.filter(s => this.isSessionOfStudent(s, st));
 
                       const fcSecs = stStudy.filter(s => s.activity_type === 'flashcard').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
                       const quizSecs = stTests.reduce((acc, s) => acc + (s.duration_seconds || 0), 0) + stStudy.filter(s => s.activity_type === 'quiz').reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
@@ -5122,18 +5203,12 @@ window.App = {
     const activeClass = state.classes.find(c => c.id === targetClassId) || state.classes[0] || { name: "Lớp học" };
     
     // Students in this class
-    const classStudents = state.usersList.filter(u => u.role === 'student' && u.class_id === targetClassId);
+    const classStudents = state.usersList.filter(u => u.role === 'student' && (Number(u.class_id) === targetClassId || (Array.isArray(u.enrolled_classes) && u.enrolled_classes.map(Number).includes(targetClassId))));
     
     // Compute student metrics
     const studentMetrics = classStudents.map(st => {
-      const sessions = state.testSessions.filter(s => 
-        s.user_id === st.id || 
-        (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
-      );
-      const studySessions = (state.studySessions || []).filter(s =>
-        s.user_id === st.id || 
-        (st.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002')
-      );
+      const sessions = state.testSessions.filter(s => this.isSessionOfStudent(s, st));
+      const studySessions = (state.studySessions || []).filter(s => this.isSessionOfStudent(s, st));
       const flashcardSessions = studySessions.filter(s => s.activity_type === 'flashcard');
       const totalTests = sessions.length;
       const avgScore = totalTests > 0 ? Math.round(sessions.reduce((acc, s) => acc + (s.score_percentage || 0), 0) / totalTests) : 0;
@@ -5196,8 +5271,8 @@ window.App = {
       if (!selectedMetric) {
         const foundUser = state.usersList.find(u => u.id === effectiveSelectedStudentId);
         if (foundUser) {
-          const userTests = state.testSessions.filter(s => s.user_id === foundUser.id || (foundUser.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
-          const userStudy = (state.studySessions || []).filter(s => s.user_id === foundUser.id || (foundUser.username === 'an_nguyen' && s.user_id === '00000000-0000-0000-0000-000000000002'));
+          const userTests = state.testSessions.filter(s => this.isSessionOfStudent(s, foundUser));
+          const userStudy = (state.studySessions || []).filter(s => this.isSessionOfStudent(s, foundUser));
           selectedMetric = {
             student: foundUser,
             sessions: userTests,
