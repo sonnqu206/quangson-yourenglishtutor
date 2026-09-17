@@ -1624,56 +1624,68 @@ window.App = {
     const totalCols = isHUST ? 4 : 2;
 
     if (e.key === 'Enter') {
+      // Trong ô textarea nhiều dòng (col 2, 3), cho phép Enter xuống dòng tự nhiên trừ khi nhấn Ctrl/Cmd + Enter
+      const isTextarea = e.target.tagName === 'TEXTAREA';
+      if (isTextarea && !e.ctrlKey && !e.metaKey) {
+        return;
+      }
       e.preventDefault();
       if (rowIndex === totalRows - 1) {
         // Tự động thêm dòng mới khi nhấn Enter ở dòng cuối cùng
         this.addBatchTableRow(false);
         setTimeout(() => {
-          const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+          const nextInput = document.querySelector(`[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
           if (nextInput) {
             nextInput.focus();
-            nextInput.select();
+            if (nextInput.select) nextInput.select();
           }
         }, 30);
       } else {
-        const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+        const nextInput = document.querySelector(`[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
         if (nextInput) {
           nextInput.focus();
-          nextInput.select();
+          if (nextInput.select) nextInput.select();
         }
       }
       return;
     }
 
     if (e.key === 'ArrowDown') {
+      const el = e.target;
+      if (el.tagName === 'TEXTAREA' && el.selectionStart !== el.value.length) {
+        return;
+      }
       e.preventDefault();
       if (rowIndex === totalRows - 1) {
-        // Tự động tạo dòng mới khi mũi tên xuống ở dòng cuối
         this.addBatchTableRow(false);
         setTimeout(() => {
-          const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+          const nextInput = document.querySelector(`[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
           if (nextInput) {
             nextInput.focus();
-            nextInput.select();
+            if (nextInput.select) nextInput.select();
           }
         }, 30);
       } else {
-        const nextInput = document.querySelector(`input[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
+        const nextInput = document.querySelector(`[data-row-idx="${rowIndex + 1}"][data-col="${colIndex}"]`);
         if (nextInput) {
           nextInput.focus();
-          nextInput.select();
+          if (nextInput.select) nextInput.select();
         }
       }
       return;
     }
 
     if (e.key === 'ArrowUp') {
+      const el = e.target;
+      if (el.tagName === 'TEXTAREA' && el.selectionStart !== 0) {
+        return;
+      }
       if (rowIndex > 0) {
         e.preventDefault();
-        const prevInput = document.querySelector(`input[data-row-idx="${rowIndex - 1}"][data-col="${colIndex}"]`);
+        const prevInput = document.querySelector(`[data-row-idx="${rowIndex - 1}"][data-col="${colIndex}"]`);
         if (prevInput) {
           prevInput.focus();
-          prevInput.select();
+          if (prevInput.select) prevInput.select();
         }
       }
       return;
@@ -1683,10 +1695,10 @@ window.App = {
       const input = e.target;
       if (input.selectionStart === input.value.length && colIndex < totalCols - 1) {
         e.preventDefault();
-        const nextInput = document.querySelector(`input[data-row-idx="${rowIndex}"][data-col="${colIndex + 1}"]`);
+        const nextInput = document.querySelector(`[data-row-idx="${rowIndex}"][data-col="${colIndex + 1}"]`);
         if (nextInput) {
           nextInput.focus();
-          nextInput.select();
+          if (nextInput.select) nextInput.select();
         }
       }
       return;
@@ -1696,10 +1708,10 @@ window.App = {
       const input = e.target;
       if (input.selectionStart === 0 && colIndex > 0) {
         e.preventDefault();
-        const prevInput = document.querySelector(`input[data-row-idx="${rowIndex}"][data-col="${colIndex - 1}"]`);
+        const prevInput = document.querySelector(`[data-row-idx="${rowIndex}"][data-col="${colIndex - 1}"]`);
         if (prevInput) {
           prevInput.focus();
-          prevInput.select();
+          if (prevInput.select) prevInput.select();
         }
       }
       return;
@@ -1764,61 +1776,193 @@ window.App = {
     }
   },
 
+  // Phân tích văn bản Clipboard chuẩn RFC 4180 (xử lý chính xác ô có xuống dòng trong ngoặc kép từ Google Sheets/Excel)
+  parseClipboardTextToRows(text) {
+    if (!text) return [];
+    
+    // Tự động phát hiện dấu phân cách (Tab hay Comma)
+    let delimiter = '\t';
+    if (!text.includes('\t') && text.includes(',')) {
+      delimiter = ',';
+    }
+
+    const rows = [];
+    let currentRow = [];
+    let currentField = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (inQuotes) {
+        if (char === '"' && nextChar === '"') {
+          currentField += '"';
+          i++; // Bỏ qua dấu ngoặc kép được escape
+        } else if (char === '"') {
+          inQuotes = false;
+        } else {
+          currentField += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === delimiter) {
+          currentRow.push(currentField);
+          currentField = '';
+        } else if (char === '\r') {
+          // Bỏ qua CR
+        } else if (char === '\n') {
+          currentRow.push(currentField);
+          rows.push(currentRow);
+          currentRow = [];
+          currentField = '';
+        } else {
+          currentField += char;
+        }
+      }
+    }
+
+    if (currentField !== '' || currentRow.length > 0) {
+      currentRow.push(currentField);
+      rows.push(currentRow);
+    }
+
+    return rows;
+  },
+
+  // Ánh xạ mảng cột thành đối tượng từ vựng thông minh (hỗ trợ 2, 3, 4, 5 [có STT], 6 [có Unit + STT] cột)
+  mapRawCellsToVocabRow(cells, rowIndex = 0, isHUST = true) {
+    if (!cells || !Array.isArray(cells)) return null;
+
+    // Làm sạch và bỏ dấu ngoặc kép bao quanh nếu có
+    const cleaned = cells.map(c => {
+      let val = String(c !== undefined && c !== null ? c : '').trim();
+      if (val.startsWith('"') && val.endsWith('"') && val.length >= 2) {
+        val = val.slice(1, -1).trim();
+      }
+      return val;
+    });
+
+    if (cleaned.length === 0 || cleaned.every(c => c === '')) return null;
+
+    // Bỏ qua dòng tiêu đề nếu người dùng copy cả header từ Sheets/Excel
+    const col0Lower = cleaned[0].toLowerCase();
+    const col1Lower = (cleaned[1] || '').toLowerCase();
+    if (rowIndex === 0) {
+      const headerKeywords = ['stt', 'unit', 'term', 'terms', 'từ vựng', 'word', '#', 'tiếng việt', 'định nghĩa'];
+      const isHeader = headerKeywords.some(k => col0Lower.includes(k) || col1Lower.includes(k));
+      if (isHeader && !/^\d+$/.test(cleaned[0])) {
+        return null;
+      }
+    }
+
+    let word = '';
+    let meaning = '';
+    let def_en = '';
+    let def_vn = '';
+
+    if (cleaned.length >= 6) {
+      // Dạng 6 cột: Unit (0), STT (1), Term (2), Tiếng Việt (3), Def EN (4), Def VN (5)
+      word = cleaned[2] || '';
+      meaning = cleaned[3] || '';
+      def_en = cleaned[4] || '';
+      def_vn = cleaned[5] || '';
+    } else if (cleaned.length === 5) {
+      // Dạng 5 cột: Kiểm tra nếu cột đầu là STT (số)
+      const isFirstColNum = /^\d+$/.test(cleaned[0]) || cleaned[0].length <= 3;
+      if (isFirstColNum) {
+        // STT (0), Term (1), Tiếng Việt (2), Def EN (3), Def VN (4)
+        word = cleaned[1] || '';
+        meaning = cleaned[2] || '';
+        def_en = cleaned[3] || '';
+        def_vn = cleaned[4] || '';
+      } else {
+        word = cleaned[0] || '';
+        meaning = cleaned[1] || '';
+        def_en = cleaned[2] || '';
+        def_vn = cleaned[3] || '';
+      }
+    } else if (cleaned.length === 4) {
+      // Dạng chuẩn 4 cột: Term (0), Tiếng Việt (1), Def EN (2), Def VN (3)
+      word = cleaned[0] || '';
+      meaning = cleaned[1] || '';
+      def_en = cleaned[2] || '';
+      def_vn = cleaned[3] || '';
+    } else if (cleaned.length === 3) {
+      word = cleaned[0] || '';
+      meaning = cleaned[1] || '';
+      def_en = cleaned[2] || '';
+    } else if (cleaned.length === 2) {
+      word = cleaned[0] || '';
+      meaning = cleaned[1] || '';
+    } else if (cleaned.length === 1) {
+      const line = cleaned[0];
+      if (line.includes(' | ')) {
+        const parts = line.split(' | ');
+        word = parts[0]?.trim() || '';
+        meaning = parts[1]?.trim() || '';
+        def_en = parts[2]?.trim() || '';
+        def_vn = parts[3]?.trim() || '';
+      } else if (line.includes(' - ')) {
+        const parts = line.split(' - ');
+        word = parts[0]?.trim() || '';
+        meaning = parts[1]?.trim() || '';
+      } else if (line.includes(':')) {
+        const parts = line.split(':');
+        word = parts[0]?.trim() || '';
+        meaning = parts.slice(1).join(':').trim() || '';
+      } else {
+        word = line.trim();
+      }
+    }
+
+    // Làm sạch dấu ngoặc kép thừa còn sót
+    const stripQuotes = (str) => {
+      let s = (str || '').trim();
+      if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
+        s = s.slice(1, -1).trim();
+      }
+      return s;
+    };
+
+    word = stripQuotes(word);
+    meaning = stripQuotes(meaning);
+    def_en = stripQuotes(def_en);
+    def_vn = stripQuotes(def_vn);
+
+    if (!word && !meaning) return null;
+
+    return {
+      word,
+      meaning,
+      definition_en: def_en,
+      definition_vn: def_vn,
+      example: def_en,
+      ipa: def_vn
+    };
+  },
+
   parseAndApplyPastedText(text) {
     if (!text || !text.trim()) {
       showToast("Dữ liệu dán đang trống!", "error");
       return;
     }
 
-    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    const isStudent = state.currentUser?.role === 'student';
+    const targetClassId = isStudent 
+      ? Number(state.currentUser.class_id || 1) 
+      : (Number(document.getElementById('table-input-class')?.value) || Number(state.selectedClassDetailId) || Number(state.selectedClassId) || 1);
+    const isHUST = this.isHUSTClass(targetClassId);
+
+    const rawRows = this.parseClipboardTextToRows(text);
     const parsedRows = [];
 
-    lines.forEach((line, index) => {
-      let word = "";
-      let meaning = "";
-      let def_en = "";
-      let def_vn = "";
-
-      if (line.includes("\t")) {
-        const parts = line.split("\t");
-        word = parts[0]?.trim() || "";
-        meaning = parts[1]?.trim() || "";
-        def_en = parts[2]?.trim() || "";
-        def_vn = parts[3]?.trim() || "";
-      } else if (line.includes(" | ")) {
-        const parts = line.split(" | ");
-        word = parts[0]?.trim() || "";
-        meaning = parts[1]?.trim() || "";
-        def_en = parts[2]?.trim() || "";
-        def_vn = parts[3]?.trim() || "";
-      } else if (line.includes(" - ")) {
-        const parts = line.split(" - ");
-        word = parts[0]?.trim() || "";
-        meaning = parts[1]?.trim() || "";
-      } else if (line.includes(":")) {
-        const parts = line.split(":");
-        word = parts[0]?.trim() || "";
-        meaning = parts.slice(1).join(":").trim() || "";
-      } else {
-        word = line.trim();
-      }
-
-      // Bỏ qua dòng tiêu đề nếu người dùng copy cả header
-      const lowerW = word.toLowerCase();
-      if (index === 0 && (lowerW === 'terms' || lowerW === 'term' || lowerW === 'từ vựng' || lowerW === 'stt' || lowerW === 'word')) {
-        return;
-      }
-
-      if (word) {
-        parsedRows.push({
-          id: index + 1,
-          word: word,
-          meaning: meaning,
-          definition_en: def_en,
-          definition_vn: def_vn,
-          example: def_en,
-          ipa: def_vn
-        });
+    rawRows.forEach((rowCells, idx) => {
+      const mapped = this.mapRawCellsToVocabRow(rowCells, idx, isHUST);
+      if (mapped) {
+        mapped.id = parsedRows.length + 1;
+        parsedRows.push(mapped);
       }
     });
 
@@ -1853,30 +1997,19 @@ window.App = {
         return;
       }
 
+      const isStudent = state.currentUser?.role === 'student';
+      const targetClassId = isStudent 
+        ? Number(state.currentUser.class_id || 1) 
+        : (Number(document.getElementById('table-input-class')?.value) || Number(state.selectedClassDetailId) || Number(state.selectedClassId) || 1);
+      const isHUST = this.isHUSTClass(targetClassId);
+
       const parsedRows = [];
       rawRows.forEach((row, idx) => {
         if (!row || !Array.isArray(row) || row.length === 0) return;
-        const col0 = String(row[0] !== undefined && row[0] !== null ? row[0] : '').trim();
-        const col1 = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
-        const col2 = String(row[2] !== undefined && row[2] !== null ? row[2] : '').trim();
-        const col3 = String(row[3] !== undefined && row[3] !== null ? row[3] : '').trim();
-
-        // Bỏ qua dòng tiêu đề
-        const lower0 = col0.toLowerCase();
-        if (idx === 0 && (lower0.includes('term') || lower0.includes('stt') || lower0.includes('từ vựng') || lower0.includes('word') || lower0 === '#')) {
-          return;
-        }
-
-        if (col0 || col1) {
-          parsedRows.push({
-            id: parsedRows.length + 1,
-            word: col0,
-            meaning: col1,
-            definition_en: col2,
-            definition_vn: col3,
-            example: col2,
-            ipa: col3
-          });
+        const mapped = this.mapRawCellsToVocabRow(row, idx, isHUST);
+        if (mapped) {
+          mapped.id = parsedRows.length + 1;
+          parsedRows.push(mapped);
         }
       });
 
@@ -4382,30 +4515,28 @@ window.App = {
                         />
                       </td>
                       <td class="p-2">
-                        <input 
-                          type="text" 
+                        <textarea 
                           data-row-idx="${idx}"
                           data-col="2"
-                          value="${(row.definition_en || row.example || '').replace(/"/g, '&quot;')}"
+                          rows="2"
                           placeholder="Definition bằng Tiếng Anh..."
                           oninput="App.updateBatchTableCell(${row.id}, 'definition_en', this.value)"
                           onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 2)"
                           onpaste="App.handleTableInputPaste(event, ${idx})"
-                          class="w-full px-3 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all"
-                        />
+                          class="w-full px-3 py-2 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:border-primary focus:bg-white transition-all resize-y leading-relaxed"
+                        >${(row.definition_en || row.example || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                       </td>
                       <td class="p-2">
-                        <input 
-                          type="text" 
+                        <textarea 
                           data-row-idx="${idx}"
                           data-col="3"
-                          value="${(row.definition_vn || row.ipa || '').replace(/"/g, '&quot;')}"
+                          rows="2"
                           placeholder="Definition bằng Tiếng Việt..."
                           oninput="App.updateBatchTableCell(${row.id}, 'definition_vn', this.value)"
                           onkeydown="App.handleBatchTableKeyNav(event, ${idx}, 3)"
                           onpaste="App.handleTableInputPaste(event, ${idx})"
-                          class="w-full px-3 py-2.5 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm text-on-surface-variant focus:outline-none focus:border-primary focus:bg-white transition-all"
-                        />
+                          class="w-full px-3 py-2 bg-surface-container-low/60 border border-outline-variant/40 rounded-xl text-xs sm:text-sm text-on-surface-variant focus:outline-none focus:border-primary focus:bg-white transition-all resize-y leading-relaxed"
+                        >${(row.definition_vn || row.ipa || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                       </td>
                       <td class="p-2 text-center">
                         <button onclick="App.removeBatchTableRow(${row.id})" class="p-2 text-outline hover:text-error rounded-xl hover:bg-error-container/20 transition-colors" title="Xóa dòng này">
